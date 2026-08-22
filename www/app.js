@@ -187,6 +187,8 @@ function saveProtocolEditor() {
 let tickHandle = null;
 let pendingFeedback = { rpe: null, feeling: null };
 let lastCompletedSessionId = null;
+let pendingCustomFeedback = { rpe: null, feeling: null };
+let lastCompletedCustomSessionId = null;
 let currentPeriod = 'all';
 let currentMetric = 'rounds';
 let wakeLockRef = null;
@@ -370,7 +372,8 @@ function renderHomeCustomShortcut() {
     return;
   }
   const recent = list.slice().sort((a, b) => b.updatedAt - a.updatedAt)[0];
-  const detail = recent.exercises.length + ' ท่า · ' + recent.sets + ' เซ็ต';
+  const totalSets = recent.exercises.reduce((sum, ex) => sum + (ex.sets || 1), 0);
+  const detail = recent.exercises.length + ' ท่า · ' + totalSets + ' เซ็ตรวม';
   card.innerHTML = `<div class="history-item" onclick="startCustomWorkoutPlayer('${recent.id}')">
     <div>
       <div class="date">${escapeHtml(recent.name)}</div>
@@ -1672,11 +1675,35 @@ const KEY_CUSTOM_SESSIONS = 'custom_workout_sessions';  // completed workout res
 /* ---- Workout definitions (the "recipe" the user builds) ---- */
 
 function loadCustomWorkouts() {
+  let saved;
   try {
-    const saved = JSON.parse(localStorage.getItem(KEY_CUSTOM_WORKOUTS));
-    if (Array.isArray(saved)) return saved;
-  } catch (e) {}
-  return [];
+    saved = JSON.parse(localStorage.getItem(KEY_CUSTOM_WORKOUTS));
+    if (!Array.isArray(saved)) return [];
+  } catch (e) { return []; }
+
+  /* Schema v1 -> v2 migration: sets/restBetweenSetsSec used to live on the
+     whole workout (a "circuit" repeated N times, same rest for every
+     exercise). v2 moves both onto each exercise instead, so every exercise
+     can have its own set count and its own rest between sets. This runs
+     once per legacy workout and persists the migrated shape immediately,
+     so it's a no-op on every later load. */
+  let migrated = false;
+  saved = saved.map(w => {
+    const needsMigration = w && Array.isArray(w.exercises) &&
+      w.exercises.some(ex => ex.sets == null) && (w.sets != null || w.restBetweenSetsSec != null);
+    if (!needsMigration) return w;
+    migrated = true;
+    const legacySets = Math.max(1, parseInt(w.sets, 10) || 1);
+    const legacyRest = Math.max(0, parseInt(w.restBetweenSetsSec, 10) || 0);
+    return Object.assign({}, w, {
+      exercises: w.exercises.map(ex => Object.assign({}, ex, {
+        sets: ex.sets != null ? ex.sets : legacySets,
+        restBetweenSetsSec: ex.restBetweenSetsSec != null ? ex.restBetweenSetsSec : legacyRest
+      }))
+    });
+  });
+  if (migrated) saveCustomWorkouts(saved);
+  return saved;
 }
 
 function saveCustomWorkouts(list) {
@@ -1695,10 +1722,12 @@ function makeCustomExercise(overrides) {
   return Object.assign({
     order: 0,
     name: '',
-    type: 'reps',        // 'reps' | 'time'
-    reps: 10,             // used when type === 'reps'
-    durationSec: 30,      // used when type === 'time'
-    restAfterSec: 15
+    type: 'reps',              // 'reps' | 'time'
+    reps: 10,                  // used when type === 'reps'
+    durationSec: 30,           // used when type === 'time'
+    sets: 3,                   // how many sets of THIS exercise before moving on
+    restBetweenSetsSec: 45,    // rest between sets of THIS exercise
+    restAfterSec: 15           // rest after the LAST set of this exercise, before the next exercise
   }, overrides || {});
 }
 
@@ -1717,9 +1746,7 @@ function saveCustomWorkout(workout) {
     updatedAt: Date.now(),
     exercises: Array.isArray(workout.exercises)
       ? workout.exercises.map((ex, i) => makeCustomExercise(Object.assign({}, ex, { order: i })))
-      : [],
-    sets: Math.max(1, parseInt(workout.sets, 10) || 1),
-    restBetweenSetsSec: Math.max(0, parseInt(workout.restBetweenSetsSec, 10) || 0)
+      : []
   };
   const idx = list.findIndex(w => w.id === clean.id);
   if (idx >= 0) list[idx] = clean; else list.push(clean);
@@ -1758,8 +1785,12 @@ function recordCustomWorkoutSession(session) {
     completedAt: Date.now(),
     totalDurationSec: session.totalDurationSec || 0,
     setsCompleted: session.setsCompleted || 0,
-    // e.g. [{ name:'Push-up', setNumber:1, repsOrSecDone:15 }, ...]
-    exerciseLog: Array.isArray(session.exerciseLog) ? session.exerciseLog : []
+    // e.g. [{ name:'Push-up', exIndex:0, setNumber:1, repsOrSecDone:15, type:'reps' }, ...]
+    exerciseLog: Array.isArray(session.exerciseLog) ? session.exerciseLog : [],
+    isPR: !!session.isPR,
+    rpe: null,
+    feeling: null,
+    note: ''
   };
   list.push(clean);
   saveCustomWorkoutSessions(list);
@@ -1785,7 +1816,8 @@ function renderCustomList() {
   }
   wrap.innerHTML = list.map(w => {
     const exCount = w.exercises.length;
-    const detail = exCount + ' ท่า · ' + w.sets + ' เซ็ต' + (w.restBetweenSetsSec ? ' · พัก ' + w.restBetweenSetsSec + 'วิ' : '');
+    const totalSets = w.exercises.reduce((sum, ex) => sum + (ex.sets || 1), 0);
+    const detail = exCount + ' ท่า · ' + totalSets + ' เซ็ตรวม';
     return `<div class="history-item protocol-item">
       <div onclick="openCustomEditor('${w.id}')" style="flex:1;min-width:0;cursor:pointer;">
         <div class="date">${escapeHtml(w.name)}</div>
@@ -1820,8 +1852,6 @@ function duplicateCustomWorkout(id) {
   saveCustomWorkout({
     id: null,
     name: original.name + ' (Copy)',
-    sets: original.sets,
-    restBetweenSetsSec: original.restBetweenSetsSec,
     exercises: original.exercises.map(ex => Object.assign({}, ex))
   });
   renderCustomList();
@@ -1852,22 +1882,17 @@ function blankCustomWorkoutDraft() {
   return {
     id: null,
     name: '',
-    sets: 1,
-    restBetweenSetsSec: 30,
     exercises: [makeCustomExercise({ name: '' })]
   };
 }
 function openCustomEditor(id) {
   const existing = id ? getCustomWorkout(id) : null;
   customEditorDraft = existing
-    ? { id: existing.id, name: existing.name, sets: existing.sets, restBetweenSetsSec: existing.restBetweenSetsSec,
-        exercises: existing.exercises.map(ex => Object.assign({}, ex)) }
+    ? { id: existing.id, name: existing.name, exercises: existing.exercises.map(ex => Object.assign({}, ex)) }
     : blankCustomWorkoutDraft();
 
   document.getElementById('customEditorTitle').textContent = existing ? 'แก้ไข WORKOUT' : 'สร้าง WORKOUT';
   document.getElementById('customNameInput').value = customEditorDraft.name;
-  document.getElementById('customSetsInput').value = customEditorDraft.sets;
-  document.getElementById('customRestInput').value = customEditorDraft.restBetweenSetsSec;
   renderCustomExerciseList();
   go('customeditor');
 }
@@ -1911,10 +1936,12 @@ function renderCustomExerciseList() {
         <div class="period-pill${isReps ? '' : ' sel'}" onclick="setCustomExerciseType(${i}, 'time')">TIME</div>
       </div>
       ${isReps
-        ? `<div class="field-row"><label>จำนวนครั้ง</label><input type="number" min="1" max="999" value="${ex.reps}" oninput="updateCustomExerciseField(${i}, 'reps', this.value)"></div>`
-        : `<div class="field-row"><label>ระยะเวลา (วินาที)</label><input type="number" min="1" max="3600" value="${ex.durationSec}" oninput="updateCustomExerciseField(${i}, 'durationSec', this.value)"></div>`
+        ? `<div class="field-row"><label>จำนวนครั้ง/เซ็ต</label><input type="number" min="1" max="999" value="${ex.reps}" oninput="updateCustomExerciseField(${i}, 'reps', this.value)"></div>`
+        : `<div class="field-row"><label>ระยะเวลา/เซ็ต (วินาที)</label><input type="number" min="1" max="3600" value="${ex.durationSec}" oninput="updateCustomExerciseField(${i}, 'durationSec', this.value)"></div>`
       }
-      <div class="field-row"><label>พักหลังท่านี้ (วินาที)</label><input type="number" min="0" max="600" value="${ex.restAfterSec}" oninput="updateCustomExerciseField(${i}, 'restAfterSec', this.value)"></div>
+      <div class="field-row"><label>จำนวนเซ็ต</label><input type="number" min="1" max="20" value="${ex.sets}" oninput="updateCustomExerciseField(${i}, 'sets', this.value)"></div>
+      ${ex.sets > 1 ? `<div class="field-row"><label>พักระหว่างเซ็ต (วินาที)</label><input type="number" min="0" max="600" value="${ex.restBetweenSetsSec}" oninput="updateCustomExerciseField(${i}, 'restBetweenSetsSec', this.value)"></div>` : ''}
+      <div class="field-row"><label>พักก่อนไปท่าถัดไป (วินาที)</label><input type="number" min="0" max="600" value="${ex.restAfterSec}" oninput="updateCustomExerciseField(${i}, 'restAfterSec', this.value)"></div>
     </div>`;
   }).join('');
 }
@@ -2013,6 +2040,7 @@ function setCustomExerciseType(idx, type) {
 function updateCustomExerciseField(idx, field, value) {
   if (!customEditorDraft) return;
   customEditorDraft.exercises[idx][field] = (field === 'name') ? value : (parseInt(value, 10) || 0);
+  if (field === 'sets') renderCustomExerciseList(); // toggles the "rest between sets" field's visibility
 }
 
 function saveCustomEditorForm() {
@@ -2044,9 +2072,9 @@ function startCustomWorkoutPlayer(id) {
   if (!workout || !workout.exercises.length) { showToast('Workout นี้ยังไม่มีท่า'); return; }
   customPlayer = {
     workout,
-    setIndex: 0,
     exIndex: 0,
-    phase: 'exercise',           // 'exercise' | 'restEx' | 'restSet'
+    setIndex: 0,                 // set index WITHIN the current exercise
+    phase: 'exercise',           // 'exercise' | 'restSet' | 'restEx'
     startedAt: Date.now(),
     exerciseLog: [],
     currentValue: 0,
@@ -2061,11 +2089,11 @@ function startCustomWorkoutPlayer(id) {
 function currentCustomExercise() {
   return customPlayer.workout.exercises[customPlayer.exIndex];
 }
-function isLastExerciseInSet() {
-  return customPlayer.exIndex >= customPlayer.workout.exercises.length - 1;
+function isLastSetOfCurrentExercise() {
+  return customPlayer.setIndex >= currentCustomExercise().sets - 1;
 }
-function isLastSet() {
-  return customPlayer.setIndex >= customPlayer.workout.sets - 1;
+function isLastCustomExercise() {
+  return customPlayer.exIndex >= customPlayer.workout.exercises.length - 1;
 }
 
 function clearCustomPlayerTimer() {
@@ -2131,9 +2159,8 @@ function beginCustomPlayerPhase() {
       customPlayer.currentValue = ex.reps;
     }
   } else {
-    const restSec = customPlayer.phase === 'restEx'
-      ? currentCustomExercise().restAfterSec
-      : customPlayer.workout.restBetweenSetsSec;
+    const exNow = currentCustomExercise();
+    const restSec = customPlayer.phase === 'restSet' ? exNow.restBetweenSetsSec : exNow.restAfterSec;
     if (restSec > 0) {
       startCustomPlayerCountdown(restSec, onCustomRestDone);
     } else {
@@ -2146,7 +2173,7 @@ function beginCustomPlayerPhase() {
 
 function logCurrentCustomExercise(value) {
   const ex = currentCustomExercise();
-  customPlayer.exerciseLog.push({ name: ex.name, setNumber: customPlayer.setIndex + 1, repsOrSecDone: value, type: ex.type || 'reps' });
+  customPlayer.exerciseLog.push({ name: ex.name, exIndex: customPlayer.exIndex, setNumber: customPlayer.setIndex + 1, repsOrSecDone: value, type: ex.type || 'reps' });
 }
 
 function onCustomExerciseTimeUp() {
@@ -2167,7 +2194,7 @@ function skipPlayerStep() {
     clearCustomPlayerTimer();
     logCurrentCustomExercise(elapsedSec);
     advanceAfterCustomExercise();
-  } else if (customPlayer.phase === 'restEx' || customPlayer.phase === 'restSet') {
+  } else if (customPlayer.phase === 'restSet' || customPlayer.phase === 'restEx') {
     clearCustomPlayerTimer();
     onCustomRestDone();
   }
@@ -2178,9 +2205,20 @@ function adjustPlayerReps(delta) {
   renderCustomPlayer();
 }
 
+/* One "set" of the current exercise just finished. Decide what's next:
+   another set of the SAME exercise (with restBetweenSetsSec in between),
+   or — once its last set is done — restAfterSec before moving on to the
+   next exercise, or the end of the workout if this was the last exercise. */
 function advanceAfterCustomExercise() {
-  if (isLastExerciseInSet()) {
-    advanceAfterCustomSet();
+  if (!isLastSetOfCurrentExercise()) {
+    if (currentCustomExercise().restBetweenSetsSec > 0) {
+      customPlayer.phase = 'restSet';
+      beginCustomPlayerPhase();
+    } else {
+      advanceToNextSetSameExercise();
+    }
+  } else if (isLastCustomExercise()) {
+    finishCustomPlayerWorkout();
   } else if (currentCustomExercise().restAfterSec > 0) {
     customPlayer.phase = 'restEx';
     beginCustomPlayerPhase();
@@ -2188,48 +2226,47 @@ function advanceAfterCustomExercise() {
     advanceToNextCustomExercise();
   }
 }
-function advanceToNextCustomExercise() {
-  customPlayer.exIndex++;
+function advanceToNextSetSameExercise() {
+  customPlayer.setIndex++;
   customPlayer.phase = 'exercise';
   beginCustomPlayerPhase();
 }
-function advanceAfterCustomSet() {
-  if (isLastSet()) {
-    finishCustomPlayerWorkout();
-  } else if (customPlayer.workout.restBetweenSetsSec > 0) {
-    customPlayer.phase = 'restSet';
-    beginCustomPlayerPhase();
-  } else {
-    advanceToNextCustomSet();
-  }
-}
-function advanceToNextCustomSet() {
-  customPlayer.setIndex++;
-  customPlayer.exIndex = 0;
+function advanceToNextCustomExercise() {
+  customPlayer.exIndex++;
+  customPlayer.setIndex = 0;
   customPlayer.phase = 'exercise';
   beginCustomPlayerPhase();
 }
 function onCustomRestDone() {
-  if (customPlayer.phase === 'restEx') advanceToNextCustomExercise();
-  else advanceToNextCustomSet();
+  if (customPlayer.phase === 'restSet') advanceToNextSetSameExercise();
+  else advanceToNextCustomExercise();
 }
 
 function finishCustomPlayerWorkout() {
   clearCustomPlayerTimer();
   releaseWakeLock();
   const totalDurationSec = Math.round((Date.now() - customPlayer.startedAt) / 1000);
-  recordCustomWorkoutSession({
-    workoutId: customPlayer.workout.id,
-    workoutName: customPlayer.workout.name,
+  const workout = customPlayer.workout;
+
+  const priorSessions = loadCustomWorkoutSessions().filter(s => s.workoutId === workout.id);
+  const prevBestSec = priorSessions.reduce((m, s) => Math.min(m, s.totalDurationSec), Infinity);
+  const isNewPR = priorSessions.length > 0 && totalDurationSec < prevBestSec;
+
+  const session = recordCustomWorkoutSession({
+    workoutId: workout.id,
+    workoutName: workout.name,
     totalDurationSec,
-    setsCompleted: customPlayer.workout.sets,
-    exerciseLog: customPlayer.exerciseLog
+    setsCompleted: customPlayer.exerciseLog.length,
+    exerciseLog: customPlayer.exerciseLog,
+    isPR: isNewPR
   });
+
   vibrate([100, 60, 100, 60, 200]);
   beep(660, 200, 0.2);
-  showToast('จบ WORKOUT แล้ว 💪 บันทึกผลแล้ว');
   customPlayer = null;
-  go('customlist');
+  lastCompletedCustomSessionId = session.id;
+  renderCustomCompleteScreen(session);
+  go('customcomplete');
 }
 
 function openCustomPlayerEndModal() {
@@ -2249,7 +2286,7 @@ function renderCustomPlayer() {
   const ex = currentCustomExercise();
   const nameEl = document.getElementById('playerExerciseName');
 
-  document.getElementById('playerStatusPill').textContent = 'SET ' + (customPlayer.setIndex + 1) + '/' + w.sets;
+  document.getElementById('playerStatusPill').textContent = 'เซ็ต ' + (customPlayer.setIndex + 1) + '/' + ex.sets;
   document.getElementById('playerWorkoutName').textContent = w.name;
   document.getElementById('playerProgress').textContent = 'ท่า ' + (customPlayer.exIndex + 1) + '/' + w.exercises.length;
 
@@ -2276,7 +2313,7 @@ function renderCustomPlayer() {
     const remainingSec = customPlayer.timer.endTime ? Math.max(0, (customPlayer.timer.endTime - Date.now()) / 1000) : 0;
     digitsText = fmtTime(remainingSec);
     ringFrac = customPlayer.timer.totalMs ? (remainingSec * 1000) / customPlayer.timer.totalMs : 1;
-    phaseLabel = customPlayer.phase === 'restEx' ? 'พักก่อนท่าถัดไป' : 'พักก่อนเซ็ตถัดไป';
+    phaseLabel = customPlayer.phase === 'restSet' ? 'พักก่อนเซ็ตถัดไป' : 'พักก่อนท่าถัดไป';
     showSkip = true;
   }
 
@@ -2295,10 +2332,93 @@ function renderCustomPlayer() {
   }
 }
 
+/* ================= CUSTOM WORKOUT — POST-WORKOUT SUMMARY ================= */
+/* Mirrors Cindy's own renderCompleteScreen()/finishCompleteFlow() as closely
+   as the different data shape allows: same hero/PR-badge/metric-grid/
+   breakdown layout, same RPE + FEELING + NOTE capture flow. Writes into
+   KEY_CUSTOM_SESSIONS only — never touches Cindy's KEY_SESSIONS. */
+
+function renderCustomCompleteScreen(session) {
+  document.getElementById('customCompleteSets').textContent = session.setsCompleted;
+  document.getElementById('customCompleteName').textContent = session.workoutName || 'Untitled Workout';
+  document.getElementById('cCustomTotalTime').textContent = fmtTime(session.totalDurationSec);
+  document.getElementById('cCustomSets').textContent = session.setsCompleted;
+
+  const prBadge = document.getElementById('customPrBadge');
+  const completeHero = prBadge.closest('.complete-hero');
+  completeHero.classList.remove('pr-burst');
+  if (session.isPR) {
+    prBadge.textContent = 'NEW PR';
+    prBadge.className = 'pr-badge new';
+    void completeHero.offsetWidth;
+    completeHero.classList.add('pr-burst');
+    vibrate([40, 30, 40, 30, 80]);
+  } else {
+    prBadge.textContent = 'PR —';
+    prBadge.className = 'pr-badge no';
+  }
+
+  document.getElementById('customBreakdown').innerHTML = buildCustomExerciseBreakdownHtml(session.exerciseLog || []);
+
+  pendingCustomFeedback = { rpe: null, feeling: null };
+  document.getElementById('customNoteInput').value = '';
+  const rpeRow = document.getElementById('customRpeRow');
+  rpeRow.innerHTML = '';
+  for (let i = 1; i <= 10; i++) {
+    const el = document.createElement('div');
+    el.className = 'rpe-pill';
+    el.textContent = i;
+    el.onclick = () => selectCustomRPE(i, el);
+    rpeRow.appendChild(el);
+  }
+  document.querySelectorAll('#customFeelingRow .feeling-pill').forEach(p => p.classList.remove('sel'));
+}
+
+/* Sums each unique exercise's total reps/seconds across all its sets — the
+   custom-workout analog of Cindy's fixed PULL/PUSH/SQUAT breakdown rows. */
+function buildCustomExerciseBreakdownHtml(exerciseLog) {
+  const totals = {};
+  const order = [];
+  exerciseLog.forEach(entry => {
+    if (!(entry.name in totals)) { totals[entry.name] = { value: 0, type: entry.type }; order.push(entry.name); }
+    totals[entry.name].value += entry.repsOrSecDone;
+  });
+  if (!order.length) return '<div class="empty-hint">ไม่มีข้อมูลท่าออกกำลังกาย</div>';
+  return order.map(name => {
+    const t = totals[name];
+    const unit = t.type === 'time' ? 'วินาที' : 'ครั้ง';
+    return `<div class="breakdown-row"><span class="breakdown-name">${escapeHtml(name)}</span><span class="breakdown-val">${t.value} <span style="font-size:11px;color:var(--text-faint);">${unit}</span></span></div>`;
+  }).join('');
+}
+
+function selectCustomRPE(val, el) {
+  pendingCustomFeedback.rpe = val;
+  document.querySelectorAll('#customRpeRow .rpe-pill').forEach(p => p.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function selectCustomFeeling(val) {
+  pendingCustomFeedback.feeling = val;
+  document.querySelectorAll('#customFeelingRow .feeling-pill').forEach(p => p.classList.toggle('sel', p.dataset.f === val));
+}
+function finishCustomCompleteFlow() {
+  const sessions = loadCustomWorkoutSessions();
+  const idx = sessions.findIndex(s => s.id === lastCompletedCustomSessionId);
+  if (idx !== -1) {
+    sessions[idx].rpe = pendingCustomFeedback.rpe;
+    sessions[idx].feeling = pendingCustomFeedback.feeling;
+    sessions[idx].note = document.getElementById('customNoteInput').value.trim();
+    saveCustomWorkoutSessions(sessions);
+  }
+  showToast('บันทึก WORKOUT แล้ว 💪');
+  go('customlist');
+}
+
 /* ================= CUSTOM WORKOUT — HISTORY / REPORT (PHASE 4) ================= */
 /* Read-only reporting on top of KEY_CUSTOM_SESSIONS. Fully separate screen from
    Cindy's HISTORY tab/filter — never reads KEY_SESSIONS, never touches Cindy's
-   currentDetailId. */
+   currentDetailId. Detail layout intentionally mirrors Cindy's own
+   openDetail(): hero + PR badge, 4-card metric grid, exercise breakdown,
+   per-set breakdown table, note, edit/delete. */
 
 let currentCustomHistoryDetailId = null;
 
@@ -2314,8 +2434,8 @@ function renderCustomHistory() {
     const meta = s.setsCompleted + ' เซ็ต · ' + fmtTime(s.totalDurationSec);
     return `<div class="history-item" onclick="openCustomHistoryDetail('${s.id}')">
       <div>
-        <div class="date">${escapeHtml(s.workoutName || 'Untitled Workout')}</div>
-        <div class="reps">${fmtDate(s.completedAt)} · ${meta}</div>
+        <div class="date">${fmtDate(s.completedAt)}${s.isPR ? ' <span class="proto-active-tag">PR</span>' : ''}</div>
+        <div class="reps">${meta} · ${escapeHtml(s.workoutName || 'Untitled Workout')}</div>
       </div>
       <div class="rounds tabular">${fmtTime(s.totalDurationSec)}</div>
     </div>`;
@@ -2334,32 +2454,77 @@ function renderCustomHistoryDetail() {
   const s = loadCustomWorkoutSessions().find(x => x.id === currentCustomHistoryDetailId);
   if (!s) { wrap.innerHTML = '<div class="empty-hint">ไม่พบข้อมูล</div>'; return; }
 
-  const setsGrouped = {};
-  (s.exerciseLog || []).forEach(entry => {
-    if (!setsGrouped[entry.setNumber]) setsGrouped[entry.setNumber] = [];
-    setsGrouped[entry.setNumber].push(entry);
-  });
-  const setNumbers = Object.keys(setsGrouped).map(n => parseInt(n, 10)).sort((a, b) => a - b);
-
-  const setsHtml = setNumbers.map(n => {
-    const rows = setsGrouped[n].map(entry => {
-      const unit = entry.type === 'time' ? 'วินาที' : 'ครั้ง';
-      return `<div class="history-item" style="cursor:default;">
-        <div><div class="date">${escapeHtml(entry.name)}</div></div>
-        <div class="rounds tabular" style="font-size:18px;">${entry.repsOrSecDone} <span style="font-size:11px;color:var(--text-faint);">${unit}</span></div>
-      </div>`;
-    }).join('');
-    return `<div class="section-label">เซ็ต ${n}</div>${rows}`;
+  const log = s.exerciseLog || [];
+  const rows = log.map(entry => {
+    const unit = entry.type === 'time' ? 'วิ' : 'ครั้ง';
+    return `<tr><td>${escapeHtml(entry.name)}</td><td>${entry.setNumber}</td><td>${entry.repsOrSecDone} ${unit}</td></tr>`;
   }).join('');
+  const tableRows = rows || '<tr><td colspan="3" style="color:var(--text-faint);">ไม่มีข้อมูลเซ็ต</td></tr>';
 
   wrap.innerHTML = `
-    <div class="stats-grid">
-      <div class="stat-card"><div class="v">${fmtTime(s.totalDurationSec)}</div><div class="l">เวลารวม</div></div>
-      <div class="stat-card"><div class="v">${s.setsCompleted}</div><div class="l">เซ็ตที่ทำ</div></div>
+    <div class="complete-hero" style="padding-top:4px;">
+      <div class="complete-rounds tabular">${s.setsCompleted}</div>
+      <div class="complete-lbl">SETS · ${fmtDate(s.completedAt)}</div>
+      <div style="font-size:11px;color:var(--text-faint);margin-top:4px;letter-spacing:1px;">${escapeHtml(s.workoutName || 'Untitled Workout')}</div>
+      ${s.isPR ? '<div class="pr-badge new">NEW PR</div>' : ''}
     </div>
-    <div class="empty-hint" style="text-align:left;padding:4px 0 0;">${fmtDate(s.completedAt)}</div>
-    ${setsHtml || '<div class="empty-hint">ไม่มีข้อมูลท่าออกกำลังกาย</div>'}
+    <div class="metric-grid">
+      <div class="metric-card"><div class="v tabular">${fmtTime(s.totalDurationSec)}</div><div class="l">TOTAL TIME</div></div>
+      <div class="metric-card"><div class="v">${s.setsCompleted}</div><div class="l">SETS COMPLETED</div></div>
+      <div class="metric-card"><div class="v">${s.rpe ? s.rpe + '/10' : '—'}</div><div class="l">RPE</div></div>
+      <div class="metric-card"><div class="v">${s.feeling || '—'}</div><div class="l">FEELING</div></div>
+    </div>
+
+    <div class="section-label">EXERCISE BREAKDOWN</div>
+    <div class="metric-card">${buildCustomExerciseBreakdownHtml(log)}</div>
+
+    <div class="section-label">SET BREAKDOWN</div>
+    <div class="metric-card">
+      <table class="detail-table">
+        <thead><tr><th>ท่า</th><th>เซ็ต</th><th>ผลลัพธ์</th></tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+
+    ${s.note ? `<div class="section-label">NOTE</div><div class="metric-card" style="font-size:13px;color:var(--text-dim);line-height:1.5;">${escapeHtml(s.note)}</div>` : ''}
   `;
+}
+
+/* ---- edit / delete (mirrors Cindy's openEditSessionModal/saveEditSession) ---- */
+let pendingEditCustomFeedback = { rpe: null, feeling: null };
+function openEditCustomHistorySessionModal(id) {
+  const s = loadCustomWorkoutSessions().find(x => x.id === id);
+  if (!s) return;
+  currentCustomHistoryDetailId = id;
+  pendingEditCustomFeedback = { rpe: s.rpe || null, feeling: s.feeling || null };
+  document.getElementById('editCustomNoteInput').value = s.note || '';
+  const rpeRow = document.getElementById('editCustomRpeRow');
+  rpeRow.innerHTML = '';
+  for (let i = 1; i <= 10; i++) {
+    const el = document.createElement('div');
+    el.className = 'rpe-pill' + (s.rpe === i ? ' sel' : '');
+    el.textContent = i;
+    el.onclick = () => { pendingEditCustomFeedback.rpe = i; rpeRow.querySelectorAll('.rpe-pill').forEach(p => p.classList.remove('sel')); el.classList.add('sel'); };
+    rpeRow.appendChild(el);
+  }
+  document.querySelectorAll('#editCustomFeelingRow .feeling-pill').forEach(p => p.classList.toggle('sel', p.dataset.f === s.feeling));
+  document.getElementById('editCustomHistoryModal').classList.add('active');
+}
+function selectEditCustomFeeling(val) {
+  pendingEditCustomFeedback.feeling = val;
+  document.querySelectorAll('#editCustomFeelingRow .feeling-pill').forEach(p => p.classList.toggle('sel', p.dataset.f === val));
+}
+function saveEditCustomHistorySession() {
+  const sessions = loadCustomWorkoutSessions();
+  const idx = sessions.findIndex(s => s.id === currentCustomHistoryDetailId);
+  if (idx === -1) return;
+  sessions[idx].rpe = pendingEditCustomFeedback.rpe;
+  sessions[idx].feeling = pendingEditCustomFeedback.feeling;
+  sessions[idx].note = document.getElementById('editCustomNoteInput').value.trim();
+  saveCustomWorkoutSessions(sessions);
+  closeModal('editCustomHistoryModal');
+  renderCustomHistoryDetail();
+  showToast('บันทึกการแก้ไขแล้ว');
 }
 
 function confirmDeleteCustomHistorySession() {

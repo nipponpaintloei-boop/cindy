@@ -783,18 +783,9 @@ textarea.note-input::placeholder{color:var(--text-faint);}
           oninput="updateCustomHeaderField('name', this.value)">
       </div>
 
-      <div class="control-row">
-        <div class="field-row" style="grid-template-columns:1fr 70px;margin-bottom:0;">
-          <label>จำนวนเซ็ต</label>
-          <input type="number" id="customSetsInput" min="1" max="20" oninput="updateCustomHeaderField('sets', this.value)">
-        </div>
-        <div class="field-row" style="grid-template-columns:1fr 70px;margin-bottom:0;">
-          <label>พักระหว่างเซ็ต (วิ)</label>
-          <input type="number" id="customRestInput" min="0" max="600" oninput="updateCustomHeaderField('restBetweenSetsSec', this.value)">
-        </div>
-      </div>
+      <div class="empty-hint" style="text-align:left;padding:2px 0 0;">กำหนดจำนวนเซ็ต พักระหว่างเซ็ต และพักก่อนไปท่าถัดไปแยกของแต่ละท่าด้านล่าง</div>
 
-      <div class="section-label" style="margin-top:20px;">ท่าออกกำลังกาย</div>
+      <div class="section-label" style="margin-top:16px;">ท่าออกกำลังกาย</div>
       <div id="customExerciseList"></div>
       <button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="openExerciseLibrary()">+ เพิ่มท่า</button>
 
@@ -849,6 +840,44 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     </div>
   </section>
 
+  <!-- CUSTOM WORKOUT COMPLETE (post-workout summary, mirrors screen-complete) -->
+  <section id="screen-customcomplete" class="screen">
+    <div class="complete-wrap">
+      <div class="complete-hero">
+        <div class="complete-star">★</div>
+        <div id="customCompleteSets" class="complete-rounds tabular">0</div>
+        <div class="complete-lbl">SETS COMPLETED</div>
+        <div id="customCompleteName" style="font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:2px;font-weight:700;text-transform:uppercase;"></div>
+        <div id="customPrBadge" class="pr-badge no">PR —</div>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-card"><div id="cCustomTotalTime" class="v tabular">00:00</div><div class="l">TOTAL TIME</div></div>
+        <div class="metric-card"><div id="cCustomSets" class="v">0</div><div class="l">SETS COMPLETED</div></div>
+      </div>
+
+      <div class="section-label">EXERCISE BREAKDOWN</div>
+      <div class="metric-card" id="customBreakdown"></div>
+
+      <div class="feedback-block">
+        <div class="section-label" style="margin-top:0;">RPE (1–10)</div>
+        <div id="customRpeRow" class="rpe-row"></div>
+
+        <div class="section-label">FEELING</div>
+        <div id="customFeelingRow" class="feeling-row">
+          <div class="feeling-pill" data-f="Great" onclick="selectCustomFeeling('Great')">GREAT</div>
+          <div class="feeling-pill" data-f="Good" onclick="selectCustomFeeling('Good')">GOOD</div>
+          <div class="feeling-pill" data-f="Hard" onclick="selectCustomFeeling('Hard')">HARD</div>
+          <div class="feeling-pill" data-f="Max" onclick="selectCustomFeeling('Max')">MAX</div>
+        </div>
+
+        <div class="section-label">NOTE</div>
+        <textarea id="customNoteInput" class="note-input" placeholder="เช่น วันนี้ Push-up ช่วงท้ายเหนื่อยมาก..."></textarea>
+      </div>
+
+      <button class="btn btn-primary" style="margin-top:22px;" onclick="finishCustomCompleteFlow()">บันทึกและกลับหน้าหลัก</button>
+    </div>
+  </section>
+
   <!-- CUSTOM WORKOUT HISTORY -->
   <section id="screen-customhistory" class="screen">
     <div class="topbar">
@@ -872,7 +901,10 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     </div>
     <div class="list-wrap" id="customHistoryDetailWrap"></div>
     <div style="padding:0 20px 20px;">
-      <button class="btn btn-danger btn-sm" onclick="confirmDeleteCustomHistorySession()">ลบ Workout นี้</button>
+      <div class="control-row">
+        <button class="btn btn-ghost btn-sm" onclick="openEditCustomHistorySessionModal(currentCustomHistoryDetailId)">แก้ไข</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDeleteCustomHistorySession()">ลบ</button>
+      </div>
     </div>
   </section>
 
@@ -1014,6 +1046,28 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="modal-row">
       <button class="btn btn-outline btn-sm" onclick="closeModal('deleteSessionModal')">ยกเลิก</button>
       <button class="btn btn-danger btn-sm" onclick="deleteSessionExecute()">ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Custom Workout History Session Modal -->
+<div id="editCustomHistoryModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">แก้ไข Workout</div>
+    <div class="section-label" style="margin-top:0;">RPE (1–10)</div>
+    <div id="editCustomRpeRow" class="rpe-row"></div>
+    <div class="section-label">FEELING</div>
+    <div id="editCustomFeelingRow" class="feeling-row">
+      <div class="feeling-pill" data-f="Great" onclick="selectEditCustomFeeling('Great')">GREAT</div>
+      <div class="feeling-pill" data-f="Good" onclick="selectEditCustomFeeling('Good')">GOOD</div>
+      <div class="feeling-pill" data-f="Hard" onclick="selectEditCustomFeeling('Hard')">HARD</div>
+      <div class="feeling-pill" data-f="Max" onclick="selectEditCustomFeeling('Max')">MAX</div>
+    </div>
+    <div class="section-label">NOTE</div>
+    <textarea id="editCustomNoteInput" class="note-input" placeholder="เช่น วันนี้ Push-up ช่วงท้ายเหนื่อยมาก..."></textarea>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('editCustomHistoryModal')">ยกเลิก</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEditCustomHistorySession()">บันทึก</button>
     </div>
   </div>
 </div>
