@@ -818,7 +818,10 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 <!-- Rest Timer Modal -->
 <div id="restTimerModal" class="modal-overlay">
   <div class="modal-card">
-    <div class="modal-title">Rest Timer</div>
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Rest Timer</span>
+      <span onclick="closeModal('restTimerModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
+    </div>
     <div class="modal-body">ตัวจับเวลาพักแบบอิสระ ไม่ผูกกับ Workout — ใช้พักระหว่างเซ็ตได้เลย</div>
     <div id="restTimerDigits" class="timer-digits tabular" style="text-align:center;font-size:48px;margin:10px 0 16px;">01:00</div>
     <div id="restQuickRow" class="period-row">
