@@ -371,6 +371,12 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 .switch-thumb{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--text-faint);transition:transform .2s ease,background .2s ease;}
 .switch input:checked ~ .switch-track{background:rgba(232,35,42,.18);border-color:var(--push);}
 .switch input:checked ~ .switch-track .switch-thumb{transform:translateX(20px);background:var(--push);}
+.protocol-list{max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px;}
+.protocol-item{cursor:pointer;}
+.protocol-item.sel{border-color:var(--push);}
+.proto-active-tag{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--success);border:1px solid var(--success);border-radius:5px;padding:1px 5px;vertical-align:1px;margin-left:4px;}
+#screen-workout.mode-emom #skipRoundBtn{display:none;}
+#screen-workout.mode-emom #saveRoundBtn{pointer-events:none;opacity:.85;}
 .time-input{
   background:var(--bg-elev);border:1px solid var(--card-border);border-radius:8px;
   color:var(--text);padding:8px 10px;font-size:14px;font-weight:700;font-family:inherit;
@@ -443,6 +449,9 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <button id="installBtn" class="iconbtn install-btn" onclick="handleInstallClick()" aria-label="Install app">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v13M7 11l5 5 5-5"/><path d="M4 19h16"/></svg>
         </button>
+        <button class="iconbtn" onclick="openRestTimer()" aria-label="Rest Timer">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>
+        </button>
         <button class="iconbtn" onclick="openSettingsModal()" aria-label="Settings">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         </button>
@@ -456,6 +465,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     </div>
     <div class="home-content">
       <div class="hero-card">
+        <div id="activeProtocolName" style="font-size:11px;letter-spacing:2px;color:var(--text-faint);text-transform:uppercase;margin-bottom:2px;">Cindy (Classic)</div>
         <div id="heroEyebrow" class="hero-eyebrow">20 MIN AMRAP</div>
         <div id="heroTitle" class="hero-title">5 PULL-UP · 10 PUSH-UP · 15 SQUAT</div>
         <div class="hero-protocol">
@@ -559,7 +569,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 
       <div class="control-row">
         <button id="pauseBtn" class="btn btn-outline btn-sm" onclick="togglePause()">PAUSE</button>
-        <button class="btn btn-outline btn-sm" onclick="skipRound()">SKIP</button>
+        <button id="skipRoundBtn" class="btn btn-outline btn-sm" onclick="skipRound()">SKIP</button>
       </div>
       <div class="control-row">
         <button class="btn btn-ghost btn-sm" onclick="openEndModal()">END WORKOUT</button>
@@ -639,6 +649,10 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="list-wrap" id="detailWrap"></div>
     <div style="padding:0 20px 20px;">
       <button class="btn btn-outline btn-sm" onclick="shareResult(currentDetailId)">แชร์ผลลัพธ์</button>
+      <div class="control-row" style="margin-top:10px;">
+        <button class="btn btn-ghost btn-sm" onclick="openEditSessionModal(currentDetailId)">แก้ไข</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDeleteSession()">ลบ</button>
+      </div>
     </div>
   </section>
 
@@ -760,18 +774,97 @@ textarea.note-input::placeholder{color:var(--text-faint);}
   </div>
 </div>
 
-<!-- Settings / Custom Protocol Modal -->
+<!-- Protocol Library Modal -->
 <div id="settingsModal" class="modal-overlay">
   <div class="modal-card">
-    <div class="modal-title">ปรับโปรโตคอล</div>
-    <div class="modal-body">ตั้งจำนวนครั้งต่อรอบและเวลาทั้งหมดตามที่ต้องการ (ค่าเริ่มต้นคือ Cindy ดั้งเดิม 5-10-15 / 20 นาที)</div>
+    <div class="modal-title">โปรโตคอล / WOD</div>
+    <div class="modal-body">เลือกโปรโตคอลที่จะใช้เล่น หรือสร้างสูตรของคุณเอง (AMRAP หรือ EMOM)</div>
+    <div id="protocolList" class="protocol-list"></div>
+    <div class="modal-row" style="grid-template-columns:1fr;margin-top:14px;">
+      <button class="btn btn-primary btn-sm" onclick="openProtocolEditor(null)">+ สร้างโปรโตคอลใหม่</button>
+    </div>
+  </div>
+</div>
+
+<!-- Protocol Editor Modal (create / edit) -->
+<div id="protocolEditorModal" class="modal-overlay">
+  <div class="modal-card">
+    <div id="protoEditorTitle" class="modal-title">สร้างโปรโตคอลใหม่</div>
+    <div class="field-row"><label>ชื่อโปรโตคอล</label><input type="text" id="cfgName" placeholder="เช่น My AMRAP" style="width:140px;text-align:right;background:var(--bg-elev);border:1.5px solid var(--card-border);border-radius:8px;color:var(--text);padding:8px 10px;font-size:14px;"></div>
+    <div id="protoModeRow" class="period-row" style="margin:4px 0 14px;">
+      <div class="period-pill sel" data-mode="amrap" onclick="setProtoEditorMode('amrap')">AMRAP</div>
+      <div class="period-pill" data-mode="emom" onclick="setProtoEditorMode('emom')">EMOM</div>
+    </div>
     <div class="field-row"><label>PULL-UP ต่อรอบ</label><input type="number" id="cfgPull" min="0" max="99"></div>
     <div class="field-row"><label>PUSH-UP ต่อรอบ</label><input type="number" id="cfgPush" min="0" max="99"></div>
     <div class="field-row"><label>SQUAT ต่อรอบ</label><input type="number" id="cfgSquat" min="0" max="99"></div>
-    <div class="field-row"><label>เวลาทั้งหมด (นาที)</label><input type="number" id="cfgDuration" min="1" max="120"></div>
+    <div id="amrapFields">
+      <div class="field-row"><label>เวลาทั้งหมด (นาที)</label><input type="number" id="cfgDuration" min="1" max="120"></div>
+    </div>
+    <div id="emomFields" style="display:none;">
+      <div class="field-row"><label>ทุกๆ (วินาที)</label><input type="number" id="cfgEmomInterval" min="10" max="600"></div>
+      <div class="field-row"><label>จำนวนรอบ</label><input type="number" id="cfgEmomRounds" min="1" max="200"></div>
+    </div>
     <div class="modal-row">
-      <button class="btn btn-outline btn-sm" onclick="resetSettingsDefault()">ค่าเริ่มต้น</button>
-      <button class="btn btn-primary btn-sm" onclick="saveSettings()">บันทึก</button>
+      <button class="btn btn-outline btn-sm" onclick="closeModal('protocolEditorModal');openSettingsModal()">ยกเลิก</button>
+      <button class="btn btn-primary btn-sm" onclick="saveProtocolEditor()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rest Timer Modal -->
+<div id="restTimerModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">Rest Timer</div>
+    <div class="modal-body">ตัวจับเวลาพักแบบอิสระ ไม่ผูกกับ Workout — ใช้พักระหว่างเซ็ตได้เลย</div>
+    <div id="restTimerDigits" class="timer-digits tabular" style="text-align:center;font-size:48px;margin:10px 0 16px;">01:00</div>
+    <div id="restQuickRow" class="period-row">
+      <div class="period-pill sel" data-sec="30" onclick="setRestDuration(30)">30s</div>
+      <div class="period-pill" data-sec="60" onclick="setRestDuration(60)">60s</div>
+      <div class="period-pill" data-sec="90" onclick="setRestDuration(90)">90s</div>
+      <div class="period-pill" data-sec="120" onclick="setRestDuration(120)">120s</div>
+    </div>
+    <div class="control-row" style="margin-top:14px;">
+      <button class="btn btn-outline btn-sm" onclick="adjustRestDuration(-15)">−15s</button>
+      <button class="btn btn-outline btn-sm" onclick="adjustRestDuration(15)">+15s</button>
+    </div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="resetRestTimer()">RESET</button>
+      <button id="restTimerToggleBtn" class="btn btn-success btn-sm" onclick="toggleRestTimer()">START</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Session Modal -->
+<div id="editSessionModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">แก้ไข Workout</div>
+    <div class="section-label" style="margin-top:0;">RPE (1–10)</div>
+    <div id="editRpeRow" class="rpe-row"></div>
+    <div class="section-label">FEELING</div>
+    <div id="editFeelingRow" class="feeling-row">
+      <div class="feeling-pill" data-f="Great" onclick="selectEditFeeling('Great')">GREAT</div>
+      <div class="feeling-pill" data-f="Good" onclick="selectEditFeeling('Good')">GOOD</div>
+      <div class="feeling-pill" data-f="Hard" onclick="selectEditFeeling('Hard')">HARD</div>
+      <div class="feeling-pill" data-f="Max" onclick="selectEditFeeling('Max')">MAX</div>
+    </div>
+    <div class="section-label">NOTE</div>
+    <textarea id="editNoteInput" class="note-input" placeholder="เช่น วันนี้ Pull-Up ช่วงท้ายเหนื่อยมาก..."></textarea>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('editSessionModal')">ยกเลิก</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEditSession()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Session Modal -->
+<div id="deleteSessionModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">ลบ Workout นี้?</div>
+    <div class="modal-body">ข้อมูล Workout นี้จะถูกลบถาวรและกู้คืนไม่ได้</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('deleteSessionModal')">ยกเลิก</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteSessionExecute()">ลบถาวร</button>
     </div>
   </div>
 </div>
