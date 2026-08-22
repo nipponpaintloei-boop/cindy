@@ -1,0 +1,24 @@
+{
+  "name": "CINDY — Fitness RPG Workout",
+  "short_name": "CINDY",
+  "description": "20 นาที AMRAP: Pull-Up, Push-Up, Squat (ปรับจำนวนและเวลาได้)",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0A0D",
+  "theme_color": "#0A0A0D",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Start Workout",
+      "short_name": "Start",
+      "description": "เริ่ม Workout ทันที",
+      "url": "./index.html?action=start",
+      "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

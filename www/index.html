@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#0A0A0D" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="CINDY" />
+<title>CINDY — Fitness RPG Workout</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --bg:#0A0A0D;
+  --bg-elev:#12141B;
+  --card:#161821;
+  --card-border:#2B2E3D;
+  --primary:#E8232A;
+  --primary-text:#F5F4F0;
+  --primary-dim:#3A3A3C;
+  --success:#3ED598;
+  --warning:#FFB020;
+  --danger:#E8232A;
+  --text:#F5F4F0;
+  --text-dim:#8D93A6;
+  --text-faint:#4E5468;
+  --web:#3D6FE0;
+  --pull:#3D6FE0;
+  --push:#E8232A;
+  --squat:#FFB020;
+  --radius:14px;
+  --radius-sm:10px;
+  --font-display:"Bebas Neue",Impact,"Arial Narrow",sans-serif;
+}
+body.oled{
+  --bg:#000000;
+  --bg-elev:#08090C;
+  --card:#0C0D12;
+  --card-border:#1D2030;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  margin:0;
+  background:
+    repeating-conic-gradient(from 0deg at 50% -10%, rgba(232,35,42,.05) 0deg 1deg, transparent 1deg 15deg),
+    radial-gradient(circle at 50% -10%, rgba(61,111,224,.10), transparent 55%),
+    repeating-radial-gradient(circle at 50% -10%, rgba(255,255,255,.035) 0 1px, transparent 1px 46px),
+    var(--bg);
+  color:var(--text);
+  font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  overscroll-behavior:none;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+  min-height:100dvh;
+}
+#app{
+  max-width:480px;
+  margin:0 auto;
+  height:100vh;
+  height:100dvh;
+  display:flex;
+  flex-direction:column;
+  position:relative;
+  overflow:hidden;
+  padding-top:env(safe-area-inset-top);
+}
+.screen{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden;animation:fadeIn .18s ease;}
+.screen.active{display:flex;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.tabular{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";}
+
+/* ---- top nav ---- */
+.topbar{
+  flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 20px 8px;
+}
+.brand{
+  font-family:var(--font-display);
+  font-size:30px;line-height:1;font-weight:400;letter-spacing:2px;color:var(--text);
+  position:relative;padding-left:2px;
+  text-shadow:0 0 14px rgba(232,35,42,.35);
+}
+.brand::after{
+  content:"";display:block;width:34px;height:4px;
+  background:linear-gradient(90deg,var(--push) 0 55%,var(--web) 55%);
+  margin-top:3px;border-radius:2px;
+}
+.iconbtn{
+  position:relative;overflow:hidden;
+  width:38px;height:38px;border-radius:10px;background:var(--card);
+  border:1px solid rgba(61,111,224,.35);display:flex;align-items:center;justify-content:center;
+  color:var(--text-dim);transition:transform .08s ease;
+}
+.iconbtn::after{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:radial-gradient(circle, rgba(120,170,255,.6) 0%, rgba(120,170,255,0) 65%);
+  opacity:0;transform:scale(.25);transition:opacity .32s ease, transform .38s ease;
+}
+.iconbtn:active{transform:scale(.92);}
+.iconbtn:active::after{opacity:1;transform:scale(1.6);transition:opacity .04s ease, transform .04s ease;}
+.iconbtn.install-btn{display:none;color:var(--text);border-color:var(--text-faint);}
+.iconbtn.install-btn.show{display:flex;}
+
+/* ---- home ---- */
+.home-content{padding:0 20px 32px;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.hero-card{
+  position:relative;
+  background:
+    repeating-linear-gradient(45deg, rgba(255,255,255,.02) 0 1px, transparent 1px 7px),
+    linear-gradient(155deg,var(--card) 0%,var(--bg-elev) 100%);
+  border:1px solid var(--card-border);
+  border-radius:var(--radius);
+  padding:30px 22px 26px;
+  margin-top:22px;
+  text-align:center;
+}
+.hero-card::before{
+  content:"";position:absolute;top:0;right:0;width:110px;height:110px;
+  border-radius:0 var(--radius) 0 0;
+  overflow:hidden;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%233D6FE0' stroke-width='1.1' opacity='0.4'%3E%3Cpath d='M100 0 L0 100'/%3E%3Cpath d='M100 22 L22 100'/%3E%3Cpath d='M100 44 L44 100'/%3E%3Cpath d='M100 66 L66 100'/%3E%3Cpath d='M100 0 Q60 40 100 100'/%3E%3Cpath d='M100 0 Q75 55 78 100'/%3E%3Cpath d='M100 0 Q88 65 92 100'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:contain;background-position:top right;background-repeat:no-repeat;
+  pointer-events:none;z-index:0;
+}
+.hero-eyebrow{
+  position:absolute;top:-14px;left:20px;z-index:1;
+  background:var(--push);color:#fff;
+  font-size:11px;font-weight:800;letter-spacing:2.5px;
+  padding:6px 12px;border-radius:4px;
+  transform:rotate(-2deg);
+  box-shadow:0 4px 10px rgba(232,35,42,.4);
+}
+.hero-title{position:relative;z-index:1;font-size:15px;color:var(--text-dim);margin:6px 0 20px;font-weight:600;letter-spacing:.5px;}
+.hero-protocol{position:relative;z-index:1;display:flex;justify-content:center;gap:10px;margin-bottom:22px;}
+.proto-chip{
+  flex:1;background:var(--bg-elev);border:1px solid var(--card-border);
+  border-radius:var(--radius-sm);padding:12px 6px;
+}
+.proto-chip .n{font-family:var(--font-display);font-size:30px;line-height:1;letter-spacing:.5px;}
+.proto-chip .l{font-size:10px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;font-weight:600;}
+.proto-chip.pull .n{color:var(--pull)}
+.proto-chip.push .n{color:var(--push)}
+.proto-chip.squat .n{color:var(--squat)}
+.btn{
+  position:relative;overflow:hidden;
+  border:none;border-radius:10px;font-weight:800;font-size:15px;letter-spacing:1px;text-transform:uppercase;
+  padding:18px;width:100%;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .08s ease, opacity .15s ease;
+}
+.btn::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(circle, rgba(120,170,255,.55) 0%, rgba(120,170,255,0) 62%);
+  opacity:0;transform:scale(.25);
+  transition:opacity .32s ease, transform .38s ease;
+}
+.btn:active{transform:scale(.97);}
+.btn:active::after{opacity:1;transform:scale(1.5);transition:opacity .04s ease, transform .04s ease;}
+.btn-primary{background:var(--primary);color:var(--primary-text);}
+.btn-resume{background:var(--warning);color:#1a1200;}
+.btn-outline{background:transparent;border:1.5px solid rgba(61,111,224,.4);color:var(--text);}
+.btn-ghost{background:var(--bg-elev);color:var(--text-dim);}
+.btn-danger{background:var(--danger);color:#fff;}
+.btn-success{background:var(--success);color:#04140c;}
+.btn-sm{padding:12px;font-size:12px;border-radius:8px;}
+
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;}
+.stat-card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:14px 16px;}
+.stat-card .v{font-family:var(--font-display);font-size:30px;line-height:1;}
+.stat-card .l{font-size:11px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;font-weight:600;}
+
+.section-label{font-size:12px;font-weight:700;letter-spacing:1.5px;color:var(--text-dim);margin:24px 0 10px;}
+.last-workout{
+  background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);
+  padding:14px 16px;display:flex;justify-content:space-between;align-items:center;
+}
+.last-workout .date{font-size:13px;color:var(--text-dim);}
+.last-workout .rounds{font-family:var(--font-display);font-size:22px;}
+.empty-hint{color:var(--text-faint);font-size:13px;text-align:center;padding:18px 0;}
+
+/* ---- bottom tabbar ---- */
+.tabbar{
+  flex-shrink:0;
+  display:flex;border-top:1px solid var(--card-border);background:var(--bg-elev);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.tab{flex:1;text-align:center;padding:12px 0 10px;color:var(--text-faint);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+.tab.active{color:var(--text);}
+.tab .dot{width:6px;height:6px;border-radius:50%;background:currentColor;margin:0 auto 5px;opacity:0;}
+.tab.active .dot{opacity:1;background:var(--push);}
+
+/* ---- workout screen ---- */
+.workout-wrap{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;padding:16px 20px 20px;}
+.workout-top{flex-shrink:0;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.status-pill{
+  font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-dim);text-transform:uppercase;
+  background:var(--card);border:1px solid var(--card-border);padding:6px 12px;border-radius:20px;
+}
+.status-pill.paused{color:var(--warning);border-color:var(--warning);}
+.timer-wrap{position:relative;display:flex;align-items:center;justify-content:center;margin:14px auto 6px;width:250px;height:250px;}
+.timer-wrap svg{width:250px;height:250px;transform:rotate(-90deg);}
+.timer-wrap .track{fill:none;stroke:var(--card-border);stroke-width:14;}
+.timer-wrap .ring{fill:none;stroke:var(--text);stroke-width:14;stroke-linecap:round;transition:stroke .3s ease, stroke-dasharray .25s linear;}
+.timer-center{position:absolute;display:flex;flex-direction:column;align-items:center;}
+.timer-digits{font-family:var(--font-display);font-size:64px;line-height:1;letter-spacing:1px;}
+.timer-sub{font-size:11px;color:var(--text-dim);letter-spacing:2px;margin-top:6px;text-transform:uppercase;}
+
+.rounds-banner{text-align:center;margin:6px 0 18px;}
+.rounds-banner .num{font-family:var(--font-display);font-size:20px;letter-spacing:1px;}
+.rounds-banner .lbl{font-size:10px;color:var(--text-dim);letter-spacing:2px;}
+.pb-hint{font-size:11px;color:var(--text-faint);margin-top:4px;font-weight:600;letter-spacing:.5px;}
+
+.exercise-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px;}
+.ex-box{
+  background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);
+  padding:12px 6px;text-align:center;
+}
+.ex-box svg{width:26px;height:26px;margin-bottom:6px;}
+.ex-box .rep{font-family:var(--font-display);font-size:26px;line-height:1;}
+.ex-box .name{font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;}
+.ex-box.pull{border-color:rgba(61,127,255,.35);}
+.ex-box.push{border-color:rgba(52,211,153,.35);}
+.ex-box.squat{border-color:rgba(245,166,35,.35);}
+.ex-box.pull svg{color:var(--pull)}
+.ex-box.push svg{color:var(--push)}
+.ex-box.squat svg{color:var(--squat)}
+
+.save-round-btn{margin-bottom:12px;}
+.control-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.workout-spacer{flex:1;}
+
+/* ---- modal ---- */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;
+  align-items:center;justify-content:center;z-index:50;padding:24px;
+  backdrop-filter:blur(2px);
+}
+.modal-overlay.active{display:flex;}
+.modal-card{
+  background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);
+  padding:22px;max-width:340px;width:100%;
+}
+.modal-title{font-size:17px;font-weight:800;margin-bottom:6px;}
+.modal-body{font-size:13px;color:var(--text-dim);margin-bottom:18px;line-height:1.5;}
+.modal-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.field-row{display:grid;grid-template-columns:1fr 88px;align-items:center;gap:10px;margin-bottom:12px;}
+.field-row label{font-size:13px;color:var(--text-dim);font-weight:600;}
+.field-row input[type="number"]{
+  width:100%;background:var(--bg-elev);border:1px solid var(--card-border);border-radius:8px;
+  color:var(--text);padding:10px;font-size:15px;font-weight:700;text-align:center;font-family:inherit;
+}
+.field-row input[type="number"]:focus{outline:none;border-color:var(--web);}
+.modal-scroll{max-height:60vh;overflow-y:auto;padding-right:2px;}
+.toast{
+  position:fixed;bottom:26px;left:50%;transform:translateX(-50%);
+  background:var(--card);border:1px solid var(--card-border);color:var(--text);
+  padding:10px 18px;border-radius:20px;font-size:13px;z-index:60;opacity:0;
+  transition:opacity .2s ease, transform .2s ease;pointer-events:none;font-weight:600;
+}
+.toast.show{opacity:1;}
+
+/* ---- complete screen ---- */
+.complete-wrap{flex:1;min-height:0;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.complete-hero{position:relative;text-align:center;padding:22px 0 8px;}
+.complete-hero::before{
+  content:"";position:absolute;left:50%;top:38%;width:280px;height:280px;z-index:0;
+  transform:translate(-50%,-50%) scale(.4);opacity:0;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cg stroke='%23E8232A' stroke-width='2.4' opacity='0.9'%3E%3Cpath d='M100 100L100 5'/%3E%3Cpath d='M100 100L167 33'/%3E%3Cpath d='M100 100L195 100'/%3E%3Cpath d='M100 100L167 167'/%3E%3Cpath d='M100 100L100 195'/%3E%3Cpath d='M100 100L33 167'/%3E%3Cpath d='M100 100L5 100'/%3E%3Cpath d='M100 100L33 33'/%3E%3C/g%3E%3Cg stroke='%233D6FE0' stroke-width='1.6' opacity='0.65'%3E%3Ccircle cx='100' cy='100' r='35'/%3E%3Ccircle cx='100' cy='100' r='65'/%3E%3Ccircle cx='100' cy='100' r='95'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  background-size:contain;background-repeat:no-repeat;
+}
+.complete-hero.pr-burst::before{animation:webBurst .9s cubic-bezier(.2,.7,.3,1) 1;}
+.complete-hero .complete-star,.complete-hero .complete-rounds,.complete-hero .complete-lbl,.complete-hero .pr-badge{position:relative;z-index:1;}
+@keyframes webBurst{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.3);}
+  18%{opacity:.95;}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1.55);}
+}
+.complete-star{font-size:34px;color:var(--warning);margin-bottom:6px;}
+.complete-rounds{font-family:var(--font-display);font-size:72px;line-height:1;}
+.complete-lbl{font-size:12px;color:var(--text-dim);letter-spacing:2px;margin-top:4px;text-transform:uppercase;}
+.pr-badge{
+  display:inline-block;margin-top:10px;padding:5px 14px;border-radius:4px;
+  font-size:11px;font-weight:800;letter-spacing:1px;
+}
+.pr-badge.new{background:rgba(62,213,152,.15);color:var(--success);}
+.pr-badge.no{background:var(--bg-elev);color:var(--text-faint);}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px;}
+.metric-card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:14px 16px;}
+.metric-card .v{font-family:var(--font-display);font-size:28px;line-height:1;}
+.metric-card .l{font-size:11px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;text-transform:uppercase;}
+.breakdown-row{display:flex;justify-content:space-between;align-items:center;padding:11px 4px;border-bottom:1px solid var(--card-border);}
+.breakdown-row:last-child{border-bottom:none;}
+.breakdown-row .dot{width:8px;height:8px;border-radius:50%;margin-right:8px;display:inline-block;}
+.breakdown-name{display:flex;align-items:center;font-size:14px;color:var(--text-dim);font-weight:600;}
+.breakdown-val{font-family:var(--font-display);font-size:20px;}
+
+.feedback-block{margin-top:24px;}
+.rpe-row{display:flex;gap:6px;margin-top:8px;}
+.rpe-pill{
+  flex:1;text-align:center;padding:10px 0;border-radius:8px;background:var(--card);
+  border:1px solid var(--card-border);font-size:13px;font-weight:700;color:var(--text-dim);
+}
+.rpe-pill.sel{background:var(--text);border-color:var(--text);color:var(--bg);}
+.feeling-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;}
+.feeling-pill{
+  text-align:center;padding:12px 4px;border-radius:8px;background:var(--card);
+  border:1px solid var(--card-border);font-size:12px;font-weight:700;color:var(--text-dim);letter-spacing:.5px;
+}
+.feeling-pill.sel{background:var(--success);border-color:var(--success);color:#04140c;}
+textarea.note-input{
+  width:100%;background:var(--card);border:1px solid var(--card-border);border-radius:14px;
+  color:var(--text);padding:14px;font-size:14px;margin-top:8px;resize:none;min-height:80px;font-family:inherit;
+}
+textarea.note-input::placeholder{color:var(--text-faint);}
+
+/* ---- history ---- */
+.list-wrap{flex:1;min-height:0;padding:16px 20px 20px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.history-item{
+  position:relative;
+  background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);
+  padding:14px 16px 14px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;
+  overflow:hidden;
+}
+.history-item::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+  background:linear-gradient(180deg,var(--push),var(--web));
+}
+.history-item .date{font-size:13px;color:var(--text-dim);font-weight:600;}
+.history-item .reps{font-size:11px;color:var(--text-faint);margin-top:2px;}
+.history-item .rounds{font-family:var(--font-display);font-size:24px;}
+
+/* ---- detail ---- */
+.detail-table{width:100%;border-collapse:collapse;margin-top:10px;}
+.detail-table th{font-size:10px;color:var(--text-faint);letter-spacing:1px;text-align:center;padding:8px 4px;font-weight:700;text-transform:uppercase;}
+.detail-table td{font-size:13px;text-align:center;padding:9px 4px;border-top:1px solid var(--card-border);font-weight:700;}
+.detail-table td:first-child, .detail-table th:first-child{text-align:left;color:var(--text-dim);font-weight:600;}
+.skip-row td{opacity:.65;}
+
+/* ---- progress ---- */
+.period-row{display:flex;gap:8px;margin:14px 0 18px;}
+.period-pill{flex:1;text-align:center;padding:9px 0;border-radius:8px;background:var(--card);border:1px solid var(--card-border);font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;}
+.period-pill.sel{background:var(--text);border-color:var(--text);color:var(--bg);}
+.chart-card{position:relative;background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);padding:18px 14px 10px;margin-top:6px;}
+.chart-card::before{
+  content:"";position:absolute;top:0;right:0;width:74px;height:74px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%233D6FE0' stroke-width='1.3' opacity='0.3'%3E%3Cpath d='M100 0 L0 100'/%3E%3Cpath d='M100 28 L28 100'/%3E%3Cpath d='M100 56 L56 100'/%3E%3Cpath d='M100 0 Q70 45 100 100'/%3E%3Cpath d='M100 0 Q85 60 88 100'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:contain;background-position:top right;background-repeat:no-repeat;
+  pointer-events:none;border-radius:0 var(--radius) 0 0;
+}
+.chart-bars{position:relative;z-index:1;}
+.chart-bars{display:flex;align-items:flex-end;gap:5px;height:130px;}
+.chart-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
+.chart-bar{width:100%;max-width:22px;background:var(--primary);border-radius:5px 5px 2px 2px;min-height:3px;}
+.chart-bar.pb{background:var(--success);}
+.chart-xlabel{font-size:8px;color:var(--text-faint);margin-top:6px;}
+
+/* ---- reminder ---- */
+.reminder-card{text-align:left;padding:16px;}
+.reminder-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.reminder-lbl{font-size:14px;font-weight:700;color:var(--text);}
+.reminder-sub{font-size:11px;color:var(--text-faint);margin-top:2px;}
+.switch{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0;}
+.switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1;}
+.switch-track{position:absolute;inset:0;background:var(--bg-elev);border:1px solid var(--card-border);border-radius:20px;transition:background .2s ease,border-color .2s ease;}
+.switch-thumb{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--text-faint);transition:transform .2s ease,background .2s ease;}
+.switch input:checked ~ .switch-track{background:rgba(232,35,42,.18);border-color:var(--push);}
+.switch input:checked ~ .switch-track .switch-thumb{transform:translateX(20px);background:var(--push);}
+.time-input{
+  background:var(--bg-elev);border:1px solid var(--card-border);border-radius:8px;
+  color:var(--text);padding:8px 10px;font-size:14px;font-weight:700;font-family:inherit;
+}
+.time-input:focus{outline:none;border-color:var(--web);}
+
+/* ---- splash ---- */
+.splash{
+  position:fixed;inset:0;z-index:999;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  transition:opacity .45s ease, visibility .45s ease;
+}
+.splash.hide{opacity:0;visibility:hidden;pointer-events:none;}
+.splash-mark{width:104px;height:104px;}
+.splash-mark svg{width:100%;height:100%;}
+.splash-mark .spokes path{
+  stroke-dasharray:140;stroke-dashoffset:140;
+  animation:splashDraw .55s ease-out forwards;
+}
+.splash-mark .spokes path:nth-child(2){animation-delay:.04s;}
+.splash-mark .spokes path:nth-child(3){animation-delay:.08s;}
+.splash-mark .spokes path:nth-child(4){animation-delay:.12s;}
+.splash-mark .spokes path:nth-child(5){animation-delay:.16s;}
+.splash-mark .spokes path:nth-child(6){animation-delay:.2s;}
+.splash-mark .spokes path:nth-child(7){animation-delay:.24s;}
+.splash-mark .spokes path:nth-child(8){animation-delay:.28s;}
+.splash-mark .rings circle{
+  stroke-dasharray:400;stroke-dashoffset:400;
+  animation:splashDraw .6s ease-out forwards;animation-delay:.3s;
+}
+@keyframes splashDraw{to{stroke-dashoffset:0;}}
+.splash-word{
+  font-family:var(--font-display);font-size:34px;letter-spacing:4px;
+  background:linear-gradient(90deg,var(--push),var(--web));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  opacity:0;animation:splashWordIn .5s ease-out forwards;animation-delay:.45s;
+}
+@keyframes splashWordIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+<div id="splash" class="splash">
+  <div class="splash-mark">
+    <svg viewBox="0 0 200 200" fill="none">
+      <g class="spokes" stroke="#E8232A" stroke-width="3" stroke-linecap="round">
+        <path d="M100 100L100 8"/>
+        <path d="M100 100L163 37"/>
+        <path d="M100 100L192 100"/>
+        <path d="M100 100L163 163"/>
+        <path d="M100 100L100 192"/>
+        <path d="M100 100L37 163"/>
+        <path d="M100 100L8 100"/>
+        <path d="M100 100L37 37"/>
+      </g>
+      <g class="rings" stroke="#3D6FE0" stroke-width="2">
+        <circle cx="100" cy="100" r="38"/>
+        <circle cx="100" cy="100" r="68"/>
+      </g>
+    </svg>
+  </div>
+  <div class="splash-word">CINDY</div>
+</div>
+<div id="app">
+
+  <!-- HOME -->
+  <section id="screen-home" class="screen active">
+    <div class="topbar">
+      <div class="brand">CINDY</div>
+      <div style="display:flex;gap:8px;">
+        <button id="installBtn" class="iconbtn install-btn" onclick="handleInstallClick()" aria-label="Install app">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v13M7 11l5 5 5-5"/><path d="M4 19h16"/></svg>
+        </button>
+        <button class="iconbtn" onclick="openSettingsModal()" aria-label="Settings">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </button>
+        <button class="iconbtn" onclick="toggleTheme()" aria-label="Theme">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+        </button>
+        <button class="iconbtn" onclick="go('progress')" aria-label="Progress">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="home-content">
+      <div class="hero-card">
+        <div id="heroEyebrow" class="hero-eyebrow">20 MIN AMRAP</div>
+        <div id="heroTitle" class="hero-title">5 PULL-UP · 10 PUSH-UP · 15 SQUAT</div>
+        <div class="hero-protocol">
+          <div class="proto-chip pull"><div id="protoPullN" class="n">5</div><div class="l">PULL-UP</div></div>
+          <div class="proto-chip push"><div id="protoPushN" class="n">10</div><div class="l">PUSH-UP</div></div>
+          <div class="proto-chip squat"><div id="protoSquatN" class="n">15</div><div class="l">SQUAT</div></div>
+        </div>
+        <button id="homeMainBtn" class="btn btn-primary" onclick="handleHomeMainBtn()">START WORKOUT</button>
+        <div id="homeSecondaryWrap" style="margin-top:10px;display:none;">
+          <button class="btn btn-ghost btn-sm" onclick="confirmDiscardAndStartNew()">เริ่มใหม่ (ไม่เอา Workout ค้างอยู่)</button>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card"><div class="v" id="statBest">0</div><div class="l">PERSONAL BEST</div></div>
+        <div class="stat-card"><div class="v" id="statSessions">0</div><div class="l">SESSIONS</div></div>
+        <div class="stat-card"><div class="v" id="statTotalRounds">0</div><div class="l">TOTAL ROUNDS</div></div>
+        <div class="stat-card"><div class="v" id="statStreak">0</div><div class="l">STREAK</div></div>
+      </div>
+
+      <div class="section-label">LAST WORKOUT</div>
+      <div id="lastWorkoutWrap"><div class="empty-hint">ยังไม่มีประวัติการเล่น</div></div>
+    </div>
+    <div class="tabbar">
+      <div class="tab active" onclick="go('home')"><div class="dot"></div>HOME</div>
+      <div class="tab" onclick="go('history')"><div class="dot"></div>HISTORY</div>
+      <div class="tab" onclick="go('progress')"><div class="dot"></div>PROGRESS</div>
+    </div>
+  </section>
+
+  <!-- WORKOUT -->
+  <section id="screen-workout" class="screen">
+    <div class="workout-wrap">
+      <div class="workout-top">
+        <button class="iconbtn" onclick="openEndModal()" aria-label="Back">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+        <div id="statusPill" class="status-pill">กำลังเล่น</div>
+        <div style="width:38px;"></div>
+      </div>
+
+      <div class="timer-wrap">
+        <svg viewBox="0 0 250 250">
+          <defs>
+            <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#E8232A"/>
+              <stop offset="100%" stop-color="#3D6FE0"/>
+            </linearGradient>
+          </defs>
+          <circle class="track" cx="125" cy="125" r="108"/>
+          <circle id="ringProgress" class="ring" cx="125" cy="125" r="108" stroke="url(#ringGrad)" stroke-dasharray="678 678" stroke-dashoffset="0"/>
+        </svg>
+        <div class="timer-center">
+          <div id="timerDigits" class="timer-digits tabular">20:00</div>
+          <div class="timer-sub">เวลาที่เหลือ</div>
+        </div>
+      </div>
+
+      <div class="rounds-banner">
+        <div class="lbl">ROUNDS SAVED</div>
+        <div id="roundsBig" class="num tabular" style="font-size:28px;">0</div>
+        <div id="pbHint" class="pb-hint">PB —</div>
+      </div>
+
+      <div class="exercise-row">
+        <div class="ex-box pull">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 3l3 1.4L9 3l3 1.4L15 3l3 1.4L21 3" stroke-dasharray="1.2 2.4"/>
+            <circle cx="12" cy="8.4" r="1.7" fill="currentColor" stroke="none"/>
+            <path d="M12 10.2v4.3"/>
+            <path d="M7.2 4.7L12 10.2l4.8-5.5"/>
+            <path d="M6.4 4.2l1.6 1M15.4 4.2l-1.6 1"/>
+            <path d="M12 14.5l-2.3 3.6M12 14.5l2.3 3.6"/>
+          </svg>
+          <div id="repPull" class="rep">5</div><div class="name">PULL-UP</div>
+        </div>
+        <div class="ex-box push">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="5" cy="10.5" r="1.7" fill="currentColor" stroke="none"/>
+            <path d="M6.4 11.3l4.6 2.4 4-2 4.6 2"/>
+            <path d="M9.4 12.9l-2 4.6"/>
+            <path d="M6.6 16.2l1.4-.9"/>
+            <path d="M3 18.4h18"/>
+          </svg>
+          <div id="repPush" class="rep">10</div><div class="name">PUSH-UP</div>
+        </div>
+        <div class="ex-box squat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="5.2" r="1.7" fill="currentColor" stroke="none"/>
+            <path d="M12 7v3.6"/>
+            <path d="M8 7.6l4 3 4-3"/>
+            <path d="M8.6 7.9l-1.1 1M15.4 7.9l1.1 1"/>
+            <path d="M12 10.6l-3 3.6v4M12 10.6l3 3.6v4"/>
+            <path d="M6 18.4h12"/>
+          </svg>
+          <div id="repSquat" class="rep">15</div><div class="name">SQUAT</div>
+        </div>
+      </div>
+
+      <button id="saveRoundBtn" class="btn btn-success save-round-btn" onclick="saveRound()">✓ บันทึกรอบที่ 1</button>
+
+      <div class="control-row">
+        <button id="pauseBtn" class="btn btn-outline btn-sm" onclick="togglePause()">PAUSE</button>
+        <button class="btn btn-outline btn-sm" onclick="skipRound()">SKIP</button>
+      </div>
+      <div class="control-row">
+        <button class="btn btn-ghost btn-sm" onclick="openEndModal()">END WORKOUT</button>
+        <button class="btn btn-ghost btn-sm" onclick="openFinishModal()">FINISH NOW</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPLETE -->
+  <section id="screen-complete" class="screen">
+    <div class="complete-wrap">
+      <div class="complete-hero">
+        <div class="complete-star">★</div>
+        <div id="completeRounds" class="complete-rounds tabular">0</div>
+        <div class="complete-lbl">ROUNDS</div>
+        <div id="prBadge" class="pr-badge no">PR —</div>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-card"><div id="cTotalReps" class="v">0</div><div class="l">TOTAL REPS</div></div>
+        <div class="metric-card"><div id="cAvgRound" class="v tabular">00:00</div><div class="l">AVERAGE ROUND</div></div>
+      </div>
+
+      <div class="section-label">EXERCISE BREAKDOWN</div>
+      <div class="metric-card">
+        <div class="breakdown-row"><span class="breakdown-name"><span class="dot" style="background:var(--pull)"></span>PULL-UP</span><span id="bdPull" class="breakdown-val">0</span></div>
+        <div class="breakdown-row"><span class="breakdown-name"><span class="dot" style="background:var(--push)"></span>PUSH-UP</span><span id="bdPush" class="breakdown-val">0</span></div>
+        <div class="breakdown-row"><span class="breakdown-name"><span class="dot" style="background:var(--squat)"></span>SQUAT</span><span id="bdSquat" class="breakdown-val">0</span></div>
+      </div>
+
+      <div class="feedback-block">
+        <div class="section-label" style="margin-top:0;">RPE (1–10)</div>
+        <div id="rpeRow" class="rpe-row"></div>
+
+        <div class="section-label">FEELING</div>
+        <div class="feeling-row">
+          <div class="feeling-pill" data-f="Great" onclick="selectFeeling('Great')">GREAT</div>
+          <div class="feeling-pill" data-f="Good" onclick="selectFeeling('Good')">GOOD</div>
+          <div class="feeling-pill" data-f="Hard" onclick="selectFeeling('Hard')">HARD</div>
+          <div class="feeling-pill" data-f="Max" onclick="selectFeeling('Max')">MAX</div>
+        </div>
+
+        <div class="section-label">NOTE</div>
+        <textarea id="noteInput" class="note-input" placeholder="เช่น วันนี้ Pull-Up ช่วงท้ายเหนื่อยมาก..."></textarea>
+      </div>
+
+      <button class="btn btn-primary" style="margin-top:22px;" onclick="finishCompleteFlow()">บันทึกและกลับหน้าหลัก</button>
+      <button class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="shareResult(lastCompletedSessionId)">แชร์ผลลัพธ์</button>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="screen-history" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('home')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">HISTORY</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div id="historyList" class="list-wrap"></div>
+    <div class="tabbar">
+      <div class="tab" onclick="go('home')"><div class="dot"></div>HOME</div>
+      <div class="tab active" onclick="go('history')"><div class="dot"></div>HISTORY</div>
+      <div class="tab" onclick="go('progress')"><div class="dot"></div>PROGRESS</div>
+    </div>
+  </section>
+
+  <!-- DETAIL -->
+  <section id="screen-detail" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('history')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">WORKOUT REPORT</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap" id="detailWrap"></div>
+    <div style="padding:0 20px 20px;">
+      <button class="btn btn-outline btn-sm" onclick="shareResult(currentDetailId)">แชร์ผลลัพธ์</button>
+    </div>
+  </section>
+
+  <!-- PROGRESS -->
+  <section id="screen-progress" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('home')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">PROGRESS</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div class="stats-grid">
+        <div class="stat-card"><div id="pBest" class="v">0 R</div><div class="l">BEST</div></div>
+        <div class="stat-card"><div id="pAvg" class="v">0 R</div><div class="l">AVERAGE</div></div>
+        <div class="stat-card"><div id="pSessions" class="v">0</div><div class="l">SESSIONS</div></div>
+        <div class="stat-card"><div id="pTotalReps" class="v">0</div><div class="l">TOTAL REPS</div></div>
+      </div>
+      <div class="period-row">
+        <div class="period-pill" data-p="7" onclick="setPeriod('7')">7 DAYS</div>
+        <div class="period-pill" data-p="30" onclick="setPeriod('30')">30 DAYS</div>
+        <div class="period-pill" data-p="90" onclick="setPeriod('90')">3 MONTHS</div>
+        <div class="period-pill sel" data-p="all" onclick="setPeriod('all')">ALL</div>
+      </div>
+      <div class="period-row" style="margin-top:-8px;">
+        <div class="period-pill sel" data-m="rounds" onclick="setMetric('rounds')">ROUNDS</div>
+        <div class="period-pill" data-m="pull" onclick="setMetric('pull')">PULL-UP</div>
+        <div class="period-pill" data-m="push" onclick="setMetric('push')">PUSH-UP</div>
+        <div class="period-pill" data-m="squat" onclick="setMetric('squat')">SQUAT</div>
+      </div>
+      <div class="chart-card">
+        <div id="chartBars" class="chart-bars"></div>
+      </div>
+      <div class="section-label">STREAK</div>
+      <div class="metric-card" style="text-align:center;padding:20px;">
+        <div id="progStreak" class="v" style="font-size:28px;">0 DAYS</div>
+      </div>
+
+      <div class="section-label">เตือนเล่นทุกวัน</div>
+      <div class="metric-card reminder-card">
+        <div class="reminder-row">
+          <div>
+            <div class="reminder-lbl">เปิดการแจ้งเตือน</div>
+            <div class="reminder-sub">แจ้งเตือนตอนเปิดแอปถ้ายังไม่ได้เล่นวันนี้</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="reminderToggle" onchange="toggleReminder(this.checked)">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </label>
+        </div>
+        <div class="reminder-row" style="margin-top:12px;">
+          <div class="reminder-lbl">เวลาที่อยากให้เตือน</div>
+          <input type="time" id="reminderTime" class="time-input" onchange="setReminderTime(this.value)">
+        </div>
+        <div class="reminder-row" style="margin-top:12px;">
+          <div class="reminder-lbl">เสียงแจ้งเตือน</div>
+          <select id="reminderSound" class="time-input" onchange="setReminderSound(this.value)">
+            <option value="default">มีเสียง (ค่าเริ่มต้นเครื่อง)</option>
+            <option value="silent">สั่นอย่างเดียว (ไม่มีเสียง)</option>
+          </select>
+        </div>
+        <div id="reminderNativeHint" style="display:none;font-size:11px;color:var(--text-faint);margin-top:10px;line-height:1.5;">
+          แอปเวอร์ชันนี้แจ้งเตือนได้จริงแม้ปิดแอปอยู่ — เสียงจะใช้ค่าเริ่มต้นของเครื่อง (Android ไม่รองรับการเลือกเสียงแจ้งเตือนเองต่อแอปแบบเสียงเรียกเข้า จึงเลือกได้ระหว่าง "มีเสียง" หรือ "สั่นอย่างเดียว")
+        </div>
+        <div id="reminderWebHint" style="display:block;font-size:11px;color:var(--text-faint);margin-top:10px;line-height:1.5;">
+          บนเว็บ การแจ้งเตือนจะทำงานเฉพาะตอนเปิดแอปอยู่เท่านั้น — ติดตั้งเป็น APK เพื่อให้เตือนได้จริงแม้ปิดแอป
+        </div>
+        <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="testReminderNow()">ทดสอบการแจ้งเตือน</button>
+      </div>
+
+      <div class="section-label">BACKUP</div>
+      <div class="control-row">
+        <button class="btn btn-outline btn-sm" onclick="exportData()">EXPORT ข้อมูล</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()">IMPORT ข้อมูล</button>
+      </div>
+      <input type="file" id="importFile" accept="application/json" style="display:none;" onchange="importData(event)" />
+    </div>
+  </section>
+
+</div>
+
+<!-- End Workout Modal -->
+<div id="endModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">End Workout?</div>
+    <div class="modal-body">ข้อมูลของ Workout นี้จะไม่ถูกบันทึก</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('endModal')">CANCEL</button>
+      <button class="btn btn-danger btn-sm" onclick="confirmEndWorkout()">END</button>
+    </div>
+  </div>
+</div>
+
+<!-- iOS Install Instructions Modal -->
+<div id="iosInstallModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">ติดตั้ง CINDY ลงหน้าจอหลัก</div>
+    <div class="modal-body">
+      แตะปุ่ม
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin:0 2px;"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/></svg>
+      แชร์ ที่แถบด้านล่างของ Safari แล้วเลือก <b>"เพิ่มไปยังหน้าจอโฮม"</b> (Add to Home Screen) เพื่อเปิดแอปแบบเต็มจอได้ทันทีจากมือถือของคุณ
+    </div>
+    <div class="modal-row" style="grid-template-columns:1fr;">
+      <button class="btn btn-primary btn-sm" onclick="closeModal('iosInstallModal')">เข้าใจแล้ว</button>
+    </div>
+  </div>
+</div>
+
+<!-- Finish Now Modal -->
+<div id="finishModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">Finish Now?</div>
+    <div class="modal-body">ระบบจะบันทึก Workout ด้วยเวลาปัจจุบันและจำนวนรอบที่ทำได้</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('finishModal')">CANCEL</button>
+      <button class="btn btn-success btn-sm" onclick="confirmFinishNow()">FINISH</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings / Custom Protocol Modal -->
+<div id="settingsModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">ปรับโปรโตคอล</div>
+    <div class="modal-body">ตั้งจำนวนครั้งต่อรอบและเวลาทั้งหมดตามที่ต้องการ (ค่าเริ่มต้นคือ Cindy ดั้งเดิม 5-10-15 / 20 นาที)</div>
+    <div class="field-row"><label>PULL-UP ต่อรอบ</label><input type="number" id="cfgPull" min="0" max="99"></div>
+    <div class="field-row"><label>PUSH-UP ต่อรอบ</label><input type="number" id="cfgPush" min="0" max="99"></div>
+    <div class="field-row"><label>SQUAT ต่อรอบ</label><input type="number" id="cfgSquat" min="0" max="99"></div>
+    <div class="field-row"><label>เวลาทั้งหมด (นาที)</label><input type="number" id="cfgDuration" min="1" max="120"></div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="resetSettingsDefault()">ค่าเริ่มต้น</button>
+      <button class="btn btn-primary btn-sm" onclick="saveSettings()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

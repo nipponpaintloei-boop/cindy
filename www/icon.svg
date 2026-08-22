@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bgSplit" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8232A"/>
+      <stop offset="48%" stop-color="#7A1F3D"/>
+      <stop offset="100%" stop-color="#0B1330"/>
+    </linearGradient>
+    <linearGradient id="ringFill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#BFD0FF"/>
+    </linearGradient>
+    <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="11" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bgSplit)"/>
+  <rect x="1.5" y="1.5" width="509" height="509" rx="110.5" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="2"/>
+
+  <!-- radiating web lines from top-left corner -->
+  <g stroke="#FFFFFF" stroke-width="3" opacity="0.16">
+    <path d="M0 0 L512 512" fill="none"/>
+    <path d="M0 110 L402 512" fill="none"/>
+    <path d="M0 220 L292 512" fill="none"/>
+    <path d="M110 0 L512 402" fill="none"/>
+    <path d="M220 0 L512 292" fill="none"/>
+    <path d="M0 0 Q300 120 340 512" fill="none"/>
+    <path d="M0 0 Q120 300 170 512" fill="none"/>
+  </g>
+
+  <!-- the C: a thick ring with a gap, doubling as the app's own workout timer ring -->
+  <g filter="url(#softGlow)">
+    <circle cx="256" cy="256" r="172" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="46"/>
+    <circle cx="256" cy="256" r="172" fill="none" stroke="url(#ringFill)" stroke-width="46"
+      stroke-linecap="round" stroke-dasharray="978.6 102.1" stroke-dashoffset="-51"/>
+  </g>
+
+  <!-- terminal highlight, like the bright tip of a stopwatch hand -->
+  <circle cx="420.5" cy="205.7" r="10" fill="#FFFFFF"/>
+
+  <!-- small spider mark, bottom-right -->
+  <g transform="translate(256,256)" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" opacity="0.92">
+    <ellipse cx="0" cy="4" rx="17" ry="22" fill="#FFFFFF" stroke="none"/>
+    <ellipse cx="0" cy="-22" rx="10" ry="10" fill="#FFFFFF" stroke="none"/>
+    <path d="M-16 -6 L-46 -22 M-16 2 L-50 2 M-16 12 L-46 26"/>
+    <path d="M16 -6 L46 -22 M16 2 L50 2 M16 12 L46 26"/>
+  </g>
+</svg>

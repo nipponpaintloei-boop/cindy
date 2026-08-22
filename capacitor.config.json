@@ -1,0 +1,16 @@
+{
+  "appId": "com.cindy.workout",
+  "appName": "CINDY",
+  "webDir": "www",
+  "backgroundColor": "#0A0A0D",
+  "android": {
+    "backgroundColor": "#0A0A0D"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon",
+      "iconColor": "#E8232A",
+      "sound": "default"
+    }
+  }
+}
