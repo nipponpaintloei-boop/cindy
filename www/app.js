@@ -351,6 +351,34 @@ function renderHome() {
       <div class="rounds">${last.rounds} ROUNDS</div>
     </div>`;
   }
+
+  renderHomeCustomShortcut();
+}
+
+/**
+ * Shows a shortcut card for the most recently updated Custom Workout so
+ * people who train with Custom Workouts more than Cindy don't have to dig
+ * into a separate tab every time. Hidden entirely if none exist yet.
+ */
+function renderHomeCustomShortcut() {
+  const homeWrap = document.getElementById('homeCustomWrap');
+  const card = document.getElementById('homeCustomCard');
+  if (!homeWrap || !card) return;
+  const list = loadCustomWorkouts();
+  if (!list.length) {
+    homeWrap.style.display = 'none';
+    return;
+  }
+  const recent = list.slice().sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  const detail = recent.exercises.length + ' ท่า · ' + recent.sets + ' เซ็ต';
+  card.innerHTML = `<div class="history-item" onclick="startCustomWorkoutPlayer('${recent.id}')">
+    <div>
+      <div class="date">${escapeHtml(recent.name)}</div>
+      <div class="reps">${detail}</div>
+    </div>
+    <div class="rounds" style="color:var(--success);">▶</div>
+  </div>`;
+  homeWrap.style.display = 'block';
 }
 
 function computeStreak(sessions) {
@@ -1283,11 +1311,35 @@ async function shareResult(id) {
   }, 'image/png');
 }
 
-/* ================= BACKUP (Export / Import) ================= */
+/* ================= BACKUP (Export / Import) =================
+   v2: covers ALL locally-stored user data, not just Cindy sessions.
+   Previously this only exported KEY_SESSIONS ('cindy_sessions'), so
+   Custom Workouts, their completed-session history, and custom protocols
+   were silently left out of every backup — a device switch or app-clear
+   would permanently destroy them with no way to recover. Fixed by
+   collecting every user-data key into the payload, and merging every
+   category back in on import (still backward-compatible with old
+   v1 backups, which only ever contained `sessions`). */
 function exportData() {
   const sessions = loadSessions();
-  if (sessions.length === 0) { showToast('ยังไม่มีข้อมูลให้ส่งออก'); return; }
-  const payload = { app: 'CINDY', version: 1, exportedAt: Date.now(), sessions };
+  const customWorkouts = loadCustomWorkouts();
+  const customWorkoutSessions = loadCustomWorkoutSessions();
+  const customProtocols = loadCustomProtocols();
+
+  if (!sessions.length && !customWorkouts.length && !customWorkoutSessions.length && !customProtocols.length) {
+    showToast('ยังไม่มีข้อมูลให้ส่งออก');
+    return;
+  }
+
+  const payload = {
+    app: 'CINDY',
+    version: 2,
+    exportedAt: Date.now(),
+    sessions,
+    customWorkouts,
+    customWorkoutSessions,
+    customProtocols
+  };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const d = new Date();
@@ -1297,7 +1349,7 @@ function exportData() {
   a.href = url; a.download = fname;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showToast('ส่งออกข้อมูลแล้ว');
+  showToast('ส่งออกข้อมูลแล้ว (Cindy + Custom Workout)');
 }
 
 function importData(event) {
@@ -1307,21 +1359,69 @@ function importData(event) {
   reader.onload = () => {
     try {
       const parsed = JSON.parse(reader.result);
-      const incoming = Array.isArray(parsed) ? parsed : parsed.sessions;
-      if (!Array.isArray(incoming)) throw new Error('invalid format');
-      const existing = loadSessions();
-      const byId = new Map(existing.map(s => [s.id, s]));
+      const incomingSessions = Array.isArray(parsed) ? parsed : parsed.sessions;
+      const incomingWorkouts = Array.isArray(parsed) ? null : parsed.customWorkouts;
+      const incomingWorkoutSessions = Array.isArray(parsed) ? null : parsed.customWorkoutSessions;
+      const incomingProtocols = Array.isArray(parsed) ? null : parsed.customProtocols;
+
+      if (!Array.isArray(incomingSessions) && !Array.isArray(incomingWorkouts) &&
+          !Array.isArray(incomingWorkoutSessions) && !Array.isArray(incomingProtocols)) {
+        throw new Error('invalid format');
+      }
+
       let added = 0;
-      incoming.forEach(s => {
-        if (s && s.id && s.finished && s.total) {
-          if (!byId.has(s.id)) added++;
-          byId.set(s.id, s);
-        }
-      });
-      const merged = Array.from(byId.values()).sort((a, b) => a.finished - b.finished);
-      saveSessions(merged);
+
+      if (Array.isArray(incomingSessions)) {
+        const existing = loadSessions();
+        const byId = new Map(existing.map(s => [s.id, s]));
+        incomingSessions.forEach(s => {
+          if (s && s.id && s.finished && s.total) {
+            if (!byId.has(s.id)) added++;
+            byId.set(s.id, s);
+          }
+        });
+        saveSessions(Array.from(byId.values()).sort((a, b) => a.finished - b.finished));
+      }
+
+      if (Array.isArray(incomingWorkouts)) {
+        const existing = loadCustomWorkouts();
+        const byId = new Map(existing.map(w => [w.id, w]));
+        incomingWorkouts.forEach(w => {
+          if (w && w.id && Array.isArray(w.exercises)) {
+            if (!byId.has(w.id)) added++;
+            byId.set(w.id, w);
+          }
+        });
+        saveCustomWorkouts(Array.from(byId.values()));
+      }
+
+      if (Array.isArray(incomingWorkoutSessions)) {
+        const existing = loadCustomWorkoutSessions();
+        const byId = new Map(existing.map(s => [s.id, s]));
+        incomingWorkoutSessions.forEach(s => {
+          if (s && s.id) {
+            if (!byId.has(s.id)) added++;
+            byId.set(s.id, s);
+          }
+        });
+        saveCustomWorkoutSessions(Array.from(byId.values()).sort((a, b) => a.completedAt - b.completedAt));
+      }
+
+      if (Array.isArray(incomingProtocols)) {
+        const existing = loadCustomProtocols();
+        const byId = new Map(existing.map(p => [p.id, p]));
+        incomingProtocols.forEach(p => {
+          if (p && p.id) {
+            if (!byId.has(p.id)) added++;
+            byId.set(p.id, p);
+          }
+        });
+        saveCustomProtocols(Array.from(byId.values()));
+      }
+
       showToast('นำเข้าข้อมูลแล้ว (' + added + ' รายการใหม่)');
       renderProgress();
+      renderCustomList();
     } catch (e) {
       showToast('ไฟล์ไม่ถูกต้อง');
     }
@@ -1695,6 +1795,9 @@ function renderCustomList() {
         <button class="iconbtn" style="width:32px;height:32px;color:var(--success);" onclick="event.stopPropagation();startCustomWorkoutPlayer('${w.id}')" aria-label="Play">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>
         </button>
+        <button class="iconbtn" style="width:32px;height:32px;" onclick="event.stopPropagation();duplicateCustomWorkout('${w.id}')" aria-label="Duplicate">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
         <button class="iconbtn" style="width:32px;height:32px;" onclick="event.stopPropagation();openCustomEditor('${w.id}')" aria-label="Edit">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
         </button>
@@ -1704,6 +1807,25 @@ function renderCustomList() {
       </div>
     </div>`;
   }).join('');
+}
+
+/**
+ * Clones an existing workout recipe as a brand-new one (fresh id, "(Copy)"
+ * suffix, same exercises/sets/rest). Handy for making a variation of a
+ * workout you already like without rebuilding it from scratch.
+ */
+function duplicateCustomWorkout(id) {
+  const original = getCustomWorkout(id);
+  if (!original) return;
+  saveCustomWorkout({
+    id: null,
+    name: original.name + ' (Copy)',
+    sets: original.sets,
+    restBetweenSetsSec: original.restBetweenSetsSec,
+    exercises: original.exercises.map(ex => Object.assign({}, ex))
+  });
+  renderCustomList();
+  showToast('คัดลอก Workout แล้ว');
 }
 function confirmDeleteCustomWorkout(id) {
   // reuses the existing generic confirm pattern via native confirm-free flow:
@@ -1805,12 +1927,20 @@ function addCustomExercise() {
 
 /* ---- exercise library picker (phase 5a) ---- */
 let libraryActiveCategory = 'all';
+let libraryQuery = '';
 function openExerciseLibrary() {
   if (!customEditorDraft) return;
   libraryActiveCategory = 'all';
+  libraryQuery = '';
+  const searchInput = document.getElementById('librarySearchInput');
+  if (searchInput) searchInput.value = '';
   renderLibraryCategoryRow();
   renderLibraryList();
   document.getElementById('exerciseLibraryModal').classList.add('active');
+}
+function onLibrarySearchInput(value) {
+  libraryQuery = value;
+  renderLibraryList();
 }
 function renderLibraryCategoryRow() {
   const wrap = document.getElementById('libraryCategoryRow');
@@ -1827,9 +1957,15 @@ function setLibraryCategory(id) {
 function renderLibraryList() {
   const wrap = document.getElementById('libraryList');
   if (!wrap) return;
-  const items = libraryActiveCategory === 'all'
+  let items = libraryActiveCategory === 'all'
     ? EXERCISE_LIBRARY
     : EXERCISE_LIBRARY.filter(e => e.category === libraryActiveCategory);
+  const q = (libraryQuery || '').trim().toLowerCase();
+  if (q) items = items.filter(e => e.name.toLowerCase().includes(q));
+  if (!items.length) {
+    wrap.innerHTML = '<div class="empty-hint">ไม่พบท่าที่ค้นหา</div>';
+    return;
+  }
   wrap.innerHTML = items.map((ex, i) => {
     const idx = EXERCISE_LIBRARY.indexOf(ex);
     const equip = EQUIPMENT_LABEL[ex.equipment];
@@ -1914,7 +2050,7 @@ function startCustomWorkoutPlayer(id) {
     startedAt: Date.now(),
     exerciseLog: [],
     currentValue: 0,
-    timer: { endTime: null, totalMs: 0, running: false, handle: null, onDone: null }
+    timer: { endTime: null, totalMs: 0, running: false, paused: false, remainingMs: 0, handle: null, onDone: null }
   };
   unlockAudio();
   acquireWakeLock();
@@ -1936,13 +2072,38 @@ function clearCustomPlayerTimer() {
   if (!customPlayer) return;
   if (customPlayer.timer.handle) { clearInterval(customPlayer.timer.handle); customPlayer.timer.handle = null; }
   customPlayer.timer.running = false;
+  customPlayer.timer.paused = false;
 }
 function startCustomPlayerCountdown(totalSec, onDone) {
   customPlayer.timer.totalMs = totalSec * 1000;
   customPlayer.timer.endTime = Date.now() + totalSec * 1000;
   customPlayer.timer.running = true;
+  customPlayer.timer.paused = false;
   customPlayer.timer.onDone = onDone;
   customPlayer.timer.handle = setInterval(tickCustomPlayerTimer, 250);
+}
+/**
+ * Pauses or resumes the currently running countdown (time-mode exercise or
+ * any rest period). While paused, the interval is stopped entirely so the
+ * displayed time freezes exactly where it was — resuming shifts endTime
+ * forward by the remaining duration so nothing is lost or double-counted.
+ */
+function togglePlayerPause() {
+  if (!customPlayer) return;
+  const t = customPlayer.timer;
+  if (t.paused) {
+    t.endTime = Date.now() + t.remainingMs;
+    t.paused = false;
+    t.running = true;
+    t.handle = setInterval(tickCustomPlayerTimer, 250);
+  } else {
+    if (!t.running) return; // nothing to pause (e.g. reps-mode exercise)
+    t.remainingMs = Math.max(0, t.endTime - Date.now());
+    if (t.handle) { clearInterval(t.handle); t.handle = null; }
+    t.running = false;
+    t.paused = true;
+  }
+  renderCustomPlayer();
 }
 function tickCustomPlayerTimer() {
   if (!customPlayer || !customPlayer.timer.running) return;
@@ -1999,8 +2160,10 @@ function confirmPlayerExerciseDone() {
 }
 function skipPlayerStep() {
   if (!customPlayer) return;
+  const t = customPlayer.timer;
+  const remainingMs = t.paused ? t.remainingMs : Math.max(0, t.endTime - Date.now());
   if (customPlayer.phase === 'exercise' && currentCustomExercise().type === 'time') {
-    const elapsedSec = Math.max(0, currentCustomExercise().durationSec - Math.round((customPlayer.timer.endTime - Date.now()) / 1000));
+    const elapsedSec = Math.max(0, currentCustomExercise().durationSec - Math.round(remainingMs / 1000));
     clearCustomPlayerTimer();
     logCurrentCustomExercise(elapsedSec);
     advanceAfterCustomExercise();
@@ -2124,6 +2287,12 @@ function renderCustomPlayer() {
   document.getElementById('playerDoneBtn').style.display = showDone ? 'flex' : 'none';
   document.getElementById('playerSkipBtn').style.display = showSkip ? 'flex' : 'none';
   document.getElementById('playerRepsAdjustRow').style.display = showAdjust ? 'grid' : 'none';
+
+  const pauseBtn = document.getElementById('playerPauseBtn');
+  if (pauseBtn) {
+    pauseBtn.style.display = showSkip ? 'flex' : 'none';
+    pauseBtn.textContent = customPlayer.timer.paused ? '▶ เล่นต่อ' : '⏸ หยุดชั่วคราว';
+  }
 }
 
 /* ================= CUSTOM WORKOUT — HISTORY / REPORT (PHASE 4) ================= */

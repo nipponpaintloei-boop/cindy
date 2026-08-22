@@ -500,6 +500,11 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 
       <div class="section-label">LAST WORKOUT</div>
       <div id="lastWorkoutWrap"><div class="empty-hint">ยังไม่มีประวัติการเล่น</div></div>
+
+      <div id="homeCustomWrap" style="display:none;margin-top:14px;">
+        <div class="section-label">CUSTOM WORKOUT ล่าสุด</div>
+        <div id="homeCustomCard"></div>
+      </div>
     </div>
     <div class="tabbar">
       <div class="tab active" onclick="go('home')"><div class="dot"></div>HOME</div>
@@ -839,6 +844,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       </div>
 
       <button id="playerDoneBtn" class="btn btn-success save-round-btn" style="display:none;" onclick="confirmPlayerExerciseDone()">✓ เสร็จแล้ว</button>
+      <button id="playerPauseBtn" class="btn btn-outline" style="display:none;" onclick="togglePlayerPause()">⏸ หยุดชั่วคราว</button>
       <button id="playerSkipBtn" class="btn btn-outline" style="display:none;" onclick="skipPlayerStep()">ข้าม</button>
     </div>
   </section>
@@ -1055,6 +1061,9 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       <span>เลือกท่าออกกำลังกาย</span>
       <span onclick="closeModal('exerciseLibraryModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
     </div>
+    <input type="text" id="librarySearchInput" placeholder="ค้นหาท่า..."
+      style="width:100%;box-sizing:border-box;background:var(--bg-elev);border:1.5px solid var(--card-border);border-radius:8px;color:var(--text);padding:10px 12px;font-size:14px;margin-bottom:10px;"
+      oninput="onLibrarySearchInput(this.value)">
     <div id="libraryCategoryRow" class="period-row" style="flex-wrap:wrap;"></div>
     <div id="libraryList" class="protocol-list"></div>
     <div class="modal-row" style="grid-template-columns:1fr;margin-top:14px;">
