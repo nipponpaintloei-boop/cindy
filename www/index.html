@@ -778,8 +778,8 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 <div id="settingsModal" class="modal-overlay">
   <div class="modal-card">
     <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
-  <span>โปรโตคอล / WOD</span>
-  <span onclick="closeModal('settingsModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
+      <span>โปรโตคอล / WOD</span>
+      <span onclick="closeModal('settingsModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
     </div>
     <div class="modal-body">เลือกโปรโตคอลที่จะใช้เล่น หรือสร้างสูตรของคุณเอง (AMRAP หรือ EMOM)</div>
     <div id="protocolList" class="protocol-list"></div>
@@ -793,7 +793,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 <div id="protocolEditorModal" class="modal-overlay">
   <div class="modal-card">
     <div id="protoEditorTitle" class="modal-title">สร้างโปรโตคอลใหม่</div>
-    <div class="field-row"><label>ชื่อโปรโตคอล</label><input type="text" id="cfgName" placeholder="เช่น My AMRAP" style="width:140px;text-align:right;background:var(--bg-elev);border:1.5px solid var(--card-border);border-radius:8px;color:var(--text);padding:8px 10px;font-size:14px;"></div>
+    <div class="field-row" style="grid-template-columns:1fr 160px;"><label>ชื่อโปรโตคอล</label><input type="text" id="cfgName" placeholder="เช่น My AMRAP" style="width:100%;box-sizing:border-box;text-align:right;background:var(--bg-elev);border:1.5px solid var(--card-border);border-radius:8px;color:var(--text);padding:8px 10px;font-size:14px;"></div>
     <div id="protoModeRow" class="period-row" style="margin:4px 0 14px;">
       <div class="period-pill sel" data-mode="amrap" onclick="setProtoEditorMode('amrap')">AMRAP</div>
       <div class="period-pill" data-mode="emom" onclick="setProtoEditorMode('emom')">EMOM</div>
