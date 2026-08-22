@@ -1,31 +1,75 @@
 /* ===== CINDY — App Logic ===== */
-const KEY_CONFIG = 'cindy_config';
-const DEFAULT_CONFIG = { pull: 5, push: 10, squat: 15, durationMin: 20 };
-let CONFIG = loadConfig();
-let DURATION_MS = CONFIG.durationMin * 60 * 1000;
-let REPS = { pull: CONFIG.pull, push: CONFIG.push, squat: CONFIG.squat };
 const RING_CIRC = 2 * Math.PI * 108;
 const KEY_SESSIONS = 'cindy_sessions';
 const KEY_ACTIVE = 'cindy_active_workout';
 
-function loadConfig() {
+/* ================= PROTOCOL LIBRARY ================= */
+/* A "protocol" is a saved WOD prescription: either an AMRAP (fixed reps/round,
+   racing the clock for max rounds) or an EMOM (fixed reps, auto-advancing every
+   interval). Built-ins ship with the app and can't be edited/deleted; custom
+   ones are user-created and stored in localStorage. */
+const KEY_PROTOCOLS = 'cindy_protocols';
+const KEY_ACTIVE_PROTOCOL = 'cindy_active_protocol_id';
+
+const BUILTIN_PROTOCOLS = [
+  { id: 'builtin_cindy', builtin: true, name: 'Cindy (Classic)', mode: 'amrap', pull: 5, push: 10, squat: 15, durationMin: 20 },
+  { id: 'builtin_quickcindy', builtin: true, name: 'Quick Cindy', mode: 'amrap', pull: 3, push: 6, squat: 9, durationMin: 12 },
+  { id: 'builtin_heavycindy', builtin: true, name: 'Heavy Cindy', mode: 'amrap', pull: 8, push: 15, squat: 20, durationMin: 25 },
+  { id: 'builtin_emom', builtin: true, name: 'EMOM Starter', mode: 'emom', pull: 3, push: 6, squat: 9, emomIntervalSec: 60, emomRounds: 20 }
+];
+
+function loadCustomProtocols() {
   try {
-    const saved = JSON.parse(localStorage.getItem(KEY_CONFIG));
-    if (saved && typeof saved === 'object') return Object.assign({}, DEFAULT_CONFIG, saved);
+    const saved = JSON.parse(localStorage.getItem(KEY_PROTOCOLS));
+    if (Array.isArray(saved)) return saved;
   } catch (e) {}
-  return Object.assign({}, DEFAULT_CONFIG);
+  return [];
 }
-function saveConfig(cfg) {
-  CONFIG = cfg;
-  localStorage.setItem(KEY_CONFIG, JSON.stringify(cfg));
-  REPS = { pull: cfg.pull, push: cfg.push, squat: cfg.squat };
-  DURATION_MS = cfg.durationMin * 60 * 1000;
+function saveCustomProtocols(list) {
+  localStorage.setItem(KEY_PROTOCOLS, JSON.stringify(list));
+}
+function allProtocols() {
+  return BUILTIN_PROTOCOLS.concat(loadCustomProtocols());
+}
+function loadActiveProtocolId() {
+  return localStorage.getItem(KEY_ACTIVE_PROTOCOL) || 'builtin_cindy';
+}
+function getActiveProtocol() {
+  const id = loadActiveProtocolId();
+  return allProtocols().find(p => p.id === id) || BUILTIN_PROTOCOLS[0];
+}
+function selectProtocol(id) {
+  localStorage.setItem(KEY_ACTIVE_PROTOCOL, id);
+  applyActiveProtocolToRuntime();
   applyProtocolToUI();
+  renderProtocolList();
+  showToast('ตั้งเป็นโปรโตคอลปัจจุบันแล้ว');
 }
+
+/* runtime state derived from the active protocol */
+let ACTIVE_PROTOCOL, MODE, CONFIG, REPS, DURATION_MS, EMOM_INTERVAL_MS, EMOM_ROUNDS;
+function applyActiveProtocolToRuntime() {
+  ACTIVE_PROTOCOL = getActiveProtocol();
+  MODE = ACTIVE_PROTOCOL.mode || 'amrap';
+  REPS = { pull: ACTIVE_PROTOCOL.pull, push: ACTIVE_PROTOCOL.push, squat: ACTIVE_PROTOCOL.squat };
+  if (MODE === 'emom') {
+    EMOM_INTERVAL_MS = (ACTIVE_PROTOCOL.emomIntervalSec || 60) * 1000;
+    EMOM_ROUNDS = ACTIVE_PROTOCOL.emomRounds || 20;
+    DURATION_MS = EMOM_INTERVAL_MS * EMOM_ROUNDS;
+    CONFIG = { pull: REPS.pull, push: REPS.push, squat: REPS.squat, durationMin: Math.round(DURATION_MS / 60000) };
+  } else {
+    CONFIG = { pull: ACTIVE_PROTOCOL.pull, push: ACTIVE_PROTOCOL.push, squat: ACTIVE_PROTOCOL.squat, durationMin: ACTIVE_PROTOCOL.durationMin || 20 };
+    DURATION_MS = CONFIG.durationMin * 60 * 1000;
+  }
+}
+applyActiveProtocolToRuntime();
+
 function applyProtocolToUI() {
   const heroEyebrow = document.getElementById('heroEyebrow');
   const heroTitle = document.getElementById('heroTitle');
-  if (heroEyebrow) heroEyebrow.textContent = CONFIG.durationMin + ' MIN AMRAP';
+  if (heroEyebrow) heroEyebrow.textContent = MODE === 'emom'
+    ? 'EMOM ' + EMOM_ROUNDS + ' × ' + Math.round(EMOM_INTERVAL_MS / 1000) + 's'
+    : CONFIG.durationMin + ' MIN AMRAP';
   if (heroTitle) heroTitle.textContent = CONFIG.pull + ' PULL-UP · ' + CONFIG.push + ' PUSH-UP · ' + CONFIG.squat + ' SQUAT';
   const protoPullN = document.getElementById('protoPullN');
   const protoPushN = document.getElementById('protoPushN');
@@ -40,31 +84,104 @@ function applyProtocolToUI() {
   if (repPush) repPush.textContent = CONFIG.push;
   if (repSquat) repSquat.textContent = CONFIG.squat;
   const timerDigits = document.getElementById('timerDigits');
-  if (timerDigits && !loadActive()) timerDigits.textContent = fmtTime(CONFIG.durationMin * 60);
+  if (timerDigits && !loadActive()) {
+    timerDigits.textContent = MODE === 'emom' ? fmtTime(EMOM_INTERVAL_MS / 1000) : fmtTime(CONFIG.durationMin * 60);
+  }
+  const protocolNameEl = document.getElementById('activeProtocolName');
+  if (protocolNameEl) protocolNameEl.textContent = ACTIVE_PROTOCOL.name;
 }
+
+/* ---- protocol library screen ---- */
 function openSettingsModal() {
-  document.getElementById('cfgPull').value = CONFIG.pull;
-  document.getElementById('cfgPush').value = CONFIG.push;
-  document.getElementById('cfgSquat').value = CONFIG.squat;
-  document.getElementById('cfgDuration').value = CONFIG.durationMin;
+  renderProtocolList();
   document.getElementById('settingsModal').classList.add('active');
 }
-function saveSettings() {
-  const cfg = {
+function renderProtocolList() {
+  const wrap = document.getElementById('protocolList');
+  if (!wrap) return;
+  const activeId = loadActiveProtocolId();
+  wrap.innerHTML = allProtocols().map(p => {
+    const detail = p.mode === 'emom'
+      ? 'EMOM · ' + p.pull + '/' + p.push + '/' + p.squat + ' · ' + p.emomRounds + '×' + p.emomIntervalSec + 's'
+      : 'AMRAP · ' + p.pull + '/' + p.push + '/' + p.squat + ' · ' + p.durationMin + ' min';
+    return `<div class="history-item protocol-item${p.id === activeId ? ' sel' : ''}" onclick="selectProtocol('${p.id}')">
+      <div>
+        <div class="date">${escapeHtml(p.name)}${p.id === activeId ? ' <span class="proto-active-tag">ปัจจุบัน</span>' : ''}</div>
+        <div class="reps">${detail}</div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        ${p.builtin ? '' : `<button class="iconbtn" style="width:32px;height:32px;" onclick="event.stopPropagation();openProtocolEditor('${p.id}')" aria-label="Edit">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+        </button>
+        <button class="iconbtn" style="width:32px;height:32px;color:var(--danger);" onclick="event.stopPropagation();deleteProtocol('${p.id}')" aria-label="Delete">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/></svg>
+        </button>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+function deleteProtocol(id) {
+  if (id === loadActiveProtocolId()) { showToast('ลบไม่ได้ กำลังใช้งานอยู่ — สลับไปโปรโตคอลอื่นก่อน'); return; }
+  const list = loadCustomProtocols().filter(p => p.id !== id);
+  saveCustomProtocols(list);
+  renderProtocolList();
+  showToast('ลบโปรโตคอลแล้ว');
+}
+
+/* ---- create / edit a custom protocol ---- */
+let editingProtocolId = null;
+function openProtocolEditor(id) {
+  editingProtocolId = id || null;
+  const p = id ? allProtocols().find(x => x.id === id) : null;
+  document.getElementById('protoEditorTitle').textContent = p ? 'แก้ไขโปรโตคอล' : 'สร้างโปรโตคอลใหม่';
+  document.getElementById('cfgName').value = p ? p.name : '';
+  const mode = p ? (p.mode || 'amrap') : 'amrap';
+  setProtoEditorMode(mode);
+  document.getElementById('cfgPull').value = p ? p.pull : 5;
+  document.getElementById('cfgPush').value = p ? p.push : 10;
+  document.getElementById('cfgSquat').value = p ? p.squat : 15;
+  document.getElementById('cfgDuration').value = p && p.durationMin ? p.durationMin : 20;
+  document.getElementById('cfgEmomInterval').value = p && p.emomIntervalSec ? p.emomIntervalSec : 60;
+  document.getElementById('cfgEmomRounds').value = p && p.emomRounds ? p.emomRounds : 20;
+  closeModal('settingsModal');
+  document.getElementById('protocolEditorModal').classList.add('active');
+}
+function setProtoEditorMode(mode) {
+  document.querySelectorAll('#protoModeRow .period-pill').forEach(el => el.classList.toggle('sel', el.dataset.mode === mode));
+  document.getElementById('amrapFields').style.display = mode === 'amrap' ? 'block' : 'none';
+  document.getElementById('emomFields').style.display = mode === 'emom' ? 'block' : 'none';
+}
+function getProtoEditorMode() {
+  const sel = document.querySelector('#protoModeRow .period-pill.sel');
+  return sel ? sel.dataset.mode : 'amrap';
+}
+function saveProtocolEditor() {
+  const name = document.getElementById('cfgName').value.trim();
+  if (!name) { showToast('กรุณาตั้งชื่อโปรโตคอล'); return; }
+  const mode = getProtoEditorMode();
+  const proto = {
+    id: editingProtocolId || ('custom_' + Date.now()),
+    builtin: false,
+    name,
+    mode,
     pull: Math.max(0, parseInt(document.getElementById('cfgPull').value, 10) || 0),
     push: Math.max(0, parseInt(document.getElementById('cfgPush').value, 10) || 0),
-    squat: Math.max(0, parseInt(document.getElementById('cfgSquat').value, 10) || 0),
-    durationMin: Math.max(1, parseInt(document.getElementById('cfgDuration').value, 10) || DEFAULT_CONFIG.durationMin)
+    squat: Math.max(0, parseInt(document.getElementById('cfgSquat').value, 10) || 0)
   };
-  saveConfig(cfg);
-  closeModal('settingsModal');
+  if (mode === 'amrap') {
+    proto.durationMin = Math.max(1, parseInt(document.getElementById('cfgDuration').value, 10) || 20);
+  } else {
+    proto.emomIntervalSec = Math.max(10, parseInt(document.getElementById('cfgEmomInterval').value, 10) || 60);
+    proto.emomRounds = Math.max(1, parseInt(document.getElementById('cfgEmomRounds').value, 10) || 20);
+  }
+  const list = loadCustomProtocols();
+  const idx = list.findIndex(p => p.id === proto.id);
+  if (idx !== -1) list[idx] = proto; else list.push(proto);
+  saveCustomProtocols(list);
+  selectProtocol(proto.id);
+  closeModal('protocolEditorModal');
   showToast('บันทึกโปรโตคอลแล้ว');
-}
-function resetSettingsDefault() {
-  document.getElementById('cfgPull').value = DEFAULT_CONFIG.pull;
-  document.getElementById('cfgPush').value = DEFAULT_CONFIG.push;
-  document.getElementById('cfgSquat').value = DEFAULT_CONFIG.squat;
-  document.getElementById('cfgDuration').value = DEFAULT_CONFIG.durationMin;
+  openSettingsModal();
 }
 
 let tickHandle = null;
@@ -268,16 +385,23 @@ function confirmDiscardAndStartNew() {
 
 /* ================= WORKOUT ================= */
 function startNewWorkout() {
+  applyActiveProtocolToRuntime();
   const now = Date.now();
   const active = {
     id: 'w_' + now,
+    protocolId: ACTIVE_PROTOCOL.id,
+    protocolName: ACTIVE_PROTOCOL.name,
+    mode: MODE,
     startTime: now,
     endTime: now + DURATION_MS,
     isPaused: false,
     pausedRemainingMs: null,
     roundsSaved: 0,
     roundLog: [], // {number, pull, push, squat, time} time = elapsed seconds since start
-    skipLog: []   // {time} rounds skipped — never counted toward roundsSaved
+    skipLog: [],  // {time} rounds skipped — never counted toward roundsSaved
+    emomIntervalMs: MODE === 'emom' ? EMOM_INTERVAL_MS : null,
+    emomRounds: MODE === 'emom' ? EMOM_ROUNDS : null,
+    emomLastLoggedInterval: -1
   };
   saveActive(active);
   enterWorkoutScreen();
@@ -301,6 +425,7 @@ function getElapsedMs(active) {
 function refreshWorkoutUI() {
   const active = loadActive();
   if (!active) { go('home'); return; }
+  document.getElementById('screen-workout').classList.toggle('mode-emom', active.mode === 'emom');
 
   let remainingMs;
   if (active.isPaused) {
@@ -314,6 +439,14 @@ function refreshWorkoutUI() {
     return;
   }
 
+  if (active.mode === 'emom') {
+    refreshEmomUI(active, remainingMs);
+    return;
+  }
+  refreshAmrapUI(active, remainingMs);
+}
+
+function refreshAmrapUI(active, remainingMs) {
   const remainingSec = remainingMs / 1000;
   document.getElementById('timerDigits').textContent = fmtTime(remainingSec);
 
@@ -365,6 +498,69 @@ function refreshWorkoutUI() {
   }
 }
 
+function refreshEmomUI(active, remainingMs) {
+  const totalElapsedMs = DURATION_MS - remainingMs;
+  const intervalMs = active.emomIntervalMs;
+  const totalRounds = active.emomRounds;
+  const currentIntervalIdx = Math.min(totalRounds - 1, Math.floor(totalElapsedMs / intervalMs));
+  const msIntoInterval = totalElapsedMs - currentIntervalIdx * intervalMs;
+  const msLeftInInterval = Math.max(0, intervalMs - msIntoInterval);
+
+  // auto-log every interval that has fully elapsed since we last checked
+  if (!active.isPaused) {
+    while (active.emomLastLoggedInterval < currentIntervalIdx - 1) {
+      active.emomLastLoggedInterval++;
+      logEmomInterval(active, active.emomLastLoggedInterval);
+    }
+    saveActive(active);
+  }
+
+  document.getElementById('timerDigits').textContent = fmtTime(msLeftInInterval / 1000);
+  document.getElementById('roundsBig').textContent = active.roundsSaved;
+  document.getElementById('pbHint').textContent = 'รอบที่ ' + (currentIntervalIdx + 1) + ' / ' + totalRounds;
+  document.getElementById('saveRoundBtn').textContent = active.isPaused ? 'PAUSED' : 'รอบถัดไปใน ' + fmtTime(msLeftInInterval / 1000);
+
+  const secLeft = Math.ceil(msLeftInInterval / 1000);
+  if (!active.isPaused) {
+    const cdKey = active.id + '_i' + currentIntervalIdx;
+    if (countdownState.id !== cdKey) countdownState = { id: cdKey, done: new Set() };
+    if ([3, 2, 1].includes(secLeft) && !countdownState.done.has(secLeft)) {
+      countdownState.done.add(secLeft);
+      vibrate(30); beep(880, 90, 0.15);
+    }
+  }
+
+  const frac = Math.max(0, Math.min(1, msLeftInInterval / intervalMs));
+  const ring = document.getElementById('ringProgress');
+  const offset = RING_CIRC * (1 - frac);
+  ring.setAttribute('stroke-dasharray', RING_CIRC + ' ' + RING_CIRC);
+  ring.setAttribute('stroke-dashoffset', offset);
+  ring.style.stroke = secLeft <= 5 ? 'var(--danger)' : 'var(--web)';
+
+  const statusPill = document.getElementById('statusPill');
+  const pauseBtn = document.getElementById('pauseBtn');
+  if (active.isPaused) {
+    statusPill.textContent = 'PAUSED';
+    statusPill.classList.add('paused');
+    pauseBtn.textContent = 'RESUME';
+  } else {
+    statusPill.textContent = 'EMOM · กำลังเล่น';
+    statusPill.classList.remove('paused');
+    pauseBtn.textContent = 'PAUSE';
+  }
+}
+
+function logEmomInterval(active, idx) {
+  active.roundsSaved += 1;
+  active.roundLog.push({
+    number: active.roundsSaved,
+    pull: REPS.pull, push: REPS.push, squat: REPS.squat,
+    time: Math.round((idx + 1) * (active.emomIntervalMs / 1000))
+  });
+  vibrate([40, 30, 40]);
+  beep(700, 100, 0.15);
+}
+
 function startTickLoop() {
   stopTickLoop();
   tickHandle = setInterval(refreshWorkoutUI, 250);
@@ -376,6 +572,7 @@ function stopTickLoop() {
 function saveRound() {
   const active = loadActive();
   if (!active) return;
+  if (active.mode === 'emom') return; // EMOM logs rounds automatically each interval
   const elapsedSec = getElapsedMs(active) / 1000;
   active.roundsSaved += 1;
   active.roundLog.push({
@@ -393,6 +590,7 @@ function saveRound() {
 function skipRound() {
   const active = loadActive();
   if (!active) return;
+  if (active.mode === 'emom') return; // not applicable in EMOM — rounds auto-log on the clock
   const elapsedSec = getElapsedMs(active) / 1000;
   if (!active.skipLog) active.skipLog = [];
   active.skipLog.push({ time: Math.round(elapsedSec) });
@@ -439,6 +637,12 @@ function confirmFinishNow() {
 /* ================= COMPLETE ================= */
 function completeWorkout(active, reason) {
   releaseWakeLock();
+  if (active.mode === 'emom' && active.emomLastLoggedInterval < active.emomRounds - 1) {
+    while (active.emomLastLoggedInterval < active.emomRounds - 1) {
+      active.emomLastLoggedInterval++;
+      logEmomInterval(active, active.emomLastLoggedInterval);
+    }
+  }
   vibrate([100, 60, 100]);
   beep(440, 240, 0.18);
   const elapsedMs = reason === 'timeout' ? DURATION_MS : getElapsedMs(active);
@@ -462,6 +666,8 @@ function completeWorkout(active, reason) {
     skip_log: active.skipLog || [],
     total: { pull: totalPull, push: totalPush, squat: totalSquat, reps: totalReps },
     isPR: isNewPR,
+    protocolName: active.protocolName || 'Cindy (Classic)',
+    mode: active.mode || 'amrap',
     rpe: null,
     feeling: null,
     note: ''
@@ -548,8 +754,8 @@ function renderHistory() {
   wrap.innerHTML = sessions.map(s => `
     <div class="history-item" onclick="openDetail('${s.id}')">
       <div>
-        <div class="date">${fmtDate(s.finished)}</div>
-        <div class="reps">${s.total.reps} REPS</div>
+        <div class="date">${fmtDate(s.finished)}${s.mode === 'emom' ? ' <span class="proto-active-tag">EMOM</span>' : ''}</div>
+        <div class="reps">${s.total.reps} REPS · ${escapeHtml(s.protocolName || 'Cindy')}</div>
       </div>
       <div class="rounds">${s.rounds} R</div>
     </div>
@@ -601,6 +807,7 @@ function openDetail(id) {
     <div class="complete-hero" style="padding-top:4px;">
       <div class="complete-rounds tabular">${s.rounds}</div>
       <div class="complete-lbl">ROUNDS · ${fmtDate(s.finished)}</div>
+      <div style="font-size:11px;color:var(--text-faint);margin-top:4px;letter-spacing:1px;">${escapeHtml(s.protocolName || 'Cindy')}${s.mode === 'emom' ? ' · EMOM' : ''}</div>
       ${s.isPR ? '<div class="pr-badge new">NEW PR</div>' : ''}
     </div>
     <div class="metric-grid">
@@ -628,6 +835,54 @@ function openDetail(id) {
     ${s.note ? `<div class="section-label">NOTE</div><div class="metric-card" style="font-size:13px;color:var(--text-dim);line-height:1.5;">${escapeHtml(s.note)}</div>` : ''}
   `;
   go('detail');
+}
+
+/* ================= EDIT / DELETE SESSION ================= */
+let pendingEditFeedback = { rpe: null, feeling: null };
+function openEditSessionModal(id) {
+  const s = loadSessions().find(x => x.id === id);
+  if (!s) return;
+  currentDetailId = id;
+  pendingEditFeedback = { rpe: s.rpe || null, feeling: s.feeling || null };
+  document.getElementById('editNoteInput').value = s.note || '';
+  const rpeRow = document.getElementById('editRpeRow');
+  rpeRow.innerHTML = '';
+  for (let i = 1; i <= 10; i++) {
+    const el = document.createElement('div');
+    el.className = 'rpe-pill' + (s.rpe === i ? ' sel' : '');
+    el.textContent = i;
+    el.onclick = () => { pendingEditFeedback.rpe = i; rpeRow.querySelectorAll('.rpe-pill').forEach(p => p.classList.remove('sel')); el.classList.add('sel'); };
+    rpeRow.appendChild(el);
+  }
+  document.querySelectorAll('#editFeelingRow .feeling-pill').forEach(p => p.classList.toggle('sel', p.dataset.f === s.feeling));
+  document.getElementById('editSessionModal').classList.add('active');
+}
+function selectEditFeeling(val) {
+  pendingEditFeedback.feeling = val;
+  document.querySelectorAll('#editFeelingRow .feeling-pill').forEach(p => p.classList.toggle('sel', p.dataset.f === val));
+}
+function saveEditSession() {
+  const sessions = loadSessions();
+  const idx = sessions.findIndex(s => s.id === currentDetailId);
+  if (idx === -1) return;
+  sessions[idx].rpe = pendingEditFeedback.rpe;
+  sessions[idx].feeling = pendingEditFeedback.feeling;
+  sessions[idx].note = document.getElementById('editNoteInput').value.trim();
+  saveSessions(sessions);
+  closeModal('editSessionModal');
+  openDetail(currentDetailId);
+  showToast('บันทึกการแก้ไขแล้ว');
+}
+function confirmDeleteSession() {
+  document.getElementById('deleteSessionModal').classList.add('active');
+}
+function deleteSessionExecute() {
+  const sessions = loadSessions().filter(s => s.id !== currentDetailId);
+  saveSessions(sessions);
+  closeModal('deleteSessionModal');
+  currentDetailId = null;
+  showToast('ลบ Workout นี้แล้ว');
+  go('history');
 }
 
 function escapeHtml(str) {
@@ -1070,6 +1325,73 @@ function importData(event) {
   };
   reader.readAsText(file);
   event.target.value = '';
+}
+
+/* ================= REST TIMER (standalone quick tool, not tied to a session) ================= */
+let restTimer = { totalSec: 60, remainingMs: 60000, running: false, endTime: null, handle: null };
+function openRestTimer() {
+  renderRestTimer();
+  document.getElementById('restTimerModal').classList.add('active');
+}
+function resetRestTimerState(totalSec) {
+  stopRestTickLoop();
+  restTimer.totalSec = totalSec;
+  restTimer.remainingMs = totalSec * 1000;
+  restTimer.running = false;
+  restTimer.endTime = null;
+}
+function setRestDuration(sec) {
+  resetRestTimerState(sec);
+  renderRestTimer();
+}
+function adjustRestDuration(deltaSec) {
+  resetRestTimerState(Math.max(5, restTimer.totalSec + deltaSec));
+  renderRestTimer();
+}
+function toggleRestTimer() {
+  if (restTimer.running) {
+    restTimer.remainingMs = Math.max(0, restTimer.endTime - Date.now());
+    restTimer.running = false;
+    stopRestTickLoop();
+  } else {
+    if (restTimer.remainingMs <= 0) restTimer.remainingMs = restTimer.totalSec * 1000;
+    restTimer.endTime = Date.now() + restTimer.remainingMs;
+    restTimer.running = true;
+    startRestTickLoop();
+  }
+  renderRestTimer();
+}
+function resetRestTimer() {
+  resetRestTimerState(restTimer.totalSec);
+  renderRestTimer();
+}
+function startRestTickLoop() {
+  stopRestTickLoop();
+  restTimer.handle = setInterval(tickRestTimer, 250);
+}
+function stopRestTickLoop() {
+  if (restTimer.handle) { clearInterval(restTimer.handle); restTimer.handle = null; }
+}
+function tickRestTimer() {
+  restTimer.remainingMs = Math.max(0, restTimer.endTime - Date.now());
+  if (restTimer.remainingMs <= 0) {
+    restTimer.running = false;
+    stopRestTickLoop();
+    vibrate([100, 60, 100, 60, 100]);
+    beep(880, 200, 0.2);
+    showToast('หมดเวลาพัก!');
+  }
+  renderRestTimer();
+}
+function renderRestTimer() {
+  const digits = document.getElementById('restTimerDigits');
+  if (!digits) return;
+  digits.textContent = fmtTime(restTimer.remainingMs / 1000);
+  const btn = document.getElementById('restTimerToggleBtn');
+  if (btn) btn.textContent = restTimer.running ? 'PAUSE' : (restTimer.remainingMs > 0 && restTimer.remainingMs < restTimer.totalSec * 1000 ? 'RESUME' : 'START');
+  document.querySelectorAll('#restQuickRow .period-pill').forEach(el => {
+    el.classList.toggle('sel', parseInt(el.dataset.sec, 10) === restTimer.totalSec);
+  });
 }
 
 /* ================= PWA INSTALL ================= */
