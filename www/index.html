@@ -752,7 +752,9 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <div class="brand" style="font-size:16px;">CUSTOM WORKOUTS</div>
-      <div style="width:38px;"></div>
+      <button class="iconbtn" onclick="go('customhistory')" aria-label="History">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>
+      </button>
     </div>
     <div class="list-wrap">
       <div id="customWorkoutList"></div>
@@ -789,7 +791,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 
       <div class="section-label" style="margin-top:20px;">ท่าออกกำลังกาย</div>
       <div id="customExerciseList"></div>
-      <button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="addCustomExercise()">+ เพิ่มท่า</button>
+      <button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="openExerciseLibrary()">+ เพิ่มท่า</button>
 
       <div class="control-row" style="margin-top:26px;">
         <button class="btn btn-ghost btn-sm" onclick="cancelCustomEditor()">ยกเลิก</button>
@@ -838,6 +840,33 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 
       <button id="playerDoneBtn" class="btn btn-success save-round-btn" style="display:none;" onclick="confirmPlayerExerciseDone()">✓ เสร็จแล้ว</button>
       <button id="playerSkipBtn" class="btn btn-outline" style="display:none;" onclick="skipPlayerStep()">ข้าม</button>
+    </div>
+  </section>
+
+  <!-- CUSTOM WORKOUT HISTORY -->
+  <section id="screen-customhistory" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('customlist')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">WORKOUT HISTORY</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div id="customHistoryList" class="list-wrap"></div>
+  </section>
+
+  <!-- CUSTOM WORKOUT HISTORY DETAIL -->
+  <section id="screen-customhistorydetail" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('customhistory')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">WORKOUT REPORT</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap" id="customHistoryDetailWrap"></div>
+    <div style="padding:0 20px 20px;">
+      <button class="btn btn-danger btn-sm" onclick="confirmDeleteCustomHistorySession()">ลบ Workout นี้</button>
     </div>
   </section>
 
@@ -1003,6 +1032,33 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="modal-row">
       <button class="btn btn-outline btn-sm" onclick="closeModal('customPlayerEndModal')">CANCEL</button>
       <button class="btn btn-danger btn-sm" onclick="discardCustomPlayerWorkout()">END</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Custom History Session Modal -->
+<div id="customHistoryDeleteModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">ลบ Workout นี้?</div>
+    <div class="modal-body">ผลของ Workout นี้จะถูกลบถาวรและกู้คืนไม่ได้</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('customHistoryDeleteModal')">ยกเลิก</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteCustomHistorySessionExecute()">ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- Exercise Library Modal -->
+<div id="exerciseLibraryModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>เลือกท่าออกกำลังกาย</span>
+      <span onclick="closeModal('exerciseLibraryModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
+    </div>
+    <div id="libraryCategoryRow" class="period-row" style="flex-wrap:wrap;"></div>
+    <div id="libraryList" class="protocol-list"></div>
+    <div class="modal-row" style="grid-template-columns:1fr;margin-top:14px;">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('exerciseLibraryModal');addCustomExercise();">พิมพ์ท่าเอง</button>
     </div>
   </div>
 </div>

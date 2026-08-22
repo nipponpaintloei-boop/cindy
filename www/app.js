@@ -312,6 +312,7 @@ function go(name) {
   if (name === 'history') renderHistory();
   if (name === 'progress') { renderProgress(); applyReminderToUI(); }
   if (name === 'customlist') renderCustomList();
+  if (name === 'customhistory') renderCustomHistory();
 }
 
 /* ================= HOME ================= */
@@ -1477,6 +1478,89 @@ document.addEventListener('DOMContentLoaded', init);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') checkReminder();
 });
+/* ================= CUSTOM WORKOUT — EXERCISE LIBRARY (PHASE 5a) ================= */
+/* Static list of preset exercises the Builder can offer as shortcuts.
+   Purely a UI convenience — selecting one just pre-fills the same
+   makeCustomExercise() fields the user could type in manually, so it never
+   changes the CustomWorkout schema and never touches storage on its own.
+   category: 'pull' | 'push' | 'core' | 'legs' | 'cardio'
+   equipment: 'bodyweight' | 'dumbbell' | 'tower'  (tower = pull-up/dip station) */
+const EXERCISE_LIBRARY = [
+  // ---- PULL ----
+  { name: 'Pull-up', category: 'pull', equipment: 'tower', type: 'reps', reps: 5, restAfterSec: 30 },
+  { name: 'Chin-up', category: 'pull', equipment: 'tower', type: 'reps', reps: 5, restAfterSec: 30 },
+  { name: 'Negative Pull-up', category: 'pull', equipment: 'tower', type: 'reps', reps: 5, restAfterSec: 30 },
+  { name: 'Inverted Row', category: 'pull', equipment: 'tower', type: 'reps', reps: 10, restAfterSec: 20 },
+  { name: 'Dumbbell Row', category: 'pull', equipment: 'dumbbell', type: 'reps', reps: 12, restAfterSec: 15 },
+  { name: 'Dumbbell Deadlift', category: 'pull', equipment: 'dumbbell', type: 'reps', reps: 12, restAfterSec: 20 },
+  { name: 'Dumbbell Bicep Curl', category: 'pull', equipment: 'dumbbell', type: 'reps', reps: 12, restAfterSec: 15 },
+  { name: 'Dumbbell Hammer Curl', category: 'pull', equipment: 'dumbbell', type: 'reps', reps: 12, restAfterSec: 15 },
+  { name: 'Superman', category: 'pull', equipment: 'bodyweight', type: 'reps', reps: 15, restAfterSec: 15 },
+  { name: 'Reverse Snow Angel', category: 'pull', equipment: 'bodyweight', type: 'reps', reps: 15, restAfterSec: 15 },
+
+  // ---- PUSH ----
+  { name: 'Push-up', category: 'push', equipment: 'bodyweight', type: 'reps', reps: 10, restAfterSec: 15 },
+  { name: 'Diamond Push-up', category: 'push', equipment: 'bodyweight', type: 'reps', reps: 8, restAfterSec: 15 },
+  { name: 'Wide Push-up', category: 'push', equipment: 'bodyweight', type: 'reps', reps: 10, restAfterSec: 15 },
+  { name: 'Incline Push-up', category: 'push', equipment: 'bodyweight', type: 'reps', reps: 12, restAfterSec: 15 },
+  { name: 'Decline Push-up', category: 'push', equipment: 'bodyweight', type: 'reps', reps: 8, restAfterSec: 15 },
+  { name: 'Pike Push-up', category: 'push', equipment: 'bodyweight', type: 'reps', reps: 8, restAfterSec: 15 },
+  { name: 'Dip', category: 'push', equipment: 'tower', type: 'reps', reps: 8, restAfterSec: 30 },
+  { name: 'Bench Dip', category: 'push', equipment: 'bodyweight', type: 'reps', reps: 12, restAfterSec: 15 },
+  { name: 'Dumbbell Shoulder Press', category: 'push', equipment: 'dumbbell', type: 'reps', reps: 10, restAfterSec: 20 },
+  { name: 'Dumbbell Bench Press', category: 'push', equipment: 'dumbbell', type: 'reps', reps: 10, restAfterSec: 20 },
+  { name: 'Dumbbell Chest Fly', category: 'push', equipment: 'dumbbell', type: 'reps', reps: 12, restAfterSec: 15 },
+  { name: 'Dumbbell Lateral Raise', category: 'push', equipment: 'dumbbell', type: 'reps', reps: 12, restAfterSec: 15 },
+  { name: 'Dumbbell Front Raise', category: 'push', equipment: 'dumbbell', type: 'reps', reps: 12, restAfterSec: 15 },
+  { name: 'Dumbbell Tricep Extension', category: 'push', equipment: 'dumbbell', type: 'reps', reps: 12, restAfterSec: 15 },
+  { name: 'Dumbbell Tricep Kickback', category: 'push', equipment: 'dumbbell', type: 'reps', reps: 12, restAfterSec: 15 },
+
+  // ---- CORE ----
+  { name: 'Plank', category: 'core', equipment: 'bodyweight', type: 'time', durationSec: 30, restAfterSec: 15 },
+  { name: 'Side Plank', category: 'core', equipment: 'bodyweight', type: 'time', durationSec: 20, restAfterSec: 15 },
+  { name: 'Sit-up', category: 'core', equipment: 'bodyweight', type: 'reps', reps: 15, restAfterSec: 15 },
+  { name: 'Crunch', category: 'core', equipment: 'bodyweight', type: 'reps', reps: 20, restAfterSec: 15 },
+  { name: 'Bicycle Crunch', category: 'core', equipment: 'bodyweight', type: 'reps', reps: 20, restAfterSec: 15 },
+  { name: 'Russian Twist', category: 'core', equipment: 'bodyweight', type: 'reps', reps: 20, restAfterSec: 15 },
+  { name: 'Leg Raise', category: 'core', equipment: 'bodyweight', type: 'reps', reps: 12, restAfterSec: 15 },
+  { name: 'Hanging Leg Raise', category: 'core', equipment: 'tower', type: 'reps', reps: 10, restAfterSec: 30 },
+  { name: 'Hanging Knee Raise', category: 'core', equipment: 'tower', type: 'reps', reps: 12, restAfterSec: 30 },
+  { name: 'V-up', category: 'core', equipment: 'bodyweight', type: 'reps', reps: 12, restAfterSec: 15 },
+  { name: 'Flutter Kick', category: 'core', equipment: 'bodyweight', type: 'time', durationSec: 30, restAfterSec: 15 },
+  { name: 'Dead Bug', category: 'core', equipment: 'bodyweight', type: 'reps', reps: 12, restAfterSec: 15 },
+
+  // ---- LEGS ----
+  { name: 'Squat', category: 'legs', equipment: 'bodyweight', type: 'reps', reps: 15, restAfterSec: 15 },
+  { name: 'Dumbbell Squat', category: 'legs', equipment: 'dumbbell', type: 'reps', reps: 12, restAfterSec: 20 },
+  { name: 'Lunge', category: 'legs', equipment: 'bodyweight', type: 'reps', reps: 12, restAfterSec: 15 },
+  { name: 'Dumbbell Lunge', category: 'legs', equipment: 'dumbbell', type: 'reps', reps: 12, restAfterSec: 20 },
+  { name: 'Bulgarian Split Squat', category: 'legs', equipment: 'dumbbell', type: 'reps', reps: 10, restAfterSec: 20 },
+  { name: 'Step-up', category: 'legs', equipment: 'bodyweight', type: 'reps', reps: 12, restAfterSec: 15 },
+  { name: 'Glute Bridge', category: 'legs', equipment: 'bodyweight', type: 'reps', reps: 15, restAfterSec: 15 },
+  { name: 'Dumbbell Romanian Deadlift', category: 'legs', equipment: 'dumbbell', type: 'reps', reps: 12, restAfterSec: 20 },
+  { name: 'Calf Raise', category: 'legs', equipment: 'bodyweight', type: 'reps', reps: 20, restAfterSec: 15 },
+  { name: 'Wall Sit', category: 'legs', equipment: 'bodyweight', type: 'time', durationSec: 30, restAfterSec: 15 },
+  { name: 'Jump Squat', category: 'legs', equipment: 'bodyweight', type: 'reps', reps: 12, restAfterSec: 20 },
+
+  // ---- CARDIO ----
+  { name: 'Jumping Jack', category: 'cardio', equipment: 'bodyweight', type: 'time', durationSec: 30, restAfterSec: 15 },
+  { name: 'Burpee', category: 'cardio', equipment: 'bodyweight', type: 'reps', reps: 10, restAfterSec: 20 },
+  { name: 'Mountain Climber', category: 'cardio', equipment: 'bodyweight', type: 'time', durationSec: 30, restAfterSec: 15 },
+  { name: 'High Knees', category: 'cardio', equipment: 'bodyweight', type: 'time', durationSec: 30, restAfterSec: 15 },
+  { name: 'Butt Kick', category: 'cardio', equipment: 'bodyweight', type: 'time', durationSec: 30, restAfterSec: 15 },
+  { name: 'Skater Jump', category: 'cardio', equipment: 'bodyweight', type: 'time', durationSec: 30, restAfterSec: 15 },
+  { name: 'Star Jump', category: 'cardio', equipment: 'bodyweight', type: 'reps', reps: 15, restAfterSec: 15 }
+];
+const EXERCISE_CATEGORIES = [
+  { id: 'all', label: 'ทั้งหมด' },
+  { id: 'pull', label: 'PULL' },
+  { id: 'push', label: 'PUSH' },
+  { id: 'core', label: 'CORE' },
+  { id: 'legs', label: 'LEGS' },
+  { id: 'cardio', label: 'CARDIO' }
+];
+const EQUIPMENT_LABEL = { bodyweight: '', dumbbell: 'ดัมเบล', tower: 'Power Tower' };
+
 /* ================= CUSTOM WORKOUT (FREE-FORM) — DATA MODEL & STORAGE ================= */
 /* Phase 1: schema + CRUD only. No UI/builder/player yet — those come in later phases.
    Kept completely separate from Cindy's protocol/session storage (different keys)
@@ -1718,6 +1802,60 @@ function addCustomExercise() {
   customEditorDraft.exercises.push(makeCustomExercise({ name: '' }));
   renderCustomExerciseList();
 }
+
+/* ---- exercise library picker (phase 5a) ---- */
+let libraryActiveCategory = 'all';
+function openExerciseLibrary() {
+  if (!customEditorDraft) return;
+  libraryActiveCategory = 'all';
+  renderLibraryCategoryRow();
+  renderLibraryList();
+  document.getElementById('exerciseLibraryModal').classList.add('active');
+}
+function renderLibraryCategoryRow() {
+  const wrap = document.getElementById('libraryCategoryRow');
+  if (!wrap) return;
+  wrap.innerHTML = EXERCISE_CATEGORIES.map(c =>
+    `<div class="period-pill${c.id === libraryActiveCategory ? ' sel' : ''}" onclick="setLibraryCategory('${c.id}')">${c.label}</div>`
+  ).join('');
+}
+function setLibraryCategory(id) {
+  libraryActiveCategory = id;
+  renderLibraryCategoryRow();
+  renderLibraryList();
+}
+function renderLibraryList() {
+  const wrap = document.getElementById('libraryList');
+  if (!wrap) return;
+  const items = libraryActiveCategory === 'all'
+    ? EXERCISE_LIBRARY
+    : EXERCISE_LIBRARY.filter(e => e.category === libraryActiveCategory);
+  wrap.innerHTML = items.map((ex, i) => {
+    const idx = EXERCISE_LIBRARY.indexOf(ex);
+    const equip = EQUIPMENT_LABEL[ex.equipment];
+    const spec = ex.type === 'time' ? ex.durationSec + ' วิ' : ex.reps + ' ครั้ง';
+    return `<div class="history-item protocol-item" onclick="selectLibraryExercise(${idx})">
+      <div>
+        <div class="date">${escapeHtml(ex.name)}</div>
+        <div class="reps">${spec}${equip ? ' · ' + equip : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function selectLibraryExercise(libIdx) {
+  if (!customEditorDraft) return;
+  const preset = EXERCISE_LIBRARY[libIdx];
+  if (!preset) return;
+  customEditorDraft.exercises.push(makeCustomExercise({
+    name: preset.name,
+    type: preset.type,
+    reps: preset.reps || 10,
+    durationSec: preset.durationSec || 30,
+    restAfterSec: preset.restAfterSec != null ? preset.restAfterSec : 15
+  }));
+  closeModal('exerciseLibraryModal');
+  renderCustomExerciseList();
+}
 function removeCustomExercise(idx) {
   if (!customEditorDraft) return;
   customEditorDraft.exercises.splice(idx, 1);
@@ -1847,7 +1985,7 @@ function beginCustomPlayerPhase() {
 
 function logCurrentCustomExercise(value) {
   const ex = currentCustomExercise();
-  customPlayer.exerciseLog.push({ name: ex.name, setNumber: customPlayer.setIndex + 1, repsOrSecDone: value });
+  customPlayer.exerciseLog.push({ name: ex.name, setNumber: customPlayer.setIndex + 1, repsOrSecDone: value, type: ex.type || 'reps' });
 }
 
 function onCustomExerciseTimeUp() {
@@ -1986,4 +2124,85 @@ function renderCustomPlayer() {
   document.getElementById('playerDoneBtn').style.display = showDone ? 'flex' : 'none';
   document.getElementById('playerSkipBtn').style.display = showSkip ? 'flex' : 'none';
   document.getElementById('playerRepsAdjustRow').style.display = showAdjust ? 'grid' : 'none';
+}
+
+/* ================= CUSTOM WORKOUT — HISTORY / REPORT (PHASE 4) ================= */
+/* Read-only reporting on top of KEY_CUSTOM_SESSIONS. Fully separate screen from
+   Cindy's HISTORY tab/filter — never reads KEY_SESSIONS, never touches Cindy's
+   currentDetailId. */
+
+let currentCustomHistoryDetailId = null;
+
+function renderCustomHistory() {
+  const wrap = document.getElementById('customHistoryList');
+  if (!wrap) return;
+  const list = loadCustomWorkoutSessions().slice().sort((a, b) => b.completedAt - a.completedAt);
+  if (!list.length) {
+    wrap.innerHTML = '<div class="empty-hint">ยังไม่มีประวัติ Custom Workout — ไปเล่นสักครั้งก่อนนะ</div>';
+    return;
+  }
+  wrap.innerHTML = list.map(s => {
+    const meta = s.setsCompleted + ' เซ็ต · ' + fmtTime(s.totalDurationSec);
+    return `<div class="history-item" onclick="openCustomHistoryDetail('${s.id}')">
+      <div>
+        <div class="date">${escapeHtml(s.workoutName || 'Untitled Workout')}</div>
+        <div class="reps">${fmtDate(s.completedAt)} · ${meta}</div>
+      </div>
+      <div class="rounds tabular">${fmtTime(s.totalDurationSec)}</div>
+    </div>`;
+  }).join('');
+}
+
+function openCustomHistoryDetail(id) {
+  currentCustomHistoryDetailId = id;
+  go('customhistorydetail');
+  renderCustomHistoryDetail();
+}
+
+function renderCustomHistoryDetail() {
+  const wrap = document.getElementById('customHistoryDetailWrap');
+  if (!wrap) return;
+  const s = loadCustomWorkoutSessions().find(x => x.id === currentCustomHistoryDetailId);
+  if (!s) { wrap.innerHTML = '<div class="empty-hint">ไม่พบข้อมูล</div>'; return; }
+
+  const setsGrouped = {};
+  (s.exerciseLog || []).forEach(entry => {
+    if (!setsGrouped[entry.setNumber]) setsGrouped[entry.setNumber] = [];
+    setsGrouped[entry.setNumber].push(entry);
+  });
+  const setNumbers = Object.keys(setsGrouped).map(n => parseInt(n, 10)).sort((a, b) => a - b);
+
+  const setsHtml = setNumbers.map(n => {
+    const rows = setsGrouped[n].map(entry => {
+      const unit = entry.type === 'time' ? 'วินาที' : 'ครั้ง';
+      return `<div class="history-item" style="cursor:default;">
+        <div><div class="date">${escapeHtml(entry.name)}</div></div>
+        <div class="rounds tabular" style="font-size:18px;">${entry.repsOrSecDone} <span style="font-size:11px;color:var(--text-faint);">${unit}</span></div>
+      </div>`;
+    }).join('');
+    return `<div class="section-label">เซ็ต ${n}</div>${rows}`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card"><div class="v">${fmtTime(s.totalDurationSec)}</div><div class="l">เวลารวม</div></div>
+      <div class="stat-card"><div class="v">${s.setsCompleted}</div><div class="l">เซ็ตที่ทำ</div></div>
+    </div>
+    <div class="empty-hint" style="text-align:left;padding:4px 0 0;">${fmtDate(s.completedAt)}</div>
+    ${setsHtml || '<div class="empty-hint">ไม่มีข้อมูลท่าออกกำลังกาย</div>'}
+  `;
+}
+
+function confirmDeleteCustomHistorySession() {
+  if (!currentCustomHistoryDetailId) return;
+  document.getElementById('customHistoryDeleteModal').classList.add('active');
+}
+function deleteCustomHistorySessionExecute() {
+  if (currentCustomHistoryDetailId) {
+    deleteCustomWorkoutSession(currentCustomHistoryDetailId);
+    currentCustomHistoryDetailId = null;
+  }
+  closeModal('customHistoryDeleteModal');
+  go('customhistory');
+  showToast('ลบ Workout จากประวัติแล้ว');
 }
