@@ -859,7 +859,7 @@ function checkReminder() {
 }
 
 /* ================= SHARE RESULT (canvas image) ================= */
-function shareResult(id) {
+async function shareResult(id) {
   const sessions = loadSessions();
   const s = sessions.find(x => x.id === id);
   if (!s) { showToast('ไม่พบข้อมูล'); return; }
@@ -976,9 +976,40 @@ function shareResult(id) {
   ctx.font = '600 30px Arial';
   ctx.fillText(fmtDate(s.finished), W / 2, 1760);
 
+  const fileName = 'cindy_result_' + s.id + '.png';
+
+  /* Native app (Capacitor): write to app cache then hand off to the OS share
+     sheet via @capacitor/share. This opens a real "share to..." picker so
+     it's explicit where the image goes (Gallery, Files, LINE, etc.) instead
+     of a silent browser download that's easy to lose track of. */
+  const plugins = capPlugins();
+  if (plugins && plugins.Filesystem && plugins.Share) {
+    try {
+      const dataUrl = canvas.toDataURL('image/png');
+      const base64Data = dataUrl.split(',')[1];
+      const written = await plugins.Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: 'CACHE'
+      });
+      await plugins.Share.share({
+        title: 'CINDY Result',
+        text: s.rounds + ' rounds — CINDY AMRAP',
+        url: written.uri,
+        dialogTitle: 'แชร์ผลลัพธ์ CINDY'
+      });
+    } catch (e) {
+      if (!(e && String(e.message || e).toLowerCase().includes('cancel'))) {
+        showToast('แชร์ไม่สำเร็จ ลองอีกครั้ง');
+      }
+    }
+    return;
+  }
+
+  /* Web fallback (running in a normal browser tab, not the packaged app) */
   canvas.toBlob(async (blob) => {
     if (!blob) { showToast('สร้างรูปไม่สำเร็จ'); return; }
-    const file = new File([blob], 'cindy_result.png', { type: 'image/png' });
+    const file = new File([blob], fileName, { type: 'image/png' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({ files: [file], title: 'CINDY Result', text: s.rounds + ' rounds — CINDY AMRAP' });
@@ -987,10 +1018,10 @@ function shareResult(id) {
     }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'cindy_result_' + s.id + '.png';
+    a.href = url; a.download = fileName;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('บันทึกรูปผลลัพธ์แล้ว');
+    showToast('บันทึกรูปผลลัพธ์แล้ว (เช็คโฟลเดอร์ Download)');
   }, 'image/png');
 }
 
