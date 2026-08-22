@@ -211,7 +211,8 @@ async function releaseWakeLock() {
   }
 }
 document.addEventListener('visibilitychange', async () => {
-  const workoutActive = document.getElementById('screen-workout').classList.contains('active');
+  const workoutActive = document.getElementById('screen-workout').classList.contains('active')
+    || (document.getElementById('screen-customplayer') && document.getElementById('screen-customplayer').classList.contains('active'));
   if (document.visibilityState === 'visible' && workoutActive) {
     await acquireWakeLock();
   }
@@ -310,6 +311,7 @@ function go(name) {
   if (name === 'home') renderHome();
   if (name === 'history') renderHistory();
   if (name === 'progress') { renderProgress(); applyReminderToUI(); }
+  if (name === 'customlist') renderCustomList();
 }
 
 /* ================= HOME ================= */
@@ -1582,4 +1584,406 @@ function recordCustomWorkoutSession(session) {
 
 function deleteCustomWorkoutSession(id) {
   saveCustomWorkoutSessions(loadCustomWorkoutSessions().filter(s => s.id !== id));
+}
+
+/* ================= CUSTOM WORKOUT — BUILDER (PHASE 2) ================= */
+/* UI only: create / edit / delete a CustomWorkout "recipe". No player yet
+   (that's phase 3) — saving here just persists the recipe via saveCustomWorkout(). */
+
+/* ---- list screen ---- */
+function renderCustomList() {
+  const wrap = document.getElementById('customWorkoutList');
+  if (!wrap) return;
+  const list = loadCustomWorkouts().slice().sort((a, b) => b.updatedAt - a.updatedAt);
+  if (!list.length) {
+    wrap.innerHTML = '<div class="empty-hint">ยังไม่มี Custom Workout — กดปุ่มด้านล่างเพื่อสร้างอันแรก</div>';
+    return;
+  }
+  wrap.innerHTML = list.map(w => {
+    const exCount = w.exercises.length;
+    const detail = exCount + ' ท่า · ' + w.sets + ' เซ็ต' + (w.restBetweenSetsSec ? ' · พัก ' + w.restBetweenSetsSec + 'วิ' : '');
+    return `<div class="history-item protocol-item">
+      <div onclick="openCustomEditor('${w.id}')" style="flex:1;min-width:0;cursor:pointer;">
+        <div class="date">${escapeHtml(w.name)}</div>
+        <div class="reps">${detail}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button class="iconbtn" style="width:32px;height:32px;color:var(--success);" onclick="event.stopPropagation();startCustomWorkoutPlayer('${w.id}')" aria-label="Play">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button class="iconbtn" style="width:32px;height:32px;" onclick="event.stopPropagation();openCustomEditor('${w.id}')" aria-label="Edit">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+        </button>
+        <button class="iconbtn" style="width:32px;height:32px;color:var(--danger);" onclick="event.stopPropagation();confirmDeleteCustomWorkout('${w.id}')" aria-label="Delete">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/></svg>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function confirmDeleteCustomWorkout(id) {
+  // reuses the existing generic confirm pattern via native confirm-free flow:
+  // simple two-step using showToast would be too easy to mis-tap, so we
+  // borrow the deleteSessionModal-style pattern with a dedicated handler.
+  pendingDeleteCustomWorkoutId = id;
+  document.getElementById('customDeleteModal').classList.add('active');
+}
+let pendingDeleteCustomWorkoutId = null;
+function deleteCustomWorkoutExecute() {
+  if (pendingDeleteCustomWorkoutId) {
+    deleteCustomWorkout(pendingDeleteCustomWorkoutId);
+    pendingDeleteCustomWorkoutId = null;
+  }
+  closeModal('customDeleteModal');
+  renderCustomList();
+  showToast('ลบ Workout แล้ว');
+}
+
+/* ---- editor screen (create / edit) ---- */
+let customEditorDraft = null;
+
+function blankCustomWorkoutDraft() {
+  return {
+    id: null,
+    name: '',
+    sets: 1,
+    restBetweenSetsSec: 30,
+    exercises: [makeCustomExercise({ name: '' })]
+  };
+}
+function openCustomEditor(id) {
+  const existing = id ? getCustomWorkout(id) : null;
+  customEditorDraft = existing
+    ? { id: existing.id, name: existing.name, sets: existing.sets, restBetweenSetsSec: existing.restBetweenSetsSec,
+        exercises: existing.exercises.map(ex => Object.assign({}, ex)) }
+    : blankCustomWorkoutDraft();
+
+  document.getElementById('customEditorTitle').textContent = existing ? 'แก้ไข WORKOUT' : 'สร้าง WORKOUT';
+  document.getElementById('customNameInput').value = customEditorDraft.name;
+  document.getElementById('customSetsInput').value = customEditorDraft.sets;
+  document.getElementById('customRestInput').value = customEditorDraft.restBetweenSetsSec;
+  renderCustomExerciseList();
+  go('customeditor');
+}
+function cancelCustomEditor() {
+  customEditorDraft = null;
+  go('customlist');
+}
+
+function updateCustomHeaderField(field, value) {
+  if (!customEditorDraft) return;
+  customEditorDraft[field] = (field === 'name') ? value : (parseInt(value, 10) || 0);
+}
+
+function renderCustomExerciseList() {
+  const wrap = document.getElementById('customExerciseList');
+  if (!wrap || !customEditorDraft) return;
+  const exercises = customEditorDraft.exercises;
+  if (!exercises.length) {
+    wrap.innerHTML = '<div class="empty-hint">ยังไม่มีท่า — กด "+ เพิ่มท่า" ด้านล่าง</div>';
+    return;
+  }
+  wrap.innerHTML = exercises.map((ex, i) => {
+    const isReps = ex.type !== 'time';
+    return `<div class="exercise-card">
+      <div class="exercise-card-top">
+        <div class="exercise-num">${i + 1}</div>
+        <input type="text" class="exercise-name-input" placeholder="ชื่อท่า เช่น Push-up" value="${escapeHtml(ex.name)}"
+          oninput="updateCustomExerciseField(${i}, 'name', this.value)">
+        <button class="iconbtn" onclick="moveCustomExercise(${i}, -1)" aria-label="Move up" ${i === 0 ? 'style="opacity:.3;pointer-events:none;"' : ''}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 15l-6-6-6 6"/></svg>
+        </button>
+        <button class="iconbtn" onclick="moveCustomExercise(${i}, 1)" aria-label="Move down" ${i === exercises.length - 1 ? 'style="opacity:.3;pointer-events:none;"' : ''}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <button class="iconbtn" style="color:var(--danger);" onclick="removeCustomExercise(${i})" aria-label="Remove">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="period-row" style="margin:0 0 10px;">
+        <div class="period-pill${isReps ? ' sel' : ''}" onclick="setCustomExerciseType(${i}, 'reps')">REPS</div>
+        <div class="period-pill${isReps ? '' : ' sel'}" onclick="setCustomExerciseType(${i}, 'time')">TIME</div>
+      </div>
+      ${isReps
+        ? `<div class="field-row"><label>จำนวนครั้ง</label><input type="number" min="1" max="999" value="${ex.reps}" oninput="updateCustomExerciseField(${i}, 'reps', this.value)"></div>`
+        : `<div class="field-row"><label>ระยะเวลา (วินาที)</label><input type="number" min="1" max="3600" value="${ex.durationSec}" oninput="updateCustomExerciseField(${i}, 'durationSec', this.value)"></div>`
+      }
+      <div class="field-row"><label>พักหลังท่านี้ (วินาที)</label><input type="number" min="0" max="600" value="${ex.restAfterSec}" oninput="updateCustomExerciseField(${i}, 'restAfterSec', this.value)"></div>
+    </div>`;
+  }).join('');
+}
+
+function addCustomExercise() {
+  if (!customEditorDraft) return;
+  customEditorDraft.exercises.push(makeCustomExercise({ name: '' }));
+  renderCustomExerciseList();
+}
+function removeCustomExercise(idx) {
+  if (!customEditorDraft) return;
+  customEditorDraft.exercises.splice(idx, 1);
+  renderCustomExerciseList();
+}
+function moveCustomExercise(idx, dir) {
+  if (!customEditorDraft) return;
+  const list = customEditorDraft.exercises;
+  const target = idx + dir;
+  if (target < 0 || target >= list.length) return;
+  [list[idx], list[target]] = [list[target], list[idx]];
+  renderCustomExerciseList();
+}
+function setCustomExerciseType(idx, type) {
+  if (!customEditorDraft) return;
+  customEditorDraft.exercises[idx].type = type;
+  renderCustomExerciseList();
+}
+function updateCustomExerciseField(idx, field, value) {
+  if (!customEditorDraft) return;
+  customEditorDraft.exercises[idx][field] = (field === 'name') ? value : (parseInt(value, 10) || 0);
+}
+
+function saveCustomEditorForm() {
+  if (!customEditorDraft) return;
+  if (!customEditorDraft.name.trim()) { showToast('กรุณาตั้งชื่อ Workout'); return; }
+  if (!customEditorDraft.exercises.length) { showToast('เพิ่มอย่างน้อย 1 ท่า'); return; }
+  const emptyName = customEditorDraft.exercises.some(ex => !ex.name.trim());
+  if (emptyName) { showToast('ยังมีท่าที่ไม่ได้ตั้งชื่อ'); return; }
+
+  saveCustomWorkout(customEditorDraft);
+  customEditorDraft = null;
+  showToast('บันทึก Workout แล้ว');
+  go('customlist');
+}
+
+/* ================= CUSTOM WORKOUT — PLAYER (PHASE 3) ================= */
+/* Plays a CustomWorkout recipe in order: exercise -> (rest after exercise) ->
+   next exercise -> ... -> (rest between sets) -> next set -> ... -> done.
+   Reps-mode exercises are marked done manually; time-mode exercises count
+   down automatically. Uses the same beep/vibrate/wakeLock helpers as Cindy's
+   player, but is otherwise fully independent — nothing here touches
+   KEY_SESSIONS / KEY_ACTIVE, and completed runs are saved via
+   recordCustomWorkoutSession() into KEY_CUSTOM_SESSIONS only. */
+
+let customPlayer = null;
+
+function startCustomWorkoutPlayer(id) {
+  const workout = getCustomWorkout(id);
+  if (!workout || !workout.exercises.length) { showToast('Workout นี้ยังไม่มีท่า'); return; }
+  customPlayer = {
+    workout,
+    setIndex: 0,
+    exIndex: 0,
+    phase: 'exercise',           // 'exercise' | 'restEx' | 'restSet'
+    startedAt: Date.now(),
+    exerciseLog: [],
+    currentValue: 0,
+    timer: { endTime: null, totalMs: 0, running: false, handle: null, onDone: null }
+  };
+  unlockAudio();
+  acquireWakeLock();
+  go('customplayer');
+  beginCustomPlayerPhase();
+}
+
+function currentCustomExercise() {
+  return customPlayer.workout.exercises[customPlayer.exIndex];
+}
+function isLastExerciseInSet() {
+  return customPlayer.exIndex >= customPlayer.workout.exercises.length - 1;
+}
+function isLastSet() {
+  return customPlayer.setIndex >= customPlayer.workout.sets - 1;
+}
+
+function clearCustomPlayerTimer() {
+  if (!customPlayer) return;
+  if (customPlayer.timer.handle) { clearInterval(customPlayer.timer.handle); customPlayer.timer.handle = null; }
+  customPlayer.timer.running = false;
+}
+function startCustomPlayerCountdown(totalSec, onDone) {
+  customPlayer.timer.totalMs = totalSec * 1000;
+  customPlayer.timer.endTime = Date.now() + totalSec * 1000;
+  customPlayer.timer.running = true;
+  customPlayer.timer.onDone = onDone;
+  customPlayer.timer.handle = setInterval(tickCustomPlayerTimer, 250);
+}
+function tickCustomPlayerTimer() {
+  if (!customPlayer || !customPlayer.timer.running) return;
+  const remaining = customPlayer.timer.endTime - Date.now();
+  if (remaining <= 0) {
+    clearCustomPlayerTimer();
+    vibrate([120, 80, 120]);
+    beep(880, 150, 0.18);
+    const onDone = customPlayer.timer.onDone;
+    renderCustomPlayer();
+    if (onDone) onDone();
+    return;
+  }
+  renderCustomPlayer();
+}
+
+function beginCustomPlayerPhase() {
+  clearCustomPlayerTimer();
+  if (customPlayer.phase === 'exercise') {
+    const ex = currentCustomExercise();
+    if (ex.type === 'time') {
+      customPlayer.currentValue = ex.durationSec;
+      startCustomPlayerCountdown(ex.durationSec, onCustomExerciseTimeUp);
+    } else {
+      customPlayer.currentValue = ex.reps;
+    }
+  } else {
+    const restSec = customPlayer.phase === 'restEx'
+      ? currentCustomExercise().restAfterSec
+      : customPlayer.workout.restBetweenSetsSec;
+    if (restSec > 0) {
+      startCustomPlayerCountdown(restSec, onCustomRestDone);
+    } else {
+      onCustomRestDone();
+      return;
+    }
+  }
+  renderCustomPlayer();
+}
+
+function logCurrentCustomExercise(value) {
+  const ex = currentCustomExercise();
+  customPlayer.exerciseLog.push({ name: ex.name, setNumber: customPlayer.setIndex + 1, repsOrSecDone: value });
+}
+
+function onCustomExerciseTimeUp() {
+  logCurrentCustomExercise(currentCustomExercise().durationSec);
+  advanceAfterCustomExercise();
+}
+function confirmPlayerExerciseDone() {
+  if (!customPlayer || customPlayer.phase !== 'exercise') return;
+  logCurrentCustomExercise(customPlayer.currentValue);
+  advanceAfterCustomExercise();
+}
+function skipPlayerStep() {
+  if (!customPlayer) return;
+  if (customPlayer.phase === 'exercise' && currentCustomExercise().type === 'time') {
+    const elapsedSec = Math.max(0, currentCustomExercise().durationSec - Math.round((customPlayer.timer.endTime - Date.now()) / 1000));
+    clearCustomPlayerTimer();
+    logCurrentCustomExercise(elapsedSec);
+    advanceAfterCustomExercise();
+  } else if (customPlayer.phase === 'restEx' || customPlayer.phase === 'restSet') {
+    clearCustomPlayerTimer();
+    onCustomRestDone();
+  }
+}
+function adjustPlayerReps(delta) {
+  if (!customPlayer || customPlayer.phase !== 'exercise') return;
+  customPlayer.currentValue = Math.max(0, customPlayer.currentValue + delta);
+  renderCustomPlayer();
+}
+
+function advanceAfterCustomExercise() {
+  if (isLastExerciseInSet()) {
+    advanceAfterCustomSet();
+  } else if (currentCustomExercise().restAfterSec > 0) {
+    customPlayer.phase = 'restEx';
+    beginCustomPlayerPhase();
+  } else {
+    advanceToNextCustomExercise();
+  }
+}
+function advanceToNextCustomExercise() {
+  customPlayer.exIndex++;
+  customPlayer.phase = 'exercise';
+  beginCustomPlayerPhase();
+}
+function advanceAfterCustomSet() {
+  if (isLastSet()) {
+    finishCustomPlayerWorkout();
+  } else if (customPlayer.workout.restBetweenSetsSec > 0) {
+    customPlayer.phase = 'restSet';
+    beginCustomPlayerPhase();
+  } else {
+    advanceToNextCustomSet();
+  }
+}
+function advanceToNextCustomSet() {
+  customPlayer.setIndex++;
+  customPlayer.exIndex = 0;
+  customPlayer.phase = 'exercise';
+  beginCustomPlayerPhase();
+}
+function onCustomRestDone() {
+  if (customPlayer.phase === 'restEx') advanceToNextCustomExercise();
+  else advanceToNextCustomSet();
+}
+
+function finishCustomPlayerWorkout() {
+  clearCustomPlayerTimer();
+  releaseWakeLock();
+  const totalDurationSec = Math.round((Date.now() - customPlayer.startedAt) / 1000);
+  recordCustomWorkoutSession({
+    workoutId: customPlayer.workout.id,
+    workoutName: customPlayer.workout.name,
+    totalDurationSec,
+    setsCompleted: customPlayer.workout.sets,
+    exerciseLog: customPlayer.exerciseLog
+  });
+  vibrate([100, 60, 100, 60, 200]);
+  beep(660, 200, 0.2);
+  showToast('จบ WORKOUT แล้ว 💪 บันทึกผลแล้ว');
+  customPlayer = null;
+  go('customlist');
+}
+
+function openCustomPlayerEndModal() {
+  document.getElementById('customPlayerEndModal').classList.add('active');
+}
+function discardCustomPlayerWorkout() {
+  clearCustomPlayerTimer();
+  releaseWakeLock();
+  customPlayer = null;
+  closeModal('customPlayerEndModal');
+  go('customlist');
+}
+
+function renderCustomPlayer() {
+  if (!customPlayer) return;
+  const w = customPlayer.workout;
+  const ex = currentCustomExercise();
+  const nameEl = document.getElementById('playerExerciseName');
+
+  document.getElementById('playerStatusPill').textContent = 'SET ' + (customPlayer.setIndex + 1) + '/' + w.sets;
+  document.getElementById('playerWorkoutName').textContent = w.name;
+  document.getElementById('playerProgress').textContent = 'ท่า ' + (customPlayer.exIndex + 1) + '/' + w.exercises.length;
+
+  let digitsText, ringFrac, phaseLabel, showDone = false, showSkip = false, showAdjust = false;
+
+  if (customPlayer.phase === 'exercise') {
+    nameEl.style.display = 'block';
+    nameEl.textContent = ex.name;
+    if (ex.type === 'time') {
+      const remainingSec = customPlayer.timer.endTime ? Math.max(0, (customPlayer.timer.endTime - Date.now()) / 1000) : ex.durationSec;
+      digitsText = fmtTime(remainingSec);
+      ringFrac = customPlayer.timer.totalMs ? (remainingSec * 1000) / customPlayer.timer.totalMs : 1;
+      phaseLabel = 'ทำท่านี้';
+      showSkip = true;
+    } else {
+      digitsText = String(customPlayer.currentValue);
+      ringFrac = 1;
+      phaseLabel = 'ทำครบแล้วกด "เสร็จแล้ว"';
+      showDone = true;
+      showAdjust = true;
+    }
+  } else {
+    nameEl.style.display = 'none';
+    const remainingSec = customPlayer.timer.endTime ? Math.max(0, (customPlayer.timer.endTime - Date.now()) / 1000) : 0;
+    digitsText = fmtTime(remainingSec);
+    ringFrac = customPlayer.timer.totalMs ? (remainingSec * 1000) / customPlayer.timer.totalMs : 1;
+    phaseLabel = customPlayer.phase === 'restEx' ? 'พักก่อนท่าถัดไป' : 'พักก่อนเซ็ตถัดไป';
+    showSkip = true;
+  }
+
+  document.getElementById('playerDigits').textContent = digitsText;
+  document.getElementById('playerPhaseLabel').textContent = phaseLabel;
+  const ring = document.getElementById('playerRing');
+  if (ring) ring.style.strokeDashoffset = String(RING_CIRC * (1 - ringFrac));
+  document.getElementById('playerDoneBtn').style.display = showDone ? 'flex' : 'none';
+  document.getElementById('playerSkipBtn').style.display = showSkip ? 'flex' : 'none';
+  document.getElementById('playerRepsAdjustRow').style.display = showAdjust ? 'grid' : 'none';
 }

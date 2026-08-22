@@ -374,6 +374,15 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 .protocol-list{max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px;}
 .protocol-item{cursor:pointer;}
 .protocol-item.sel{border-color:var(--push);}
+
+/* ---- custom workout builder ---- */
+.exercise-card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px;}
+.exercise-card-top{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.exercise-num{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--bg-elev);color:var(--text-dim);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+.exercise-name-input{flex:1;min-width:0;background:var(--bg-elev);border:1.5px solid var(--card-border);border-radius:8px;color:var(--text);padding:9px 10px;font-size:13px;font-weight:600;}
+.exercise-card .iconbtn{width:30px;height:30px;flex-shrink:0;}
+.exercise-card .field-row{grid-template-columns:1fr 70px;margin-bottom:8px;}
+.exercise-card .field-row:last-child{margin-bottom:0;}
 .proto-active-tag{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--success);border:1px solid var(--success);border-radius:5px;padding:1px 5px;vertical-align:1px;margin-left:4px;}
 #screen-workout.mode-emom #skipRoundBtn{display:none;}
 #screen-workout.mode-emom #saveRoundBtn{pointer-events:none;opacity:.85;}
@@ -451,6 +460,9 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         </button>
         <button class="iconbtn" onclick="openRestTimer()" aria-label="Rest Timer">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>
+        </button>
+        <button class="iconbtn" onclick="go('customlist')" aria-label="Custom Workouts">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11M4 4l3 3M20 20l-3-3M2.5 9.5l3-3 3 3-3 3zM15.5 22.5l3-3 3 3-3 3zM18.5 2.5l3 3-3 3-3-3zM5.5 15.5l3 3-3 3-3-3z"/></svg>
         </button>
         <button class="iconbtn" onclick="openSettingsModal()" aria-label="Settings">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -733,6 +745,102 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     </div>
   </section>
 
+  <!-- CUSTOM WORKOUT LIST -->
+  <section id="screen-customlist" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('home')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">CUSTOM WORKOUTS</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div id="customWorkoutList"></div>
+      <button class="btn btn-primary" style="margin-top:6px;" onclick="openCustomEditor(null)">+ สร้าง WORKOUT ใหม่</button>
+    </div>
+  </section>
+
+  <!-- CUSTOM WORKOUT EDITOR (BUILDER) -->
+  <section id="screen-customeditor" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="cancelCustomEditor()" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div id="customEditorTitle" class="brand" style="font-size:16px;">สร้าง WORKOUT</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div class="field-row" style="grid-template-columns:1fr;">
+        <input type="text" id="customNameInput" placeholder="ชื่อ Workout เช่น Full Body 20 นาที"
+          style="width:100%;box-sizing:border-box;background:var(--bg-elev);border:1.5px solid var(--card-border);border-radius:8px;color:var(--text);padding:12px 14px;font-size:15px;font-weight:600;"
+          oninput="updateCustomHeaderField('name', this.value)">
+      </div>
+
+      <div class="control-row">
+        <div class="field-row" style="grid-template-columns:1fr 70px;margin-bottom:0;">
+          <label>จำนวนเซ็ต</label>
+          <input type="number" id="customSetsInput" min="1" max="20" oninput="updateCustomHeaderField('sets', this.value)">
+        </div>
+        <div class="field-row" style="grid-template-columns:1fr 70px;margin-bottom:0;">
+          <label>พักระหว่างเซ็ต (วิ)</label>
+          <input type="number" id="customRestInput" min="0" max="600" oninput="updateCustomHeaderField('restBetweenSetsSec', this.value)">
+        </div>
+      </div>
+
+      <div class="section-label" style="margin-top:20px;">ท่าออกกำลังกาย</div>
+      <div id="customExerciseList"></div>
+      <button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="addCustomExercise()">+ เพิ่มท่า</button>
+
+      <div class="control-row" style="margin-top:26px;">
+        <button class="btn btn-ghost btn-sm" onclick="cancelCustomEditor()">ยกเลิก</button>
+        <button class="btn btn-primary btn-sm" onclick="saveCustomEditorForm()">บันทึก</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CUSTOM WORKOUT PLAYER -->
+  <section id="screen-customplayer" class="screen">
+    <div class="workout-wrap">
+      <div class="workout-top">
+        <button class="iconbtn" onclick="openCustomPlayerEndModal()" aria-label="End">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+        <div id="playerStatusPill" class="status-pill">SET 1/1</div>
+        <div style="width:38px;"></div>
+      </div>
+
+      <div id="playerWorkoutName" style="text-align:center;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;font-weight:700;text-transform:uppercase;"></div>
+      <div id="playerProgress" style="text-align:center;font-size:11px;color:var(--text-faint);letter-spacing:1px;margin-top:2px;"></div>
+
+      <div class="timer-wrap">
+        <svg viewBox="0 0 250 250">
+          <defs>
+            <linearGradient id="playerRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#E8232A"/>
+              <stop offset="100%" stop-color="#3D6FE0"/>
+            </linearGradient>
+          </defs>
+          <circle class="track" cx="125" cy="125" r="108"/>
+          <circle id="playerRing" class="ring" cx="125" cy="125" r="108" stroke="url(#playerRingGrad)" stroke-dasharray="678 678" stroke-dashoffset="0"/>
+        </svg>
+        <div class="timer-center">
+          <div id="playerDigits" class="timer-digits tabular">10</div>
+          <div id="playerPhaseLabel" class="timer-sub">ทำท่านี้</div>
+        </div>
+      </div>
+
+      <div id="playerExerciseName" style="text-align:center;font-family:var(--font-display);font-size:26px;letter-spacing:.5px;margin:4px 0 20px;"></div>
+
+      <div id="playerRepsAdjustRow" class="control-row" style="display:none;">
+        <button class="btn btn-outline btn-sm" onclick="adjustPlayerReps(-1)">−1</button>
+        <button class="btn btn-outline btn-sm" onclick="adjustPlayerReps(1)">+1</button>
+      </div>
+
+      <button id="playerDoneBtn" class="btn btn-success save-round-btn" style="display:none;" onclick="confirmPlayerExerciseDone()">✓ เสร็จแล้ว</button>
+      <button id="playerSkipBtn" class="btn btn-outline" style="display:none;" onclick="skipPlayerStep()">ข้าม</button>
+    </div>
+  </section>
+
 </div>
 
 <!-- End Workout Modal -->
@@ -871,6 +979,30 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="modal-row">
       <button class="btn btn-outline btn-sm" onclick="closeModal('deleteSessionModal')">ยกเลิก</button>
       <button class="btn btn-danger btn-sm" onclick="deleteSessionExecute()">ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Custom Workout Modal -->
+<div id="customDeleteModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">ลบ Workout นี้?</div>
+    <div class="modal-body">สูตร Workout นี้จะถูกลบถาวรและกู้คืนไม่ได้ (ไม่กระทบ Cindy หรือ Workout อื่น)</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('customDeleteModal')">ยกเลิก</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteCustomWorkoutExecute()">ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- End Custom Player Modal -->
+<div id="customPlayerEndModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">End Workout?</div>
+    <div class="modal-body">ยังเล่นไม่ครบทุกเซ็ต — ถ้าออกตอนนี้ ผลลัพธ์จะไม่ถูกบันทึก</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('customPlayerEndModal')">CANCEL</button>
+      <button class="btn btn-danger btn-sm" onclick="discardCustomPlayerWorkout()">END</button>
     </div>
   </div>
 </div>
