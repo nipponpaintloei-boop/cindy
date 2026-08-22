@@ -23,6 +23,11 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      - name: Install shared debug keystore (keeps app signature stable across builds)
+        run: |
+          mkdir -p ~/.android
+          cp ci/debug.keystore ~/.android/debug.keystore
+
       - name: Install JS dependencies
         run: npm install
 
