@@ -107,6 +107,7 @@ body{
 .iconbtn:active::after{opacity:1;transform:scale(1.6);transition:opacity .04s ease, transform .04s ease;}
 .iconbtn.install-btn{display:none;color:var(--text);border-color:var(--text-faint);}
 .iconbtn.install-btn.show{display:flex;}
+.iconbtn.sel{color:var(--success);border-color:var(--success);}
 
 /* ---- home ---- */
 .home-content{padding:0 20px 32px;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
@@ -501,6 +502,8 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       <div class="section-label">LAST WORKOUT</div>
       <div id="lastWorkoutWrap"><div class="empty-hint">ยังไม่มีประวัติการเล่น</div></div>
 
+      <div id="homeWeeklyPlanWrap" style="display:none;margin-top:14px;"></div>
+
       <div id="homeCustomWrap" style="display:none;margin-top:14px;">
         <div class="section-label">CUSTOM WORKOUT ล่าสุด</div>
         <div id="homeCustomCard"></div>
@@ -757,13 +760,33 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <div class="brand" style="font-size:16px;">CUSTOM WORKOUTS</div>
-      <button class="iconbtn" onclick="go('customhistory')" aria-label="History">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>
-      </button>
+      <div style="display:flex;gap:6px;">
+        <button class="iconbtn" onclick="go('customschedule')" aria-label="Weekly schedule">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        </button>
+        <button class="iconbtn" onclick="go('customhistory')" aria-label="History">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>
+        </button>
+      </div>
     </div>
     <div class="list-wrap">
       <div id="customWorkoutList"></div>
       <button class="btn btn-primary" style="margin-top:6px;" onclick="openCustomEditor(null)">+ สร้าง WORKOUT ใหม่</button>
+    </div>
+  </section>
+
+  <!-- CUSTOM WORKOUT WEEKLY SCHEDULE -->
+  <section id="screen-customschedule" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('customlist')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">แผนประจำสัปดาห์</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div class="empty-hint" style="text-align:left;padding:0 0 10px;">กำหนดว่าแต่ละวันจะเล่น Workout ไหน หรือเลือกเป็นวันพัก — หน้า HOME จะโชว์แผนของวันนี้ให้อัตโนมัติ</div>
+      <div id="customScheduleList" style="display:flex;flex-direction:column;gap:10px;"></div>
     </div>
   </section>
 
@@ -785,6 +808,19 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 
       <div class="empty-hint" style="text-align:left;padding:2px 0 0;">กำหนดจำนวนเซ็ต พักระหว่างเซ็ต และพักก่อนไปท่าถัดไปแยกของแต่ละท่าด้านล่าง</div>
 
+      <div class="metric-card reminder-card" style="margin-top:14px;">
+        <div class="reminder-row">
+          <div>
+            <div class="reminder-lbl">อบอุ่นร่างกายก่อนเริ่ม (Warm-up)</div>
+            <div class="reminder-sub">โชว์เช็คลิสต์ท่าวอร์มก่อนเข้า Workout จริง</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="customWarmupToggle" onchange="updateCustomHeaderField('warmupEnabled', this.checked)">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </label>
+        </div>
+      </div>
+
       <div class="section-label" style="margin-top:16px;">ท่าออกกำลังกาย</div>
       <div id="customExerciseList"></div>
       <button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="openExerciseLibrary()">+ เพิ่มท่า</button>
@@ -796,6 +832,22 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     </div>
   </section>
 
+  <!-- CUSTOM WORKOUT WARM-UP CHECKLIST -->
+  <section id="screen-customwarmup" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="warmupPendingWorkoutId=null;go('customlist')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">WARM-UP</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div class="empty-hint" style="text-align:left;padding:0 0 10px;">ติ๊กท่าที่ทำแล้ว หรือข้ามได้เลยถ้าอบอุ่นร่างกายมาแล้ว</div>
+      <div id="customWarmupList"></div>
+      <button class="btn btn-primary" style="margin-top:16px;" onclick="proceedFromCustomWarmup()">เริ่มออกกำลังกาย</button>
+    </div>
+  </section>
+
   <!-- CUSTOM WORKOUT PLAYER -->
   <section id="screen-customplayer" class="screen">
     <div class="workout-wrap">
@@ -804,7 +856,9 @@ textarea.note-input::placeholder{color:var(--text-faint);}
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
         <div id="playerStatusPill" class="status-pill">SET 1/1</div>
-        <div style="width:38px;"></div>
+        <button id="playerVoiceBtn" class="iconbtn" onclick="toggleVoiceCues()" aria-label="Voice cues">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19 12a7 7 0 00-2-5"/></svg>
+        </button>
       </div>
 
       <div id="playerWorkoutName" style="text-align:center;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;font-weight:700;text-transform:uppercase;"></div>
@@ -875,6 +929,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       </div>
 
       <button class="btn btn-primary" style="margin-top:22px;" onclick="finishCustomCompleteFlow()">บันทึกและกลับหน้าหลัก</button>
+      <button class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="shareCustomResult(lastCompletedCustomSessionId)">แชร์ผลลัพธ์</button>
     </div>
   </section>
 
@@ -885,9 +940,32 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <div class="brand" style="font-size:16px;">WORKOUT HISTORY</div>
-      <div style="width:38px;"></div>
+      <button class="iconbtn" onclick="go('customprogress')" aria-label="Progress">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+      </button>
     </div>
     <div id="customHistoryList" class="list-wrap"></div>
+  </section>
+
+  <!-- CUSTOM WORKOUT PROGRESS CHART -->
+  <section id="screen-customprogress" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('customhistory')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">PROGRESS</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <select id="customProgressWorkoutSelect" class="time-input" style="width:100%;box-sizing:border-box;margin-bottom:14px;" onchange="renderCustomProgress(this.value)"></select>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="v" id="cProgBest">0</div><div class="l">BEST VOLUME</div></div>
+        <div class="stat-card"><div class="v" id="cProgSessions">0</div><div class="l">SESSIONS</div></div>
+      </div>
+      <div class="chart-card">
+        <div id="customChartBars" class="chart-bars"></div>
+      </div>
+    </div>
   </section>
 
   <!-- CUSTOM WORKOUT HISTORY DETAIL -->
@@ -901,7 +979,8 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     </div>
     <div class="list-wrap" id="customHistoryDetailWrap"></div>
     <div style="padding:0 20px 20px;">
-      <div class="control-row">
+      <button class="btn btn-outline btn-sm" onclick="shareCustomResult(currentCustomHistoryDetailId)">แชร์ผลลัพธ์</button>
+      <div class="control-row" style="margin-top:10px;">
         <button class="btn btn-ghost btn-sm" onclick="openEditCustomHistorySessionModal(currentCustomHistoryDetailId)">แก้ไข</button>
         <button class="btn btn-danger btn-sm" onclick="confirmDeleteCustomHistorySession()">ลบ</button>
       </div>

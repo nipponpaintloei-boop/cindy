@@ -247,6 +247,37 @@ function beep(freq, durationMs, vol) {
   } catch (e) {}
 }
 
+/* ---------- voice cues (Web Speech API) ----------
+   Announces exercise names and short countdowns during the Custom Workout
+   player. Purely additive — silently does nothing on devices/browsers
+   without speechSynthesis, and is off by default so it never surprises
+   someone who hasn't opted in. */
+const KEY_VOICE_CUES = 'cindy_voice_cues';
+function isVoiceCuesEnabled() {
+  return localStorage.getItem(KEY_VOICE_CUES) === '1';
+}
+function setVoiceCuesEnabled(on) {
+  localStorage.setItem(KEY_VOICE_CUES, on ? '1' : '0');
+}
+function speak(text) {
+  if (!isVoiceCuesEnabled()) return;
+  try {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel(); // don't let cues queue up and lag behind the timer
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'th-TH';
+    utter.rate = 1.05;
+    window.speechSynthesis.speak(utter);
+  } catch (e) {}
+}
+function toggleVoiceCues() {
+  const next = !isVoiceCuesEnabled();
+  setVoiceCuesEnabled(next);
+  showToast(next ? 'เปิดเสียงพูดบอกท่าแล้ว 🔊' : 'ปิดเสียงพูดบอกท่าแล้ว 🔇');
+  const btn = document.getElementById('playerVoiceBtn');
+  if (btn) btn.classList.toggle('sel', next);
+}
+
 /* ---------- storage helpers ---------- */
 function loadSessions() {
   try { return JSON.parse(localStorage.getItem(KEY_SESSIONS)) || []; }
@@ -315,6 +346,8 @@ function go(name) {
   if (name === 'progress') { renderProgress(); applyReminderToUI(); }
   if (name === 'customlist') renderCustomList();
   if (name === 'customhistory') renderCustomHistory();
+  if (name === 'customprogress') renderCustomProgress();
+  if (name === 'customschedule') renderCustomSchedule();
 }
 
 /* ================= HOME ================= */
@@ -355,6 +388,7 @@ function renderHome() {
   }
 
   renderHomeCustomShortcut();
+  renderHomeWeeklyPlanCard();
 }
 
 /**
@@ -1314,6 +1348,171 @@ async function shareResult(id) {
   }, 'image/png');
 }
 
+/* Custom-workout analog of shareResult() above — same canvas layout and
+   share/download fallback chain, just swapping the fixed PULL/PUSH/SQUAT
+   stats for a dynamic top-4 exercise breakdown since Custom Workouts can
+   contain any mix of exercises. */
+async function shareCustomResult(id) {
+  const s = loadCustomWorkoutSessions().find(x => x.id === id);
+  if (!s) { showToast('ไม่พบข้อมูล'); return; }
+
+  const totals = {};
+  const order = [];
+  (s.exerciseLog || []).forEach(entry => {
+    if (!(entry.name in totals)) { totals[entry.name] = { value: 0, type: entry.type }; order.push(entry.name); }
+    totals[entry.name].value += entry.repsOrSecDone;
+  });
+  const topExercises = order.slice(0, 4).map(name => [name.toUpperCase(), totals[name].value + (totals[name].type === 'time' ? 'วิ' : '')]);
+  while (topExercises.length < 4) topExercises.push(['—', '']);
+
+  const canvas = document.createElement('canvas');
+  const W = 1080, H = 1920;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  const grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, '#3a0d10');
+  grad.addColorStop(0.45, '#150912');
+  grad.addColorStop(1, '#05070f');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(232,35,42,0.28)';
+  ctx.lineWidth = 3;
+  for (let i = 0; i <= 6; i++) {
+    const t = i / 6;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(W * (0.35 + t * 0.65), H * t * 0.9 + 40);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(61,111,224,0.22)';
+  ctx.lineWidth = 2.4;
+  [0.18, 0.34, 0.5].forEach(r => {
+    ctx.beginPath();
+    ctx.arc(0, 0, W * r * 1.5, 0, Math.PI / 2);
+    ctx.stroke();
+  });
+  ctx.restore();
+
+  ctx.save();
+  const cx = W / 2, cy = 760;
+  ctx.strokeStyle = 'rgba(232,35,42,0.5)';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 8; i++) {
+    const ang = (Math.PI * 2 * i) / 8;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(ang) * 330, cy + Math.sin(ang) * 330);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(61,111,224,0.4)';
+  ctx.lineWidth = 2.6;
+  [130, 230, 330].forEach(r => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+  ctx.restore();
+
+  ctx.textAlign = 'center';
+
+  ctx.fillStyle = '#E8232A';
+  ctx.font = '800 40px Arial';
+  ctx.fillText((s.workoutName || 'WORKOUT').toUpperCase(), W / 2, 150);
+  ctx.fillStyle = 'rgba(245,244,240,0.75)';
+  ctx.font = '700 28px Arial';
+  ctx.letterSpacing = '3px';
+  ctx.fillText('CUSTOM WORKOUT · ' + fmtTime(s.totalDurationSec), W / 2, 200);
+  ctx.letterSpacing = '0px';
+
+  ctx.fillStyle = '#F5F4F0';
+  ctx.font = '800 300px Arial';
+  ctx.fillText(String(s.setsCompleted), W / 2, cy + 110);
+
+  ctx.fillStyle = 'rgba(245,244,240,0.65)';
+  ctx.font = '700 34px Arial';
+  ctx.letterSpacing = '4px';
+  ctx.fillText('SETS COMPLETED', W / 2, cy + 175);
+  ctx.letterSpacing = '0px';
+
+  if (s.isPR) {
+    ctx.fillStyle = '#3ED598';
+    ctx.font = '800 38px Arial';
+    ctx.fillText('★ NEW PERSONAL RECORD', W / 2, cy + 240);
+  }
+
+  const gridTop = 1330, cellW = W / 2, cellH = 160;
+  topExercises.forEach((st, i) => {
+    const col = i % 2, row = Math.floor(i / 2);
+    const x = cellW * col + cellW / 2;
+    const y = gridTop + row * cellH;
+    ctx.fillStyle = '#F5F4F0';
+    ctx.font = '800 56px Arial';
+    ctx.fillText(String(st[1]), x, y);
+    ctx.fillStyle = 'rgba(245,244,240,0.5)';
+    ctx.font = '700 22px Arial';
+    ctx.letterSpacing = '2px';
+    ctx.fillText(st[0], x, y + 40);
+    ctx.letterSpacing = '0px';
+  });
+
+  const barGrad = ctx.createLinearGradient(W / 2 - 140, 0, W / 2 + 140, 0);
+  barGrad.addColorStop(0, '#E8232A');
+  barGrad.addColorStop(1, '#3D6FE0');
+  ctx.fillStyle = barGrad;
+  ctx.fillRect(W / 2 - 140, 1690, 280, 6);
+
+  ctx.fillStyle = 'rgba(245,244,240,0.45)';
+  ctx.font = '600 30px Arial';
+  ctx.fillText(fmtDate(s.completedAt), W / 2, 1760);
+
+  const fileName = 'cindy_custom_result_' + s.id + '.png';
+
+  const plugins = capPlugins();
+  if (plugins && plugins.Filesystem && plugins.Share) {
+    try {
+      const dataUrl = canvas.toDataURL('image/png');
+      const base64Data = dataUrl.split(',')[1];
+      const written = await plugins.Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: 'CACHE'
+      });
+      await plugins.Share.share({
+        title: 'CINDY Custom Workout Result',
+        text: s.setsCompleted + ' sets — ' + (s.workoutName || 'Custom Workout'),
+        url: written.uri,
+        dialogTitle: 'แชร์ผลลัพธ์ Workout'
+      });
+    } catch (e) {
+      if (!(e && String(e.message || e).toLowerCase().includes('cancel'))) {
+        showToast('แชร์ไม่สำเร็จ ลองอีกครั้ง');
+      }
+    }
+    return;
+  }
+
+  canvas.toBlob(async (blob) => {
+    if (!blob) { showToast('สร้างรูปไม่สำเร็จ'); return; }
+    const file = new File([blob], fileName, { type: 'image/png' });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'CINDY Custom Workout Result', text: s.setsCompleted + ' sets — ' + (s.workoutName || 'Custom Workout') });
+        return;
+      } catch (e) { /* cancelled — fall through to download */ }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('บันทึกรูปผลลัพธ์แล้ว (เช็คโฟลเดอร์ Download)');
+  }, 'image/png');
+}
+
 /* ================= BACKUP (Export / Import) =================
    v2: covers ALL locally-stored user data, not just Cindy sessions.
    Previously this only exported KEY_SESSIONS ('cindy_sessions'), so
@@ -1727,7 +1926,9 @@ function makeCustomExercise(overrides) {
     durationSec: 30,           // used when type === 'time'
     sets: 3,                   // how many sets of THIS exercise before moving on
     restBetweenSetsSec: 45,    // rest between sets of THIS exercise
-    restAfterSec: 15           // rest after the LAST set of this exercise, before the next exercise
+    restAfterSec: 15,          // rest after the LAST set of this exercise, before the next exercise
+    weight: 0,                 // optional load in kg; 0 = bodyweight / not tracked
+    supersetWithNext: false    // true = skip the rest-before-next-exercise, flow straight into it
   }, overrides || {});
 }
 
@@ -1744,6 +1945,7 @@ function saveCustomWorkout(workout) {
     name: (workout.name || '').trim() || 'Untitled Workout',
     createdAt: workout.createdAt || Date.now(),
     updatedAt: Date.now(),
+    warmupEnabled: !!workout.warmupEnabled,
     exercises: Array.isArray(workout.exercises)
       ? workout.exercises.map((ex, i) => makeCustomExercise(Object.assign({}, ex, { order: i })))
       : []
@@ -1852,6 +2054,7 @@ function duplicateCustomWorkout(id) {
   saveCustomWorkout({
     id: null,
     name: original.name + ' (Copy)',
+    warmupEnabled: !!original.warmupEnabled,
     exercises: original.exercises.map(ex => Object.assign({}, ex))
   });
   renderCustomList();
@@ -1882,17 +2085,20 @@ function blankCustomWorkoutDraft() {
   return {
     id: null,
     name: '',
+    warmupEnabled: false,
     exercises: [makeCustomExercise({ name: '' })]
   };
 }
 function openCustomEditor(id) {
   const existing = id ? getCustomWorkout(id) : null;
   customEditorDraft = existing
-    ? { id: existing.id, name: existing.name, exercises: existing.exercises.map(ex => Object.assign({}, ex)) }
+    ? { id: existing.id, name: existing.name, warmupEnabled: !!existing.warmupEnabled, exercises: existing.exercises.map(ex => Object.assign({}, ex)) }
     : blankCustomWorkoutDraft();
 
   document.getElementById('customEditorTitle').textContent = existing ? 'แก้ไข WORKOUT' : 'สร้าง WORKOUT';
   document.getElementById('customNameInput').value = customEditorDraft.name;
+  const warmupToggle = document.getElementById('customWarmupToggle');
+  if (warmupToggle) warmupToggle.checked = customEditorDraft.warmupEnabled;
   renderCustomExerciseList();
   go('customeditor');
 }
@@ -1903,7 +2109,9 @@ function cancelCustomEditor() {
 
 function updateCustomHeaderField(field, value) {
   if (!customEditorDraft) return;
-  customEditorDraft[field] = (field === 'name') ? value : (parseInt(value, 10) || 0);
+  if (field === 'name') customEditorDraft[field] = value;
+  else if (field === 'warmupEnabled') customEditorDraft[field] = !!value;
+  else customEditorDraft[field] = parseInt(value, 10) || 0;
 }
 
 function renderCustomExerciseList() {
@@ -1941,7 +2149,12 @@ function renderCustomExerciseList() {
       }
       <div class="field-row"><label>จำนวนเซ็ต</label><input type="number" min="1" max="20" value="${ex.sets}" oninput="updateCustomExerciseField(${i}, 'sets', this.value)"></div>
       ${ex.sets > 1 ? `<div class="field-row"><label>พักระหว่างเซ็ต (วินาที)</label><input type="number" min="0" max="600" value="${ex.restBetweenSetsSec}" oninput="updateCustomExerciseField(${i}, 'restBetweenSetsSec', this.value)"></div>` : ''}
-      <div class="field-row"><label>พักก่อนไปท่าถัดไป (วินาที)</label><input type="number" min="0" max="600" value="${ex.restAfterSec}" oninput="updateCustomExerciseField(${i}, 'restAfterSec', this.value)"></div>
+      ${i < exercises.length - 1 ? `<div class="field-row" style="grid-template-columns:1fr auto;align-items:center;"><label>รวมเป็น Superset กับท่าถัดไป (ไม่พักคั่น)</label><input type="checkbox" style="width:20px;height:20px;" ${ex.supersetWithNext ? 'checked' : ''} onchange="updateCustomExerciseField(${i}, 'supersetWithNext', this.checked)"></div>` : ''}
+      ${ex.supersetWithNext
+        ? `<div class="empty-hint" style="text-align:left;padding:2px 0 6px;">Superset: ไปท่าถัดไปทันทีไม่มีพักคั่น</div>`
+        : `<div class="field-row"><label>พักก่อนไปท่าถัดไป (วินาที)</label><input type="number" min="0" max="600" value="${ex.restAfterSec}" oninput="updateCustomExerciseField(${i}, 'restAfterSec', this.value)"></div>`
+      }
+      <div class="field-row"><label>น้ำหนักที่ใช้ (กก. — ถ้ามี)</label><input type="number" min="0" max="500" step="0.5" value="${ex.weight || 0}" oninput="updateCustomExerciseField(${i}, 'weight', this.value)"></div>
     </div>`;
   }).join('');
 }
@@ -2039,8 +2252,16 @@ function setCustomExerciseType(idx, type) {
 }
 function updateCustomExerciseField(idx, field, value) {
   if (!customEditorDraft) return;
-  customEditorDraft.exercises[idx][field] = (field === 'name') ? value : (parseInt(value, 10) || 0);
-  if (field === 'sets') renderCustomExerciseList(); // toggles the "rest between sets" field's visibility
+  if (field === 'name') {
+    customEditorDraft.exercises[idx][field] = value;
+  } else if (field === 'weight') {
+    customEditorDraft.exercises[idx][field] = Math.max(0, parseFloat(value) || 0);
+  } else if (field === 'supersetWithNext') {
+    customEditorDraft.exercises[idx][field] = !!value;
+  } else {
+    customEditorDraft.exercises[idx][field] = parseInt(value, 10) || 0;
+  }
+  if (field === 'sets' || field === 'supersetWithNext') renderCustomExerciseList(); // toggles conditional fields' visibility
 }
 
 function saveCustomEditorForm() {
@@ -2067,9 +2288,48 @@ function saveCustomEditorForm() {
 
 let customPlayer = null;
 
+/* Fixed general warm-up moves offered before any Custom Workout that has
+   warmupEnabled on. Purely a visual checklist — checking items off is just
+   a ritual for the person, nothing here is logged or timed. */
+const WARMUP_LIBRARY = [
+  'หมุนแขน หมุนไหล่ 20 วินาที',
+  'Jumping Jack 20 ครั้ง',
+  'Bodyweight Squat 10 ครั้ง',
+  'Arm Swing / Leg Swing ข้างละ 10 ครั้ง',
+  'High Knees 20 วินาที'
+];
+let warmupPendingWorkoutId = null;
+
 function startCustomWorkoutPlayer(id) {
   const workout = getCustomWorkout(id);
   if (!workout || !workout.exercises.length) { showToast('Workout นี้ยังไม่มีท่า'); return; }
+  if (workout.warmupEnabled) {
+    warmupPendingWorkoutId = id;
+    renderCustomWarmup();
+    go('customwarmup');
+    return;
+  }
+  beginCustomWorkoutPlayerReal(workout);
+}
+
+function renderCustomWarmup() {
+  const wrap = document.getElementById('customWarmupList');
+  if (!wrap) return;
+  wrap.innerHTML = WARMUP_LIBRARY.map(item => `
+    <label class="history-item" style="cursor:pointer;">
+      <div><div class="date">${escapeHtml(item)}</div></div>
+      <input type="checkbox" style="width:22px;height:22px;flex-shrink:0;">
+    </label>`).join('');
+}
+
+function proceedFromCustomWarmup() {
+  const workout = getCustomWorkout(warmupPendingWorkoutId);
+  warmupPendingWorkoutId = null;
+  if (workout) beginCustomWorkoutPlayerReal(workout);
+  else go('customlist');
+}
+
+function beginCustomWorkoutPlayerReal(workout) {
   customPlayer = {
     workout,
     exIndex: 0,
@@ -2083,6 +2343,8 @@ function startCustomWorkoutPlayer(id) {
   unlockAudio();
   acquireWakeLock();
   go('customplayer');
+  const voiceBtn = document.getElementById('playerVoiceBtn');
+  if (voiceBtn) voiceBtn.classList.toggle('sel', isVoiceCuesEnabled());
   beginCustomPlayerPhase();
 }
 
@@ -2152,6 +2414,7 @@ function beginCustomPlayerPhase() {
   clearCustomPlayerTimer();
   if (customPlayer.phase === 'exercise') {
     const ex = currentCustomExercise();
+    speak(ex.name + (ex.sets > 1 ? ' เซ็ต ' + (customPlayer.setIndex + 1) : ''));
     if (ex.type === 'time') {
       customPlayer.currentValue = ex.durationSec;
       startCustomPlayerCountdown(ex.durationSec, onCustomExerciseTimeUp);
@@ -2161,6 +2424,12 @@ function beginCustomPlayerPhase() {
   } else {
     const exNow = currentCustomExercise();
     const restSec = customPlayer.phase === 'restSet' ? exNow.restBetweenSetsSec : exNow.restAfterSec;
+    if (customPlayer.phase === 'restSet') {
+      speak('พักระหว่างเซ็ต');
+    } else {
+      const next = customPlayer.workout.exercises[customPlayer.exIndex + 1];
+      speak('พักก่อนไปท่าถัดไป' + (next ? ': ' + next.name : ''));
+    }
     if (restSec > 0) {
       startCustomPlayerCountdown(restSec, onCustomRestDone);
     } else {
@@ -2173,7 +2442,7 @@ function beginCustomPlayerPhase() {
 
 function logCurrentCustomExercise(value) {
   const ex = currentCustomExercise();
-  customPlayer.exerciseLog.push({ name: ex.name, exIndex: customPlayer.exIndex, setNumber: customPlayer.setIndex + 1, repsOrSecDone: value, type: ex.type || 'reps' });
+  customPlayer.exerciseLog.push({ name: ex.name, exIndex: customPlayer.exIndex, setNumber: customPlayer.setIndex + 1, repsOrSecDone: value, type: ex.type || 'reps', weight: ex.weight || 0 });
 }
 
 function onCustomExerciseTimeUp() {
@@ -2208,7 +2477,8 @@ function adjustPlayerReps(delta) {
 /* One "set" of the current exercise just finished. Decide what's next:
    another set of the SAME exercise (with restBetweenSetsSec in between),
    or — once its last set is done — restAfterSec before moving on to the
-   next exercise, or the end of the workout if this was the last exercise. */
+   next exercise (skipped entirely for a superset pair), or the end of the
+   workout if this was the last exercise. */
 function advanceAfterCustomExercise() {
   if (!isLastSetOfCurrentExercise()) {
     if (currentCustomExercise().restBetweenSetsSec > 0) {
@@ -2219,6 +2489,8 @@ function advanceAfterCustomExercise() {
     }
   } else if (isLastCustomExercise()) {
     finishCustomPlayerWorkout();
+  } else if (currentCustomExercise().supersetWithNext) {
+    advanceToNextCustomExercise();
   } else if (currentCustomExercise().restAfterSec > 0) {
     customPlayer.phase = 'restEx';
     beginCustomPlayerPhase();
@@ -2380,14 +2652,15 @@ function buildCustomExerciseBreakdownHtml(exerciseLog) {
   const totals = {};
   const order = [];
   exerciseLog.forEach(entry => {
-    if (!(entry.name in totals)) { totals[entry.name] = { value: 0, type: entry.type }; order.push(entry.name); }
+    if (!(entry.name in totals)) { totals[entry.name] = { value: 0, type: entry.type, weight: entry.weight || 0 }; order.push(entry.name); }
     totals[entry.name].value += entry.repsOrSecDone;
   });
   if (!order.length) return '<div class="empty-hint">ไม่มีข้อมูลท่าออกกำลังกาย</div>';
   return order.map(name => {
     const t = totals[name];
     const unit = t.type === 'time' ? 'วินาที' : 'ครั้ง';
-    return `<div class="breakdown-row"><span class="breakdown-name">${escapeHtml(name)}</span><span class="breakdown-val">${t.value} <span style="font-size:11px;color:var(--text-faint);">${unit}</span></span></div>`;
+    const weightTag = t.weight > 0 ? ' · ' + t.weight + ' กก.' : '';
+    return `<div class="breakdown-row"><span class="breakdown-name">${escapeHtml(name)}${weightTag}</span><span class="breakdown-val">${t.value} <span style="font-size:11px;color:var(--text-faint);">${unit}</span></span></div>`;
   }).join('');
 }
 
@@ -2421,6 +2694,114 @@ function finishCustomCompleteFlow() {
    per-set breakdown table, note, edit/delete. */
 
 let currentCustomHistoryDetailId = null;
+
+/* ---- per-workout progress chart ---- */
+function totalVolumeOfCustomSession(s) {
+  return (s.exerciseLog || []).reduce((sum, e) => sum + (e.repsOrSecDone || 0), 0);
+}
+function renderCustomProgress(workoutId) {
+  const allSessions = loadCustomWorkoutSessions();
+  const workouts = loadCustomWorkouts();
+  const ids = [...new Set(allSessions.map(s => s.workoutId))];
+  const select = document.getElementById('customProgressWorkoutSelect');
+  if (select) {
+    if (!ids.length) {
+      select.innerHTML = '<option value="">— ยังไม่มีข้อมูล —</option>';
+    } else {
+      select.innerHTML = ids.map(id => {
+        const w = workouts.find(x => x.id === id);
+        const name = w ? w.name : ((allSessions.find(s => s.workoutId === id) || {}).workoutName || 'Untitled Workout');
+        return `<option value="${id}">${escapeHtml(name)}</option>`;
+      }).join('');
+    }
+  }
+  if (!workoutId) workoutId = ids[ids.length - 1];
+  if (select && workoutId) select.value = workoutId;
+
+  const chart = document.getElementById('customChartBars');
+  const bestEl = document.getElementById('cProgBest');
+  const sessEl = document.getElementById('cProgSessions');
+  const sessions = allSessions.filter(s => s.workoutId === workoutId).sort((a, b) => a.completedAt - b.completedAt);
+  if (!sessions.length) {
+    chart.innerHTML = '<div class="empty-hint" style="width:100%;">ยังไม่มีข้อมูล Workout นี้</div>';
+    bestEl.textContent = '—';
+    sessEl.textContent = '0';
+    return;
+  }
+  const vols = sessions.map(totalVolumeOfCustomSession);
+  bestEl.textContent = Math.max(...vols).toLocaleString();
+  sessEl.textContent = sessions.length;
+
+  const maxVal = Math.max(1, ...vols);
+  chart.innerHTML = '';
+  sessions.slice(-14).forEach(s => {
+    const val = totalVolumeOfCustomSession(s);
+    const barH = Math.max(4, (val / maxVal) * 118);
+    const d = new Date(s.completedAt);
+    const col = document.createElement('div');
+    col.className = 'chart-col';
+    col.innerHTML = `<div class="chart-bar${s.isPR ? ' pb' : ''}" style="height:${barH}px;" title="${val}"></div>
+      <div class="chart-xlabel">${d.getDate()}/${d.getMonth() + 1}</div>`;
+    chart.appendChild(col);
+  });
+}
+
+/* ---- weekly schedule / rest days ---- */
+const KEY_WEEKLY_PLAN = 'cindy_custom_weekly_plan';
+const WEEKDAY_LABELS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+function loadWeeklyPlan() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY_WEEKLY_PLAN));
+    if (saved && typeof saved === 'object') return saved;
+  } catch (e) {}
+  return {};
+}
+function saveWeeklyPlan(plan) {
+  localStorage.setItem(KEY_WEEKLY_PLAN, JSON.stringify(plan));
+}
+function setWeeklyPlanDay(dayIdx, workoutId) {
+  const plan = loadWeeklyPlan();
+  plan[dayIdx] = workoutId || null;
+  saveWeeklyPlan(plan);
+  renderHomeWeeklyPlanCard();
+}
+function renderCustomSchedule() {
+  const wrap = document.getElementById('customScheduleList');
+  if (!wrap) return;
+  const workouts = loadCustomWorkouts();
+  const plan = loadWeeklyPlan();
+  wrap.innerHTML = WEEKDAY_LABELS.map((label, i) => {
+    const options = ['<option value="">วันพัก (Rest Day)</option>']
+      .concat(workouts.map(w => `<option value="${w.id}"${plan[i] === w.id ? ' selected' : ''}>${escapeHtml(w.name)}</option>`));
+    return `<div class="field-row" style="grid-template-columns:90px 1fr;align-items:center;">
+      <label>${label}</label>
+      <select class="time-input" onchange="setWeeklyPlanDay(${i}, this.value)">${options.join('')}</select>
+    </div>`;
+  }).join('');
+}
+/* Shows today's planned Custom Workout (or a rest-day message) on Home. */
+function renderHomeWeeklyPlanCard() {
+  const wrap = document.getElementById('homeWeeklyPlanWrap');
+  if (!wrap) return;
+  const plan = loadWeeklyPlan();
+  const todayIdx = new Date().getDay();
+  const hasAnyPlan = Object.keys(plan).length > 0 && Object.values(plan).some(v => v !== undefined);
+  if (!hasAnyPlan) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const workoutId = plan[todayIdx];
+  if (!workoutId) {
+    wrap.innerHTML = `<div class="section-label">แผนวันนี้ (${WEEKDAY_LABELS[todayIdx]})</div>
+      <div class="metric-card" style="text-align:center;padding:16px;color:var(--text-dim);">🌙 วันนี้เป็นวันพัก — พักผ่อนให้เต็มที่</div>`;
+    return;
+  }
+  const workout = getCustomWorkout(workoutId);
+  if (!workout) { wrap.style.display = 'none'; return; }
+  wrap.innerHTML = `<div class="section-label">แผนวันนี้ (${WEEKDAY_LABELS[todayIdx]})</div>
+    <div class="history-item" onclick="startCustomWorkoutPlayer('${workout.id}')">
+      <div><div class="date">${escapeHtml(workout.name)}</div><div class="reps">${workout.exercises.length} ท่า</div></div>
+      <div class="rounds" style="color:var(--success);">▶ เริ่ม</div>
+    </div>`;
+}
 
 function renderCustomHistory() {
   const wrap = document.getElementById('customHistoryList');
@@ -2457,7 +2838,8 @@ function renderCustomHistoryDetail() {
   const log = s.exerciseLog || [];
   const rows = log.map(entry => {
     const unit = entry.type === 'time' ? 'วิ' : 'ครั้ง';
-    return `<tr><td>${escapeHtml(entry.name)}</td><td>${entry.setNumber}</td><td>${entry.repsOrSecDone} ${unit}</td></tr>`;
+    const weightTag = entry.weight > 0 ? ' · ' + entry.weight + 'กก.' : '';
+    return `<tr><td>${escapeHtml(entry.name)}</td><td>${entry.setNumber}</td><td>${entry.repsOrSecDone} ${unit}${weightTag}</td></tr>`;
   }).join('');
   const tableRows = rows || '<tr><td colspan="3" style="color:var(--text-faint);">ไม่มีข้อมูลเซ็ต</td></tr>';
 
