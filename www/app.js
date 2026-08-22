@@ -1475,3 +1475,111 @@ document.addEventListener('DOMContentLoaded', init);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') checkReminder();
 });
+/* ================= CUSTOM WORKOUT (FREE-FORM) — DATA MODEL & STORAGE ================= */
+/* Phase 1: schema + CRUD only. No UI/builder/player yet — those come in later phases.
+   Kept completely separate from Cindy's protocol/session storage (different keys)
+   so nothing here can ever corrupt or interfere with existing Cindy data. */
+
+const KEY_CUSTOM_WORKOUTS = 'custom_workouts';          // saved workout "recipes"
+const KEY_CUSTOM_SESSIONS = 'custom_workout_sessions';  // completed workout results
+
+/* ---- Workout definitions (the "recipe" the user builds) ---- */
+
+function loadCustomWorkouts() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY_CUSTOM_WORKOUTS));
+    if (Array.isArray(saved)) return saved;
+  } catch (e) {}
+  return [];
+}
+
+function saveCustomWorkouts(list) {
+  localStorage.setItem(KEY_CUSTOM_WORKOUTS, JSON.stringify(list));
+}
+
+function getCustomWorkout(id) {
+  return loadCustomWorkouts().find(w => w.id === id) || null;
+}
+
+/**
+ * Creates a blank/valid exercise entry. The (future) builder UI calls this
+ * every time the user taps "+ เพิ่มท่า".
+ */
+function makeCustomExercise(overrides) {
+  return Object.assign({
+    order: 0,
+    name: '',
+    type: 'reps',        // 'reps' | 'time'
+    reps: 10,             // used when type === 'reps'
+    durationSec: 30,      // used when type === 'time'
+    restAfterSec: 15
+  }, overrides || {});
+}
+
+/**
+ * Creates or updates a workout definition.
+ * Pass an existing `id` to update in place; omit it to create a new one.
+ * Always re-numbers exercise order to match array position, so the builder
+ * never has to manage order indices itself — just reorder the array and save.
+ */
+function saveCustomWorkout(workout) {
+  const list = loadCustomWorkouts();
+  const clean = {
+    id: workout.id || ('workout_' + Date.now()),
+    name: (workout.name || '').trim() || 'Untitled Workout',
+    createdAt: workout.createdAt || Date.now(),
+    updatedAt: Date.now(),
+    exercises: Array.isArray(workout.exercises)
+      ? workout.exercises.map((ex, i) => makeCustomExercise(Object.assign({}, ex, { order: i })))
+      : [],
+    sets: Math.max(1, parseInt(workout.sets, 10) || 1),
+    restBetweenSetsSec: Math.max(0, parseInt(workout.restBetweenSetsSec, 10) || 0)
+  };
+  const idx = list.findIndex(w => w.id === clean.id);
+  if (idx >= 0) list[idx] = clean; else list.push(clean);
+  saveCustomWorkouts(list);
+  return clean;
+}
+
+function deleteCustomWorkout(id) {
+  saveCustomWorkouts(loadCustomWorkouts().filter(w => w.id !== id));
+}
+
+/* ---- Completed session results ---- */
+
+function loadCustomWorkoutSessions() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY_CUSTOM_SESSIONS));
+    if (Array.isArray(saved)) return saved;
+  } catch (e) {}
+  return [];
+}
+
+function saveCustomWorkoutSessions(list) {
+  localStorage.setItem(KEY_CUSTOM_SESSIONS, JSON.stringify(list));
+}
+
+/**
+ * Records one completed run of a custom workout. The (future) Workout Player
+ * calls this when the user finishes the last set.
+ */
+function recordCustomWorkoutSession(session) {
+  const list = loadCustomWorkoutSessions();
+  const clean = {
+    id: 'wsession_' + Date.now(),
+    workoutId: session.workoutId,
+    workoutName: session.workoutName || '',
+    completedAt: Date.now(),
+    totalDurationSec: session.totalDurationSec || 0,
+    setsCompleted: session.setsCompleted || 0,
+    // e.g. [{ name:'Push-up', setNumber:1, repsOrSecDone:15 }, ...]
+    exerciseLog: Array.isArray(session.exerciseLog) ? session.exerciseLog : []
+  };
+  list.push(clean);
+  saveCustomWorkoutSessions(list);
+  return clean;
+}
+
+function deleteCustomWorkoutSession(id) {
+  saveCustomWorkoutSessions(loadCustomWorkoutSessions().filter(s => s.id !== id));
+}
