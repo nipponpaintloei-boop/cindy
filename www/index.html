@@ -777,7 +777,10 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 <!-- Protocol Library Modal -->
 <div id="settingsModal" class="modal-overlay">
   <div class="modal-card">
-    <div class="modal-title">โปรโตคอล / WOD</div>
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
+  <span>โปรโตคอล / WOD</span>
+  <span onclick="closeModal('settingsModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
+    </div>
     <div class="modal-body">เลือกโปรโตคอลที่จะใช้เล่น หรือสร้างสูตรของคุณเอง (AMRAP หรือ EMOM)</div>
     <div id="protocolList" class="protocol-list"></div>
     <div class="modal-row" style="grid-template-columns:1fr;margin-top:14px;">
