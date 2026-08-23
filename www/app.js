@@ -4,6 +4,10 @@ const KEY_SESSIONS = 'cindy_sessions';
 const KEY_ACTIVE = 'cindy_active_workout';
 const KEY_LAST_SEEN_LEVEL = 'cindy_last_seen_level';
 
+/* ---- streak milestone treasure chests ---- */
+const STREAK_MILESTONES = [7, 14, 30, 100];
+const KEY_STREAK_CHESTS_OPENED = 'cindy_streak_chests_opened';
+
 /* ================= PROTOCOL LIBRARY ================= */
 /* A "protocol" is a saved WOD prescription: either an AMRAP (fixed reps/round,
    racing the clock for max rounds) or an EMOM (fixed reps, auto-advancing every
@@ -493,6 +497,7 @@ function renderHome() {
   renderBossCard();
   renderWeekRing();
   renderHomeLastWorkout();
+  renderTreasureChest();
 }
 
 /** Combined streak across Cindy sessions + Custom Workout sessions. */
@@ -512,6 +517,86 @@ function computeCombinedStreak() {
     cursor.setDate(cursor.getDate() - 1);
   }
   return streak;
+}
+
+/* ---------- streak milestone treasure chests ---------- */
+function loadOpenedChests() {
+  try { return JSON.parse(localStorage.getItem(KEY_STREAK_CHESTS_OPENED)) || []; }
+  catch (e) { return []; }
+}
+function saveOpenedChests(list) {
+  localStorage.setItem(KEY_STREAK_CHESTS_OPENED, JSON.stringify(list));
+}
+function streakBadgeInfo(milestone) {
+  switch (milestone) {
+    case 7: return { emoji: '🥉', title: 'นักสู้ 7 วัน', desc: 'สร้าง Streak ครบ 7 วันติดต่อกัน' };
+    case 14: return { emoji: '🥈', title: 'นักสู้ 14 วัน', desc: 'สร้าง Streak ครบ 14 วันติดต่อกัน' };
+    case 30: return { emoji: '🥇', title: 'นักรบ 30 วัน', desc: 'สร้าง Streak ครบ 30 วันติดต่อกัน' };
+    case 100: return { emoji: '💎', title: 'ตำนาน 100 วัน', desc: 'สร้าง Streak ครบ 100 วันติดต่อกัน' };
+    default: return { emoji: '🏆', title: 'Milestone', desc: '' };
+  }
+}
+/** Lowest achieved-but-unopened streak milestone, or null if none pending. */
+function nextUnclaimedChestMilestone(streak) {
+  const opened = loadOpenedChests();
+  for (const m of STREAK_MILESTONES) {
+    if (streak >= m && opened.indexOf(m) === -1) return m;
+  }
+  return null;
+}
+function renderTreasureChest() {
+  const btn = document.getElementById('treasureChestBtn');
+  if (!btn) return;
+  const milestone = nextUnclaimedChestMilestone(computeCombinedStreak());
+  btn.classList.toggle('show', milestone !== null);
+}
+function openTreasureChestModal() {
+  const milestone = nextUnclaimedChestMilestone(computeCombinedStreak());
+  if (milestone === null) return;
+  const info = streakBadgeInfo(milestone);
+  document.getElementById('chestMilestoneLabel').textContent = 'STREAK ' + milestone + ' วัน';
+  document.getElementById('chestBadgeEmoji').textContent = info.emoji;
+  document.getElementById('chestBadgeTitle').textContent = info.title;
+  document.getElementById('chestBadgeDesc').textContent = info.desc;
+  document.getElementById('treasureChestModal').dataset.milestone = String(milestone);
+
+  const icon = document.getElementById('chestIcon');
+  const reveal = document.getElementById('chestBadgeReveal');
+  const rewardText = document.getElementById('chestRewardText');
+  icon.classList.remove('chest-opened', 'chest-shake');
+  reveal.classList.remove('show');
+  rewardText.classList.remove('show');
+  document.getElementById('chestOpenBtn').style.display = '';
+  document.getElementById('chestCloseBtn').style.display = 'none';
+
+  document.getElementById('treasureChestModal').classList.add('active');
+}
+function revealTreasureChest() {
+  const modal = document.getElementById('treasureChestModal');
+  const milestone = parseInt(modal.dataset.milestone, 10);
+  if (!milestone) return;
+
+  const icon = document.getElementById('chestIcon');
+  const reveal = document.getElementById('chestBadgeReveal');
+  const rewardText = document.getElementById('chestRewardText');
+
+  vibrate([40, 30, 40, 30, 90]);
+  icon.classList.add('chest-shake');
+  setTimeout(() => {
+    icon.classList.add('chest-opened');
+    reveal.classList.add('show');
+    rewardText.classList.add('show');
+  }, 320);
+
+  document.getElementById('chestOpenBtn').style.display = 'none';
+  document.getElementById('chestCloseBtn').style.display = '';
+
+  const opened = loadOpenedChests();
+  if (opened.indexOf(milestone) === -1) {
+    opened.push(milestone);
+    saveOpenedChests(opened);
+  }
+  renderTreasureChest();
 }
 
 function renderMascotCard() {

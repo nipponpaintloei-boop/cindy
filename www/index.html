@@ -238,6 +238,50 @@ body{
   100%{transform:scale(1) rotate(0deg);}
 }
 
+/* ---- streak milestone treasure chest ---- */
+.treasure-chest-btn{
+  position:absolute;top:-10px;right:-8px;z-index:3;
+  width:38px;height:38px;border-radius:50%;
+  background:linear-gradient(155deg,var(--warning),#c97e00);
+  border:2px solid var(--bg);
+  display:none;align-items:center;justify-content:center;
+  font-size:19px;line-height:1;cursor:pointer;
+  box-shadow:0 4px 12px rgba(255,176,32,.5);
+  animation:chestPulse 1.6s ease-in-out infinite;
+}
+.treasure-chest-btn.show{display:flex;}
+.treasure-chest-btn:active{transform:scale(.9);animation:none;}
+@keyframes chestPulse{
+  0%,100%{transform:scale(1);box-shadow:0 4px 12px rgba(255,176,32,.5);}
+  50%{transform:scale(1.12);box-shadow:0 4px 18px rgba(255,176,32,.75);}
+}
+.chest-stage{
+  position:relative;width:130px;height:130px;margin:8px auto 14px;
+  display:flex;align-items:center;justify-content:center;
+}
+.chest-icon{
+  font-size:68px;line-height:1;
+  transition:transform .22s ease, opacity .22s ease;
+}
+.chest-icon.chest-shake{animation:chestShake .5s ease;}
+@keyframes chestShake{
+  0%,100%{transform:rotate(0deg);}
+  20%{transform:rotate(-8deg);}
+  40%{transform:rotate(7deg);}
+  60%{transform:rotate(-5deg);}
+  80%{transform:rotate(4deg);}
+}
+.chest-icon.chest-opened{opacity:0;transform:scale(.5);}
+.chest-badge-reveal{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  opacity:0;transform:scale(.3);
+  transition:opacity .35s ease, transform .35s cubic-bezier(.2,.9,.3,1.3);
+}
+.chest-badge-reveal.show{opacity:1;transform:scale(1);}
+.chest-badge-reveal .emoji{font-size:60px;line-height:1;filter:drop-shadow(0 4px 10px rgba(255,176,32,.5));}
+.chest-reward-text{opacity:0;transition:opacity .3s ease .1s;}
+.chest-reward-text.show{opacity:1;}
+
 /* ---- boss fight card ---- */
 .boss-card{
   position:relative;
@@ -646,6 +690,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="home-content">
 
       <div class="mascot-card">
+        <div id="treasureChestBtn" class="treasure-chest-btn" onclick="openTreasureChestModal()" aria-label="เปิดหีบรางวัล">🎁</div>
         <div class="mascot-avatar" id="mascotAvatar">
           <img id="mascotImg" src="mascot.svg" alt="" />
           <div id="mascotLevelBadge" class="mascot-level-badge">LV.1</div>
@@ -1360,6 +1405,28 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="modal-row">
       <button class="btn btn-outline btn-sm" onclick="resetRestTimer()">RESET</button>
       <button id="restTimerToggleBtn" class="btn btn-success btn-sm" onclick="toggleRestTimer()">START</button>
+    </div>
+  </div>
+</div>
+
+<!-- Streak Milestone Treasure Chest Modal -->
+<div id="treasureChestModal" class="modal-overlay">
+  <div class="modal-card" style="text-align:center;">
+    <div class="modal-title">หีบรางวัล Streak!</div>
+    <div id="chestMilestoneLabel" class="modal-body" style="margin-bottom:4px;">STREAK 7 วัน</div>
+    <div class="chest-stage">
+      <div id="chestIcon" class="chest-icon">🎁</div>
+      <div id="chestBadgeReveal" class="chest-badge-reveal">
+        <div id="chestBadgeEmoji" class="emoji">🥉</div>
+      </div>
+    </div>
+    <div id="chestRewardText" class="chest-reward-text">
+      <div id="chestBadgeTitle" style="font-family:var(--font-display);font-size:22px;letter-spacing:1px;">นักสู้ 7 วัน</div>
+      <div id="chestBadgeDesc" class="modal-body" style="margin-top:4px;margin-bottom:16px;">สร้าง Streak ครบ 7 วันติดต่อกัน</div>
+    </div>
+    <div class="modal-row" style="grid-template-columns:1fr;">
+      <button id="chestOpenBtn" class="btn btn-primary btn-sm" onclick="revealTreasureChest()">เปิดหีบ</button>
+      <button id="chestCloseBtn" class="btn btn-outline btn-sm" style="display:none;" onclick="closeModal('treasureChestModal')">รับไว้แล้ว!</button>
     </div>
   </div>
 </div>
