@@ -587,20 +587,31 @@ function renderBossCard() {
 }
 
 /* ---- elemental damage breakdown ----
- * Same weekly damage total as above, just split by move so it reads like
- * three damage types instead of one lump sum. Custom Workout volume can't
- * be split by move (arbitrary exercises), so it's shown as a 4th "OTHER"
- * bucket only when it's actually nonzero this week. */
+ * Same weekly damage total as above, split into 5 buckets so the chart
+ * reflects each mode's actual role: PULL/PUSH/SQUAT come from Cindy
+ * (special, played rarely but heavy), CUSTOM is Custom Workout volume
+ * (the main damage source since it's played most often), and CARDIO is
+ * the smaller optional top-up. Custom Workout sessions and Cardio sessions
+ * both live in KEY_CUSTOM_SESSIONS and are told apart the same way
+ * renderProgramHubCards() does it: by workoutId matching a CARDIO_PRESETS
+ * id. CUSTOM and CARDIO rows are only shown when actually nonzero this week. */
 function currentBossDamageBreakdown() {
   const startTs = weekStart(Date.now()).getTime();
   const cindyThisWeek = loadSessions().filter(s => s.finished >= startTs);
   const pull = cindyThisWeek.reduce((sum, s) => sum + (s.total ? s.total.pull : 0), 0);
   const push = cindyThisWeek.reduce((sum, s) => sum + (s.total ? s.total.push : 0), 0);
   const squat = cindyThisWeek.reduce((sum, s) => sum + (s.total ? s.total.squat : 0), 0);
-  const other = loadCustomWorkoutSessions()
-    .filter(s => s.completedAt >= startTs)
+
+  const cardioIds = new Set(CARDIO_PRESETS.map(p => p.id));
+  const customSessionsThisWeek = loadCustomWorkoutSessions().filter(s => s.completedAt >= startTs);
+  const custom = customSessionsThisWeek
+    .filter(s => !cardioIds.has(s.workoutId))
     .reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
-  return { pull, push, squat, other };
+  const cardio = customSessionsThisWeek
+    .filter(s => cardioIds.has(s.workoutId))
+    .reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
+
+  return { pull, push, squat, custom, cardio };
 }
 function renderBossDmgBreakdown() {
   const wrap = document.getElementById('bossDmgBreakdown');
@@ -611,7 +622,8 @@ function renderBossDmgBreakdown() {
     { label: 'PUSH', val: dmg.push, color: 'var(--push)' },
     { label: 'SQUAT', val: dmg.squat, color: 'var(--squat)' }
   ];
-  if (dmg.other > 0) rows.push({ label: 'OTHER', val: dmg.other, color: 'var(--text-faint)' });
+  if (dmg.custom > 0) rows.push({ label: 'CUSTOM', val: dmg.custom, color: 'var(--success)' });
+  if (dmg.cardio > 0) rows.push({ label: 'CARDIO', val: dmg.cardio, color: 'var(--danger)' });
   const maxVal = Math.max(1, ...rows.map(r => r.val));
   wrap.innerHTML = rows.map(r => {
     const pct = Math.round((r.val / maxVal) * 100);
@@ -1548,12 +1560,15 @@ function renderHomeCustomShortcut() {
 
 /**
  * Fills in the small live-stat line under each of the 3 Program hub cards
- * (Cindy / Custom Workouts / Cardio) and shows a "เริ่มตรงนี้" nudge on the
- * Cindy card for a brand-new player who hasn't finished any session of any
- * kind yet. Cardio sessions live in the same KEY_CUSTOM_SESSIONS array as
- * Custom Workout sessions (they share the player), so they're told apart
- * here purely by workoutId matching a CARDIO_PRESETS id — nothing new is
- * stored to distinguish them.
+ * (Custom Workouts / Cardio / Cindy — in that order, since Custom is the
+ * main gameplay loop, Cardio is the optional daily top-up, and Cindy is
+ * the special/boss mode played rarely). For a brand-new player who hasn't
+ * finished any session of any kind yet, shows a "ลองเล่นเลย (ไม่ต้องตั้งค่า)"
+ * quick-sample badge on the Cindy card plus a nudge on the Custom card
+ * pointing them toward building their main routine there. Cardio sessions
+ * live in the same KEY_CUSTOM_SESSIONS array as Custom Workout sessions
+ * (they share the player), so they're told apart here purely by workoutId
+ * matching a CARDIO_PRESETS id — nothing new is stored to distinguish them.
  */
 function renderProgramHubCards() {
   const cindyEl = document.getElementById('programCindyStat');
@@ -1595,9 +1610,13 @@ function renderProgramHubCards() {
     cardioEl.textContent = 'เล่นแล้ว ' + cardioSessions.length + ' ครั้ง · ล่าสุด ' + fmtDate(last);
   }
 
+  const customNudge = document.getElementById('programCustomNudge');
+  const brandNew = cindySessions.length === 0 && allCustomSessions.length === 0;
   if (startBadge) {
-    const brandNew = cindySessions.length === 0 && allCustomSessions.length === 0;
     startBadge.style.display = brandNew ? 'inline-block' : 'none';
+  }
+  if (customNudge) {
+    customNudge.style.display = brandNew ? 'block' : 'none';
   }
 
   const cindyTodayBadge = document.getElementById('programCindyTodayBadge');
