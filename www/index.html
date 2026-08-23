@@ -272,12 +272,13 @@ body{
 }
 
 .mascot-level-badge{
-  position:absolute;top:-9px;left:-9px;z-index:2;
+  position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);z-index:2;
   font-family:var(--font-display);font-size:12px;letter-spacing:.5px;
   background:var(--primary);color:#fff;
   padding:3px 8px 2px;border-radius:6px;
   border:1.5px solid var(--bg);
   box-shadow:0 2px 8px rgba(232,35,42,.5);
+  white-space:nowrap;
 }
 .xp-bar-wrap{margin-top:9px;}
 .xp-bar-track{
@@ -309,9 +310,9 @@ body{
 }
 .mascot-level-badge.bump{animation:badgeBump .5s ease;}
 @keyframes badgeBump{
-  0%{transform:scale(1) rotate(0deg);}
-  40%{transform:scale(1.4) rotate(-4deg);}
-  100%{transform:scale(1) rotate(0deg);}
+  0%{transform:translateX(-50%) scale(1) rotate(0deg);}
+  40%{transform:translateX(-50%) scale(1.4) rotate(-4deg);}
+  100%{transform:translateX(-50%) scale(1) rotate(0deg);}
 }
 
 /* ---- persistent rank aura + "gear" badge on the mascot avatar itself ----
