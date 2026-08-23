@@ -2573,26 +2573,61 @@ async function shareCustomResult(id) {
    would permanently destroy them with no way to recover. Fixed by
    collecting every user-data key into the payload, and merging every
    category back in on import (still backward-compatible with old
-   v1 backups, which only ever contained `sessions`). */
+   v1 backups, which only ever contained `sessions`).
+
+   v3: also covers mascot progression (level/streak-chest/boss unlocks and
+   the equipped skin — none of which lived in `sessions`, so a v2 backup
+   would restore workout history but silently reset every unlocked skin,
+   including bossVoid9, back to locked) plus the small settings/state
+   pieces (theme, voice cues, reminder, active protocol, quests/combo
+   bonus XP, ring goals, weekly plan). Achievement-style lists (opened
+   chests, defeated bosses) are unioned like the v2 collections; single
+   values that aren't naturally mergeable only fill in if this device
+   doesn't already have one set, so importing a backup never clobbers
+   whatever's already active on the device it's imported into; running
+   XP counters take the max of the two rather than adding, since adding
+   would double-count XP that's also embedded in the session history. */
 function exportData() {
   const sessions = loadSessions();
   const customWorkouts = loadCustomWorkouts();
   const customWorkoutSessions = loadCustomWorkoutSessions();
   const customProtocols = loadCustomProtocols();
+  const streakChestsOpened = loadOpenedChests();
+  const bossEverDefeated = loadBossEverDefeated();
 
-  if (!sessions.length && !customWorkouts.length && !customWorkoutSessions.length && !customProtocols.length) {
+  if (!sessions.length && !customWorkouts.length && !customWorkoutSessions.length &&
+      !customProtocols.length && !streakChestsOpened.length && !bossEverDefeated.length) {
     showToast('ยังไม่มีข้อมูลให้ส่งออก');
     return;
   }
 
   const payload = {
     app: 'CINDY',
-    version: 2,
+    version: 3,
     exportedAt: Date.now(),
     sessions,
     customWorkouts,
     customWorkoutSessions,
-    customProtocols
+    customProtocols,
+    progression: {
+      lastSeenLevel: loadLastSeenLevel(),
+      streakChestsOpened,
+      bossEverDefeated,
+      activeSkin: loadActiveSkin()
+    },
+    settings: {
+      theme: localStorage.getItem(KEY_THEME),
+      voiceCues: localStorage.getItem(KEY_VOICE_CUES),
+      activeProtocolId: loadActiveProtocolId(),
+      reminder: loadReminderConfig()
+    },
+    questsAndGoals: {
+      questClaimed: loadQuestClaimState(),
+      questBonusXP: loadQuestBonusXP(),
+      comboBonusXP: loadComboBonusXP(),
+      ringGoals: loadRingGoals(),
+      weeklyPlan: loadWeeklyPlan()
+    }
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -2603,7 +2638,7 @@ function exportData() {
   a.href = url; a.download = fname;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showToast('ส่งออกข้อมูลแล้ว (Cindy + Custom Workout)');
+  showToast('ส่งออกข้อมูลแล้ว (Cindy + Custom Workout + สกิน/ความคืบหน้า)');
 }
 
 function importData(event) {
@@ -2617,9 +2652,13 @@ function importData(event) {
       const incomingWorkouts = Array.isArray(parsed) ? null : parsed.customWorkouts;
       const incomingWorkoutSessions = Array.isArray(parsed) ? null : parsed.customWorkoutSessions;
       const incomingProtocols = Array.isArray(parsed) ? null : parsed.customProtocols;
+      const incomingProgression = Array.isArray(parsed) ? null : parsed.progression;
+      const incomingSettings = Array.isArray(parsed) ? null : parsed.settings;
+      const incomingQuestsAndGoals = Array.isArray(parsed) ? null : parsed.questsAndGoals;
 
       if (!Array.isArray(incomingSessions) && !Array.isArray(incomingWorkouts) &&
-          !Array.isArray(incomingWorkoutSessions) && !Array.isArray(incomingProtocols)) {
+          !Array.isArray(incomingWorkoutSessions) && !Array.isArray(incomingProtocols) &&
+          !incomingProgression && !incomingSettings && !incomingQuestsAndGoals) {
         throw new Error('invalid format');
       }
 
@@ -2673,9 +2712,72 @@ function importData(event) {
         saveCustomProtocols(Array.from(byId.values()));
       }
 
+      // Mascot progression: achievement lists union (never lose an unlock),
+      // level is a monotonic high-water mark, equipped skin only fills in
+      // if this device doesn't already have one chosen.
+      if (incomingProgression && typeof incomingProgression === 'object') {
+        if (Array.isArray(incomingProgression.streakChestsOpened)) {
+          const merged = Array.from(new Set([...loadOpenedChests(), ...incomingProgression.streakChestsOpened]));
+          saveOpenedChests(merged);
+        }
+        if (Array.isArray(incomingProgression.bossEverDefeated)) {
+          const merged = Array.from(new Set([...loadBossEverDefeated(), ...incomingProgression.bossEverDefeated]));
+          saveBossEverDefeated(merged);
+        }
+        if (Number.isFinite(incomingProgression.lastSeenLevel)) {
+          saveLastSeenLevel(Math.max(loadLastSeenLevel(), incomingProgression.lastSeenLevel));
+        }
+        if (incomingProgression.activeSkin && loadActiveSkin() === 'default') {
+          saveActiveSkin(incomingProgression.activeSkin);
+        }
+      }
+
+      // Settings: only fill in values this device hasn't set for itself yet,
+      // so importing a backup on a device already in use doesn't override
+      // choices made on that device.
+      if (incomingSettings && typeof incomingSettings === 'object') {
+        if (incomingSettings.theme && localStorage.getItem(KEY_THEME) === null) {
+          localStorage.setItem(KEY_THEME, incomingSettings.theme);
+        }
+        if (incomingSettings.voiceCues && localStorage.getItem(KEY_VOICE_CUES) === null) {
+          localStorage.setItem(KEY_VOICE_CUES, incomingSettings.voiceCues);
+        }
+        if (incomingSettings.activeProtocolId && loadActiveProtocolId() === 'builtin_cindy') {
+          localStorage.setItem(KEY_ACTIVE_PROTOCOL, incomingSettings.activeProtocolId);
+        }
+        if (incomingSettings.reminder && localStorage.getItem(KEY_REMINDER) === null) {
+          saveReminderConfig(incomingSettings.reminder);
+        }
+      }
+
+      // Quests/goals: weekly-scoped state fills in only if empty on this
+      // device; the two running XP counters take the higher of the two
+      // rather than summing, since summing would double-count XP that's
+      // already folded into the imported session history.
+      if (incomingQuestsAndGoals && typeof incomingQuestsAndGoals === 'object') {
+        if (incomingQuestsAndGoals.questClaimed && localStorage.getItem(KEY_QUEST_CLAIMED) === null) {
+          saveQuestClaimState(incomingQuestsAndGoals.questClaimed);
+        }
+        if (Number.isFinite(incomingQuestsAndGoals.questBonusXP)) {
+          const bump = incomingQuestsAndGoals.questBonusXP - loadQuestBonusXP();
+          if (bump > 0) addQuestBonusXP(bump);
+        }
+        if (Number.isFinite(incomingQuestsAndGoals.comboBonusXP)) {
+          const bump = incomingQuestsAndGoals.comboBonusXP - loadComboBonusXP();
+          if (bump > 0) addComboBonusXP(bump);
+        }
+        if (incomingQuestsAndGoals.ringGoals && localStorage.getItem(KEY_RING_GOALS) === null) {
+          saveRingGoals(incomingQuestsAndGoals.ringGoals);
+        }
+        if (incomingQuestsAndGoals.weeklyPlan && localStorage.getItem(KEY_WEEKLY_PLAN) === null) {
+          saveWeeklyPlan(incomingQuestsAndGoals.weeklyPlan);
+        }
+      }
+
       showToast('นำเข้าข้อมูลแล้ว (' + added + ' รายการใหม่)');
       renderProgress();
       renderCustomList();
+      applyActiveMascotSkinFilter();
     } catch (e) {
       showToast('ไฟล์ไม่ถูกต้อง');
     }
