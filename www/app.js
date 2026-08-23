@@ -342,6 +342,7 @@ function go(name) {
     if (t.getAttribute('onclick') === "go('" + name + "')") t.classList.add('active');
   });
   if (name === 'home') renderHome();
+  if (name === 'program') renderProgram();
   if (name === 'history') renderHistory();
   if (name === 'progress') { renderProgress(); applyReminderToUI(); }
   if (name === 'customlist') renderCustomList();
@@ -350,8 +351,137 @@ function go(name) {
   if (name === 'customschedule') renderCustomSchedule();
 }
 
-/* ================= HOME ================= */
+/* ================= HOME (dashboard) ================= */
+/**
+ * Home is now a combined dashboard summarizing both Cindy and Custom
+ * Workouts: mascot status, today's plan, a weekly progress ring split by
+ * mode, and the single most recent workout regardless of which mode it
+ * came from. Mode-specific starting/browsing UI lives on the Program tab
+ * (see renderProgram()).
+ */
 function renderHome() {
+  renderMascotCard();
+  renderHomeWeeklyPlanCard();
+  renderWeekRing();
+  renderHomeLastWorkout();
+}
+
+/** Combined streak across Cindy sessions + Custom Workout sessions. */
+function computeCombinedStreak() {
+  const cindyDays = loadSessions().map(s => dayKey(s.finished));
+  const customDays = loadCustomWorkoutSessions().map(s => dayKey(s.completedAt));
+  const days = new Set(cindyDays.concat(customDays));
+  if (days.size === 0) return 0;
+  let streak = 0;
+  let cursor = new Date();
+  if (!days.has(dayKey(cursor.getTime()))) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (!days.has(dayKey(cursor.getTime()))) return 0;
+  }
+  while (days.has(dayKey(cursor.getTime()))) {
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+function renderMascotCard() {
+  const headline = document.getElementById('mascotHeadline');
+  const sub = document.getElementById('mascotSub');
+  if (!headline || !sub) return;
+  const streak = computeCombinedStreak();
+  const playedToday = didPlayToday();
+  if (streak === 0) {
+    headline.textContent = 'ยังไม่มีประวัติการเล่น';
+    sub.textContent = 'เริ่มวันนี้เลย แล้วมาสร้าง streak กัน';
+  } else if (playedToday) {
+    headline.textContent = 'เก่งมาก ทำแล้ว ' + streak + ' วันติด';
+    sub.textContent = 'เล่นแล้ววันนี้ — พักผ่อนหรือจะเก็บอีกโหมดก็ได้';
+  } else {
+    headline.textContent = 'Streak ' + streak + ' วัน — อย่าให้ขาดวันนี้';
+    sub.textContent = 'ยังไม่ได้เล่นวันนี้ ไปต่อกันเลย';
+  }
+}
+
+function didPlayToday() {
+  const todayKey = dayKey(Date.now());
+  const cindyToday = loadSessions().some(s => dayKey(s.finished) === todayKey);
+  if (cindyToday) return true;
+  return loadCustomWorkoutSessions().some(s => dayKey(s.completedAt) === todayKey);
+}
+
+/** Counts sessions with a timestamp within the last n days (including today). */
+function countSessionsInLastNDays(timestamps, n) {
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - (n - 1));
+  return timestamps.filter(t => t >= cutoff.getTime()).length;
+}
+
+const WEEK_RING_GOAL = 5; // sessions/week considered a "full" ring, per mode
+
+function renderWeekRing() {
+  const cindyCount = countSessionsInLastNDays(loadSessions().map(s => s.finished), 7);
+  const customCount = countSessionsInLastNDays(loadCustomWorkoutSessions().map(s => s.completedAt), 7);
+  const cindyCountEl = document.getElementById('weekCindyCount');
+  const customCountEl = document.getElementById('weekCustomCount');
+  if (cindyCountEl) cindyCountEl.textContent = cindyCount;
+  if (customCountEl) customCountEl.textContent = customCount;
+
+  const cindyRing = document.getElementById('weekRingCindy');
+  const customRing = document.getElementById('weekRingCustom');
+  if (cindyRing) {
+    const circ = 2 * Math.PI * 34;
+    const pct = Math.min(1, cindyCount / WEEK_RING_GOAL);
+    cindyRing.style.strokeDasharray = circ.toFixed(1);
+    cindyRing.style.strokeDashoffset = (circ * (1 - pct)).toFixed(1);
+  }
+  if (customRing) {
+    const circ = 2 * Math.PI * 24;
+    const pct = Math.min(1, customCount / WEEK_RING_GOAL);
+    customRing.style.strokeDasharray = circ.toFixed(1);
+    customRing.style.strokeDashoffset = (circ * (1 - pct)).toFixed(1);
+  }
+}
+
+/** Most recent workout across both modes, tagged so it's clear which is which. */
+function renderHomeLastWorkout() {
+  const wrap = document.getElementById('lastWorkoutWrap');
+  if (!wrap) return;
+  const cindyLast = loadSessions().slice().sort((a, b) => b.finished - a.finished)[0];
+  const customLast = loadCustomWorkoutSessions().slice().sort((a, b) => b.completedAt - a.completedAt)[0];
+
+  let source = null;
+  if (cindyLast && customLast) source = cindyLast.finished >= customLast.completedAt ? 'cindy' : 'custom';
+  else if (cindyLast) source = 'cindy';
+  else if (customLast) source = 'custom';
+
+  if (!source) {
+    wrap.innerHTML = '<div class="empty-hint">ยังไม่มีประวัติการเล่น</div>';
+    return;
+  }
+
+  if (source === 'cindy') {
+    wrap.innerHTML = `<div class="history-item" onclick="openDetail('${cindyLast.id}')">
+      <div><div class="date">${fmtDate(cindyLast.finished)}<span class="type-tag cindy">CINDY</span></div>
+      <div class="reps">${cindyLast.total.reps} REPS</div></div>
+      <div class="rounds">${cindyLast.rounds} R</div>
+    </div>`;
+  } else {
+    const meta = customLast.setsCompleted + ' เซ็ต · ' + fmtTime(customLast.totalDurationSec);
+    wrap.innerHTML = `<div class="history-item" onclick="openCustomHistoryDetail('${customLast.id}')">
+      <div><div class="date">${fmtDate(customLast.completedAt)}<span class="type-tag custom">${escapeHtml((customLast.workoutName || 'CUSTOM').toUpperCase())}</span></div>
+      <div class="reps">${meta}</div></div>
+      <div class="rounds tabular">${fmtTime(customLast.totalDurationSec)}</div>
+    </div>`;
+  }
+}
+
+/* ================= PROGRAM (mode select: Cindy / Custom) ================= */
+function renderProgram() {
+  applyActiveProtocolToRuntime();
+  applyProtocolToUI();
+
   const sessions = loadSessions();
   const active = loadActive();
   const mainBtn = document.getElementById('homeMainBtn');
@@ -376,19 +506,7 @@ function renderHome() {
   document.getElementById('statTotalRounds').textContent = totalRounds;
   document.getElementById('statStreak').textContent = computeStreak(sessions);
 
-  const wrap = document.getElementById('lastWorkoutWrap');
-  if (sessions.length === 0) {
-    wrap.innerHTML = '<div class="empty-hint">ยังไม่มีประวัติการเล่น</div>';
-  } else {
-    const last = sessions[sessions.length - 1];
-    wrap.innerHTML = `<div class="last-workout" onclick="openDetail('${last.id}')">
-      <div><div class="date">${fmtDate(last.finished)}</div></div>
-      <div class="rounds">${last.rounds} ROUNDS</div>
-    </div>`;
-  }
-
   renderHomeCustomShortcut();
-  renderHomeWeeklyPlanCard();
 }
 
 /**
@@ -811,23 +929,46 @@ function finishCompleteFlow() {
   go('home');
 }
 
-/* ================= HISTORY ================= */
+/* ================= HISTORY (unified: Cindy + Custom Workouts) ================= */
+/**
+ * The HISTORY tab shows one combined, date-sorted list mixing Cindy sessions
+ * (loadSessions()) and Custom Workout sessions (loadCustomWorkoutSessions()).
+ * Each row carries a small tag (CINDY, or the custom workout's own name) so
+ * the two never get confused, and taps route to each mode's own detail
+ * screen — the underlying detail screens/data stay fully separate.
+ */
 function renderHistory() {
-  const sessions = loadSessions().slice().reverse();
+  const cindyItems = loadSessions().map(s => ({ kind: 'cindy', ts: s.finished, data: s }));
+  const customItems = loadCustomWorkoutSessions().map(s => ({ kind: 'custom', ts: s.completedAt, data: s }));
+  const merged = cindyItems.concat(customItems).sort((a, b) => b.ts - a.ts);
+
   const wrap = document.getElementById('historyList');
-  if (sessions.length === 0) {
+  if (merged.length === 0) {
     wrap.innerHTML = '<div class="empty-hint">ยังไม่มีประวัติการเล่น</div>';
     return;
   }
-  wrap.innerHTML = sessions.map(s => `
-    <div class="history-item" onclick="openDetail('${s.id}')">
+
+  wrap.innerHTML = merged.map(item => {
+    if (item.kind === 'cindy') {
+      const s = item.data;
+      return `<div class="history-item" onclick="openDetail('${s.id}')">
+        <div>
+          <div class="date">${fmtDate(s.finished)}<span class="type-tag cindy">CINDY</span>${s.mode === 'emom' ? ' <span class="proto-active-tag">EMOM</span>' : ''}</div>
+          <div class="reps">${s.total.reps} REPS · ${escapeHtml(s.protocolName || 'Cindy')}</div>
+        </div>
+        <div class="rounds">${s.rounds} R</div>
+      </div>`;
+    }
+    const s = item.data;
+    const meta = s.setsCompleted + ' เซ็ต · ' + fmtTime(s.totalDurationSec);
+    return `<div class="history-item" onclick="openCustomHistoryDetail('${s.id}')">
       <div>
-        <div class="date">${fmtDate(s.finished)}${s.mode === 'emom' ? ' <span class="proto-active-tag">EMOM</span>' : ''}</div>
-        <div class="reps">${s.total.reps} REPS · ${escapeHtml(s.protocolName || 'Cindy')}</div>
+        <div class="date">${fmtDate(s.completedAt)}<span class="type-tag custom">${escapeHtml((s.workoutName || 'CUSTOM').toUpperCase())}</span>${s.isPR ? ' <span class="proto-active-tag">PR</span>' : ''}</div>
+        <div class="reps">${meta}</div>
       </div>
-      <div class="rounds">${s.rounds} R</div>
-    </div>
-  `).join('');
+      <div class="rounds tabular">${fmtTime(s.totalDurationSec)}</div>
+    </div>`;
+  }).join('');
 }
 
 /* ================= DETAIL ================= */
@@ -2779,28 +2920,45 @@ function renderCustomSchedule() {
     </div>`;
   }).join('');
 }
-/* Shows today's planned Custom Workout (or a rest-day message) on Home. */
+/* Prominent "today's plan" CTA on the Home dashboard: today's scheduled
+   Custom Workout, a rest-day note, or (if no weekly schedule is set up yet)
+   a nudge toward Program to pick something to do today. */
 function renderHomeWeeklyPlanCard() {
   const wrap = document.getElementById('homeWeeklyPlanWrap');
   if (!wrap) return;
   const plan = loadWeeklyPlan();
   const todayIdx = new Date().getDay();
   const hasAnyPlan = Object.keys(plan).length > 0 && Object.values(plan).some(v => v !== undefined);
-  if (!hasAnyPlan) { wrap.style.display = 'none'; return; }
-  wrap.style.display = 'block';
+
+  if (!hasAnyPlan) {
+    wrap.innerHTML = `<div class="plan-cta" onclick="go('program')">
+      <div class="eyebrow">แผนวันนี้</div>
+      <div class="title-row"><div class="title">ยังไม่ได้ตั้งแผน</div><div class="arrow">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+      </div></div>
+      <div class="meta">ไปที่ Program เพื่อเริ่ม Cindy หรือตั้งตารางประจำสัปดาห์</div>
+    </div>`;
+    return;
+  }
+
   const workoutId = plan[todayIdx];
   if (!workoutId) {
-    wrap.innerHTML = `<div class="section-label">แผนวันนี้ (${WEEKDAY_LABELS[todayIdx]})</div>
-      <div class="metric-card" style="text-align:center;padding:16px;color:var(--text-dim);">🌙 วันนี้เป็นวันพัก — พักผ่อนให้เต็มที่</div>`;
+    wrap.innerHTML = `<div class="plan-cta" style="cursor:default;">
+      <div class="eyebrow">แผนวันนี้ (${WEEKDAY_LABELS[todayIdx]})</div>
+      <div class="title-row"><div class="title">วันพัก</div></div>
+      <div class="meta">พักผ่อนให้เต็มที่ ค่อยลุยใหม่พรุ่งนี้</div>
+    </div>`;
     return;
   }
   const workout = getCustomWorkout(workoutId);
-  if (!workout) { wrap.style.display = 'none'; return; }
-  wrap.innerHTML = `<div class="section-label">แผนวันนี้ (${WEEKDAY_LABELS[todayIdx]})</div>
-    <div class="history-item" onclick="startCustomWorkoutPlayer('${workout.id}')">
-      <div><div class="date">${escapeHtml(workout.name)}</div><div class="reps">${workout.exercises.length} ท่า</div></div>
-      <div class="rounds" style="color:var(--success);">▶ เริ่ม</div>
-    </div>`;
+  if (!workout) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `<div class="plan-cta" onclick="startCustomWorkoutPlayer('${workout.id}')">
+    <div class="eyebrow">แผนวันนี้ (${WEEKDAY_LABELS[todayIdx]})</div>
+    <div class="title-row"><div class="title">${escapeHtml(workout.name)}</div><div class="arrow">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+    </div></div>
+    <div class="meta">${workout.exercises.length} ท่า · แตะเพื่อเริ่ม</div>
+  </div>`;
 }
 
 function renderCustomHistory() {
