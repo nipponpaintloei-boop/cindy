@@ -888,15 +888,15 @@ function renderMascotCard() {
   if (streak === 0) {
     headline.textContent = 'ยังไม่มีประวัติการเล่น';
     sub.textContent = 'เริ่มวันนี้เลย แล้วมาสร้าง streak กัน';
-    if (img) img.src = 'mascot.svg';
+    if (img) img.src = 'mascot.png';
   } else if (playedToday) {
     headline.textContent = 'เก่งมาก ทำแล้ว ' + streak + ' วันติด';
     sub.textContent = 'เล่นแล้ววันนี้ — พักผ่อนหรือจะเก็บอีกโหมดก็ได้';
-    if (img) img.src = 'mascot-happy.svg';
+    if (img) img.src = 'mascot.png';
   } else {
     headline.textContent = 'Streak ' + streak + ' วัน — อย่าให้ขาดวันนี้';
     sub.textContent = 'ยังไม่ได้เล่นวันนี้ ไปต่อกันเลย';
-    if (img) img.src = 'mascot-warn.svg';
+    if (img) img.src = 'mascot.png';
   }
   renderXpBar();
   applyActiveMascotSkinFilter();
@@ -1166,7 +1166,7 @@ function renderSkinGrid() {
     const thumbShadow = unlocked && skin.aura ? 'box-shadow:0 0 ' + (skin.strong ? '14px 3px' : '9px 2px') + ' ' + skin.aura + ';border-radius:50%;' : '';
     const accessoryHtml = unlocked && skin.accIcon ? '<div class="skin-thumb-accessory">' + badgeHtml(skin.accIcon, skin.accC1, skin.accC2, { glow: !!skin.strong }) + '</div>' : '';
     return '<div class="' + cls + '"' + clickAttr + '>' + cornerHtml +
-      '<div class="skin-thumb-wrap" style="' + thumbShadow + '"><img src="mascot-happy.svg" style="filter:' + thumbFilter + ';" alt="" />' + accessoryHtml + '</div>' +
+      '<div class="skin-thumb-wrap" style="' + thumbShadow + '"><img src="mascot.png" style="filter:' + thumbFilter + ';" alt="" />' + accessoryHtml + '</div>' +
       '<div class="skin-name">' + skin.name + '</div>' +
       (unlocked ? '' : '<div class="skin-cond">' + skin.cond + '</div>') +
       '</div>';
@@ -1218,7 +1218,7 @@ function renderCollectionSkins() {
     const accessoryHtml = unlocked && skin.accIcon ? '<div class="skin-thumb-accessory">' + badgeHtml(skin.accIcon, skin.accC1, skin.accC2, { glow: !!skin.strong }) + '</div>' : '';
     return '<div class="' + cls + '">'
       + (isActive ? '<div class="active-check">' + iconHtml('check') + '</div>' : (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>'))
-      + '<div class="skin-thumb-wrap" style="' + thumbShadow + '"><img src="mascot-happy.svg" style="filter:' + thumbFilter + ';" alt="" />' + accessoryHtml + '</div>'
+      + '<div class="skin-thumb-wrap" style="' + thumbShadow + '"><img src="mascot.png" style="filter:' + thumbFilter + ';" alt="" />' + accessoryHtml + '</div>'
       + '<div class="skin-name">' + skin.name + '</div>'
       + (unlocked ? '' : '<div class="skin-cond">' + skin.cond + '</div>')
       + '</div>';
