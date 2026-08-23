@@ -317,6 +317,129 @@ function fmtTime(totalSeconds) {
   const s = totalSeconds % 60;
   return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
 }
+/* ================= BOSS FIGHT (WEEKLY) =================
+ * Reuses existing session history — no new XP/HP data stored, just derived.
+ * Week runs Monday->Sunday (calendar week, not a rolling 7-day window) so
+ * the boss resets on a predictable schedule regardless of when you check in.
+ * Damage dealt this week = total reps logged this week (Cindy + Custom).
+ * Boss index cycles through BOSS_ROSTER by ISO week number; each full lap
+ * around the roster raises the HP target so it stays a real fight.
+ */
+const BOSS_ROSTER = [
+  { id: 'grinder1', name: 'GRINDER-1', tag: 'SCRAP BRAWLER', baseHp: 250 },
+  { id: 'ironmaw', name: 'IRON MAW', tag: 'SPLIT JAW', baseHp: 350 },
+  { id: 'void9', name: 'VOID-9', tag: 'FORMLESS THREAT', baseHp: 450 },
+  { id: 'wingreaper', name: 'WING REAPER', tag: 'SKY HUNTER', baseHp: 550 },
+  { id: 'corezero', name: 'CORE-ZERO', tag: 'FINAL REACTOR', baseHp: 700 }
+];
+const KEY_BOSS_DEFEAT_SEEN = 'cindy_boss_defeat_seen_week';
+
+/** Monday 00:00 of the week containing `ts`. */
+function weekStart(ts) {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const diffToMonday = day === 0 ? 6 : day - 1;
+  d.setDate(d.getDate() - diffToMonday);
+  return d;
+}
+/** Number of whole weeks between a fixed epoch Monday and the week containing `ts`. */
+function absoluteWeekIndex(ts) {
+  const epochMonday = weekStart(Date.UTC(2024, 0, 1));
+  const thisMonday = weekStart(ts);
+  return Math.round((thisMonday.getTime() - epochMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+}
+function currentBossState() {
+  const now = Date.now();
+  const idx = absoluteWeekIndex(now);
+  const lap = Math.floor(idx / BOSS_ROSTER.length);
+  const boss = BOSS_ROSTER[((idx % BOSS_ROSTER.length) + BOSS_ROSTER.length) % BOSS_ROSTER.length];
+  const targetHp = boss.baseHp + lap * 150; // gets tougher each time the roster loops
+
+  const startTs = weekStart(now).getTime();
+  const cindyDamage = loadSessions()
+    .filter(s => s.finished >= startTs)
+    .reduce((sum, s) => sum + (s.total ? s.total.reps : 0), 0);
+  const customDamage = loadCustomWorkoutSessions()
+    .filter(s => s.completedAt >= startTs)
+    .reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
+  const damage = cindyDamage + customDamage;
+
+  return {
+    weekIndex: idx,
+    boss,
+    targetHp,
+    hp: Math.max(0, targetHp - damage),
+    damage,
+    defeated: damage >= targetHp
+  };
+}
+function bossWeekKey(weekIndex) {
+  return 'w' + weekIndex;
+}
+function loadBossDefeatSeenWeek() {
+  return localStorage.getItem(KEY_BOSS_DEFEAT_SEEN) || '';
+}
+function saveBossDefeatSeenWeek(key) {
+  localStorage.setItem(KEY_BOSS_DEFEAT_SEEN, key);
+}
+function bossSilhouetteMarkup(bossId) {
+  switch (bossId) {
+    case 'grinder1':
+      return '<svg viewBox="0 0 120 120"><defs><radialGradient id="bossG1" cx="50%" cy="40%" r="70%"><stop offset="0%" stop-color="#8a8f9e"/><stop offset="100%" stop-color="#4b4f5c"/></radialGradient></defs><g stroke="#FFB020" stroke-width="1.6" fill="none" opacity=".8"><circle cx="60" cy="66" r="36"/></g><circle cx="60" cy="66" r="32" fill="url(#bossG1)"/><g fill="#6b6f7c"><rect x="56" y="26" width="8" height="10" rx="2"/><rect x="30" y="46" width="10" height="8" rx="2" transform="rotate(-40 35 50)"/><rect x="80" y="46" width="10" height="8" rx="2" transform="rotate(40 85 50)"/></g><rect x="10" y="60" width="26" height="14" rx="6" fill="#5a5e6b"/><rect x="84" y="60" width="26" height="14" rx="6" fill="#5a5e6b"/><rect x="42" y="60" width="36" height="7" rx="3.5" fill="#FFB020"/></svg>';
+    case 'ironmaw':
+      return '<svg viewBox="0 0 120 120"><polygon points="60,18 100,50 86,102 34,102 20,50" fill="#111318" stroke="#E8232A" stroke-width="2"/><line x1="60" y1="18" x2="60" y2="102" stroke="#E8232A" stroke-width="2.4"/><polyline points="40,58 48,64 40,70 48,76 40,82" fill="none" stroke="#E8232A" stroke-width="2.2" stroke-linejoin="round"/><polyline points="80,58 72,64 80,70 72,76 80,82" fill="none" stroke="#E8232A" stroke-width="2.2" stroke-linejoin="round"/></svg>';
+    case 'void9':
+      return '<svg viewBox="0 0 120 120"><defs><radialGradient id="bossG3" cx="45%" cy="35%" r="75%"><stop offset="0%" stop-color="#5c7fe0"/><stop offset="100%" stop-color="#131a33"/></radialGradient></defs><g stroke="#3D6FE0" stroke-width="2.4" stroke-linecap="round" opacity=".85"><path d="M40 40 L18 22" fill="none"/><path d="M78 38 L100 18" fill="none"/><path d="M30 88 L10 104" fill="none"/><path d="M84 90 L104 108" fill="none"/></g><path d="M60 20 C82 22 96 42 92 62 C100 78 84 100 60 98 C38 100 22 82 26 62 C18 42 38 18 60 20 Z" fill="url(#bossG3)"/></svg>';
+    case 'wingreaper':
+      return '<svg viewBox="0 0 120 120"><polygon points="60,50 14,30 44,66" fill="#3a0d0f" stroke="#E8232A" stroke-width="1.6"/><polygon points="60,50 106,30 76,66" fill="#3a0d0f" stroke="#E8232A" stroke-width="1.6"/><polygon points="60,22 50,50 70,50" fill="#E8232A"/><polygon points="60,50 46,104 74,104" fill="#111318" stroke="#E8232A" stroke-width="1.6"/></svg>';
+    case 'corezero':
+      return '<svg viewBox="0 0 120 120"><defs><radialGradient id="bossG5" cx="50%" cy="50%" r="60%"><stop offset="0%" stop-color="#fff6da"/><stop offset="60%" stop-color="#FFB020"/><stop offset="100%" stop-color="#7a4c00"/></radialGradient></defs><g fill="none" stroke="#FFB020" stroke-width="1.2" opacity=".8"><ellipse cx="60" cy="60" rx="50" ry="18" transform="rotate(20 60 60)"/><ellipse cx="60" cy="60" rx="50" ry="18" transform="rotate(-20 60 60)"/></g><circle cx="60" cy="60" r="20" fill="url(#bossG5)"/><circle cx="106" cy="52" r="3" fill="#FFB020"/><circle cx="14" cy="68" r="3" fill="#FFB020"/></svg>';
+    default:
+      return '';
+  }
+}
+function renderBossCard() {
+  const nameEl = document.getElementById('bossName');
+  const tagEl = document.getElementById('bossTag');
+  const hpFill = document.getElementById('bossHpFill');
+  const hpLabel = document.getElementById('bossHpLabel');
+  const stage = document.getElementById('bossStage');
+  if (!nameEl || !hpFill || !stage) return;
+
+  const state = currentBossState();
+  nameEl.textContent = state.boss.name;
+  if (tagEl) tagEl.textContent = state.boss.tag;
+  if (stage.dataset.bossId !== state.boss.id) {
+    stage.dataset.bossId = state.boss.id;
+    const art = stage.querySelector('.boss-art');
+    if (art) art.innerHTML = bossSilhouetteMarkup(state.boss.id);
+  }
+  const pct = state.targetHp > 0 ? Math.max(0, Math.min(1, state.hp / state.targetHp)) : 0;
+  hpFill.style.width = Math.round(pct * 100) + '%';
+  if (hpLabel) hpLabel.textContent = Math.round(state.hp) + ' / ' + state.targetHp + ' HP';
+
+  stage.classList.toggle('boss-defeated', state.defeated);
+
+  const weekKey = bossWeekKey(state.weekIndex);
+  const lastSeenDmgKey = KEY_BOSS_DEFEAT_SEEN + '_dmg_' + weekKey;
+  const lastSeenDmg = parseFloat(localStorage.getItem(lastSeenDmgKey) || '0');
+  if (state.damage > lastSeenDmg && !state.defeated) {
+    stage.classList.remove('boss-hit');
+    void stage.offsetWidth;
+    stage.classList.add('boss-hit');
+  }
+  localStorage.setItem(lastSeenDmgKey, String(state.damage));
+
+  if (state.defeated && loadBossDefeatSeenWeek() !== weekKey) {
+    saveBossDefeatSeenWeek(weekKey);
+    stage.classList.remove('boss-explode');
+    void stage.offsetWidth;
+    stage.classList.add('boss-explode');
+    vibrate([80, 50, 80, 50, 160]);
+    showToast('ปราบ ' + state.boss.name + ' สำเร็จ!');
+  }
+}
 function fmtDate(ts) {
   const d = new Date(ts);
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -363,6 +486,7 @@ function go(name) {
 function renderHome() {
   renderMascotCard();
   renderHomeWeeklyPlanCard();
+  renderBossCard();
   renderWeekRing();
   renderHomeLastWorkout();
 }

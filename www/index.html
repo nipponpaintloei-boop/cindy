@@ -238,6 +238,84 @@ body{
   100%{transform:scale(1) rotate(0deg);}
 }
 
+/* ---- boss fight card ---- */
+.boss-card{
+  position:relative;
+  background:linear-gradient(155deg,var(--card) 0%,#0d0e14 100%);
+  border:1px solid var(--card-border);border-radius:var(--radius);
+  padding:16px 16px 18px;margin-top:12px;
+}
+.boss-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+.boss-name{font-family:var(--font-display);font-size:20px;letter-spacing:1px;}
+.boss-tag{font-size:10px;color:var(--text-faint);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;}
+.boss-stage{
+  position:relative;width:120px;height:120px;margin:6px auto 12px;
+  display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle,rgba(255,255,255,.04),transparent 70%);
+  border-radius:14px;overflow:visible;
+}
+.boss-art{width:100px;height:100px;transition:opacity .4s ease, filter .4s ease;}
+.boss-art svg{width:100%;height:100%;display:block;}
+.boss-hp-track{
+  height:9px;border-radius:5px;overflow:hidden;
+  background:var(--bg-elev);border:1px solid var(--card-border);
+}
+.boss-hp-fill{
+  height:100%;border-radius:5px;width:100%;
+  background:linear-gradient(90deg,var(--push),#ff6a3d);
+  transition:width .6s ease;
+}
+.boss-hp-label{font-size:10px;color:var(--text-faint);margin-top:6px;text-align:center;letter-spacing:.3px;}
+
+/* hit flash — small shake + quick red pulse */
+.boss-stage.boss-hit .boss-art{animation:bossHitShake .4s ease;}
+@keyframes bossHitShake{
+  0%{transform:translateX(0);filter:brightness(1);}
+  20%{transform:translateX(-5px);filter:brightness(1.6) drop-shadow(0 0 10px rgba(232,35,42,.8));}
+  40%{transform:translateX(5px);}
+  60%{transform:translateX(-3px);}
+  80%{transform:translateX(2px);}
+  100%{transform:translateX(0);filter:brightness(1);}
+}
+
+/* defeated state — dim + fade the silhouette, show "cleared" tag */
+.boss-stage.boss-defeated .boss-art{opacity:.28;filter:grayscale(1);}
+.boss-stage.boss-defeated::after{
+  content:"CLEARED";position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);
+  font-family:var(--font-display);font-size:13px;letter-spacing:2px;color:var(--success);
+  background:rgba(0,0,0,.55);padding:2px 10px;border-radius:6px;border:1px solid var(--success);
+}
+
+/* explosion burst — plays once when the boss is freshly defeated */
+.boss-boom{
+  position:absolute;inset:0;pointer-events:none;
+  display:flex;align-items:center;justify-content:center;
+}
+.boss-stage.boss-explode .boss-boom{animation:bossBoomFlash .8s ease forwards;}
+.boss-stage.boss-explode .boss-boom::before,
+.boss-stage.boss-explode .boss-boom::after{
+  content:"";position:absolute;left:50%;top:50%;width:8px;height:8px;border-radius:50%;
+  background:var(--warning);opacity:0;
+}
+.boss-stage.boss-explode .boss-boom::before{
+  box-shadow:
+    0 0 0 0 rgba(255,176,32,0),
+    -40px -30px 0 -2px #FFB020, 40px -30px 0 -2px #E8232A,
+    -46px 20px 0 -2px #E8232A, 46px 20px 0 -2px #FFB020,
+    0 -46px 0 -2px #fff, 0 46px 0 -2px #FFB020;
+  animation:bossParticles .8s ease forwards;
+}
+@keyframes bossBoomFlash{
+  0%{background:radial-gradient(circle,rgba(255,255,255,0) 0%,rgba(255,176,32,0) 60%);}
+  15%{background:radial-gradient(circle,rgba(255,255,255,.9) 0%,rgba(255,176,32,.6) 55%,rgba(255,176,32,0) 75%);}
+  100%{background:radial-gradient(circle,rgba(255,255,255,0) 0%,rgba(255,176,32,0) 60%);}
+}
+@keyframes bossParticles{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.2);}
+  25%{opacity:1;}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(2.6);}
+}
+
 .plan-cta{
   display:block;width:100%;text-align:left;
   background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);
@@ -580,6 +658,21 @@ textarea.note-input::placeholder{color:var(--text-faint);}
             <div id="xpBarLabel" class="xp-bar-label">0 / 100 XP</div>
           </div>
         </div>
+      </div>
+
+      <div class="boss-card">
+        <div class="boss-header">
+          <div>
+            <div id="bossName" class="boss-name">GRINDER-1</div>
+            <div id="bossTag" class="boss-tag">SCRAP BRAWLER</div>
+          </div>
+        </div>
+        <div id="bossStage" class="boss-stage">
+          <div class="boss-art"></div>
+          <div class="boss-boom"></div>
+        </div>
+        <div class="boss-hp-track"><div id="bossHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
+        <div id="bossHpLabel" class="boss-hp-label">0 / 0 HP</div>
       </div>
 
       <div id="homeWeeklyPlanWrap"></div>
