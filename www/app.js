@@ -1128,17 +1128,23 @@ function renderRankTag(level) {
   applyMascotGearAndAura(rank);
 }
 
-/** Drives the avatar's persistent rank aura (pulsing glow ring) and its
- * small "gear" badge (worn rank icon), both purely CSS/derived from the
- * rank tier — nothing new stored. RECRUIT stays plain so the aura/gear
- * reads as something earned from FIGHTER (LV.5) onward. */
+/** Drives the avatar's persistent rank aura (pulsing glow ring), its
+ * small "gear" badge (worn rank icon), and the LV.N chip itself, all purely
+ * CSS/derived from the rank tier — nothing new stored. RECRUIT stays plain
+ * so the aura/gear/badge escalation reads as something earned from
+ * FIGHTER (LV.5) onward, getting richer color + effects every tier. */
 function applyMascotGearAndAura(rank) {
   const avatar = document.getElementById('mascotAvatar');
   const gear = document.getElementById('mascotGearBadge');
+  const levelBadge = document.getElementById('mascotLevelBadge');
   const tier = rank.title.toLowerCase();
   if (avatar) {
     RANK_TIERS.forEach(r => avatar.classList.remove('aura-' + r.title.toLowerCase()));
     if (tier !== 'recruit') avatar.classList.add('aura-' + tier);
+  }
+  if (levelBadge) {
+    RANK_TIERS.forEach(r => levelBadge.classList.remove('lvbadge-' + r.title.toLowerCase()));
+    if (tier !== 'recruit') levelBadge.classList.add('lvbadge-' + tier);
   }
   if (gear) {
     RANK_TIERS.forEach(r => gear.classList.remove('gear-' + r.title.toLowerCase()));
