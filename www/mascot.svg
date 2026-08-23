@@ -1,1 +1,38 @@
+<svg viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg">
+<style>
+.suit-red{fill:#E8232A}
+.suit-blue{fill:#3D6FE0}
+.hood{fill:#161821}
+.visor{fill:#0A0A0D}
+.outline{fill:none;stroke:#0A0A0D;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
+.hi{fill:#F5F4F0}
+</style>
 
+<path class="hood outline" d="M100 20c-30 0-48 20-48 46 0 10 2 18 6 26l84 0c4-8 6-16 6-26 0-26-18-46-48-46z"/>
+
+<path class="visor" d="M62 66c0-12 16-20 38-20s38 8 38 20c0 14-8 26-38 26s-38-12-38-26z"/>
+<path class="outline" d="M62 66c0-12 16-20 38-20s38 8 38 20c0 14-8 26-38 26s-38-12-38-26z" style="fill:none"/>
+
+<path class="hi" d="M67 62c6-8 18-12 27-12l0 8c-8 0-17 3-22 9z"/>
+
+<path class="suit-red" d="M100 50c-14 0-24 6-28 14 6 8 16 12 28 12l0-26z"/>
+<path class="suit-blue" d="M100 50c14 0 24 6 28 14-6 8-16 12-28 12l0-26z"/>
+<line x1="100" y1="50" x2="100" y2="76" stroke="#0A0A0D" stroke-width="2"/>
+
+<path class="hood outline" d="M52 92c-6 6-10 14-10 22l6 4 10-16z"/>
+<path class="hood outline" d="M148 92c6 6 10 14 10 22l-6 4-10-16z"/>
+
+<path class="hood outline" d="M42 114c0 40 26 66 58 66s58-26 58-66c0-8-2-16-6-22l-104 0c-4 6-6 14-6 22z"/>
+
+<path class="suit-red" d="M46 118c0 34 22 56 50 58l0-90-46 0c-2 10-4 20-4 32z"/>
+<path class="suit-blue" d="M154 118c0 34-22 56-50 58l0-90 46 0c2 10 4 20 4 32z"/>
+<line x1="100" y1="86" x2="100" y2="176" stroke="#0A0A0D" stroke-width="2"/>
+
+<path class="outline" d="M42 114c0 40 26 66 58 66s58-26 58-66" style="fill:none"/>
+
+<path class="hi" d="M70 140l16 18 34-40" style="fill:none;stroke:#F5F4F0;stroke-width:9;stroke-linecap:round;stroke-linejoin:round"/>
+<path d="M70 140l16 18 34-40" style="fill:none;stroke:#0A0A0D;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"/>
+
+<path class="hood outline" d="M40 118c-14 4-26 16-30 32l14 8c2-16 8-28 18-34z"/>
+<path class="hood outline" d="M160 118c14 4 26 16 30 32l-14 8c-2-16-8-28-18-34z"/>
+</svg>
