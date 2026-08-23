@@ -4,6 +4,37 @@ const KEY_SESSIONS = 'cindy_sessions';
 const KEY_ACTIVE = 'cindy_active_workout';
 const KEY_LAST_SEEN_LEVEL = 'cindy_last_seen_level';
 
+/* ================= ICON SET =================
+ * Small inline SVG icons (stroke-based, same visual language as the header
+ * icon buttons already in the HTML) used in place of emoji for the small,
+ * recurring UI icons across the app — locks, checkmarks, the skin/chest
+ * buttons, play/pause, and rank badges. Sized via the wrapping element's
+ * font-size (icons use 1em/1em + currentColor), so no separate width/height
+ * bookkeeping is needed at each call site.
+ * Out of scope on purpose: the big celebratory art (treasure-chest reveal,
+ * medal reveal modal, PR share-image text, toast flourishes, mascot skin
+ * "gear" accessories) keeps its emoji — those are festive/thematic rather
+ * than functional UI icons. */
+const ICONS = {
+  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>',
+  palette: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 100 18c1.4 0 2-1.1 1.2-2.2-.5-.7-.1-1.8 1-1.8H16a5 5 0 005-5c0-5-4.5-9-9-9z"/><circle cx="7.7" cy="10.5" r="1.15" fill="currentColor" stroke="none"/><circle cx="12" cy="7.3" r="1.15" fill="currentColor" stroke="none"/><circle cx="16.1" cy="10" r="1.15" fill="currentColor" stroke="none"/><circle cx="9.3" cy="15" r="1.15" fill="currentColor" stroke="none"/></svg>',
+  gift: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><rect x="4" y="12" width="16" height="9" rx="1"/><path d="M12 8v13"/><path d="M12 8C10.5 4.5 6.5 4.5 6.5 6.9c0 1.5 2 1.1 5.5 1.1z"/><path d="M12 8c1.5-3.5 5.5-3.9 5.5-1.1 0 1.5-2 1.1-5.5 1.1z"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6c0 .8.9 1.3 1.6.9l10.9-6.8a1 1 0 000-1.7L9.6 4.3C8.9 3.9 8 4.4 8 5.2z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4.5" height="14" rx="1.2"/><rect x="13.5" y="5" width="4.5" height="14" rx="1.2"/></svg>',
+  rankRecruit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 7.6-7 9-4-1.4-7-4.4-7-9V6z"/></svg>',
+  rankFighter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 7.6-7 9-4-1.4-7-4.4-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>',
+  rankWarrior: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12L12 4l2 2-8 8z"/><path d="M20 12L12 4l-2 2 8 8z"/><path d="M9 9l6 6"/><path d="M4 20l3-3M20 20l-3-3"/></svg>',
+  rankElite: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 7.6-7 9-4-1.4-7-4.4-7-9V6z"/><path d="M12 8l1.1 2.3 2.5.3-1.8 1.8.4 2.5-2.2-1.2-2.2 1.2.4-2.5-1.8-1.8 2.5-.3z" fill="currentColor" stroke="none"/></svg>',
+  rankLegend: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5l3.3 2.8L12 5l4.7 6.3 3.3-2.8-1.6 9.5H5.6z"/><path d="M6 19.5h12"/></svg>'
+};
+/** Wraps a named icon in an inline span sized/colored by its context (font-
+ * size + color/currentColor), so it drops into text flow like the emoji it
+ * replaces. */
+function iconHtml(name, cls) {
+  return '<span class="icon-inline' + (cls ? ' ' + cls : '') + '">' + (ICONS[name] || '') + '</span>';
+}
+
 /* ---- streak milestone treasure chests ---- */
 const STREAK_MILESTONES = [7, 14, 30, 100];
 const KEY_STREAK_CHESTS_OPENED = 'cindy_streak_chests_opened';
@@ -775,7 +806,7 @@ function renderDailyQuests() {
     const claimed = claimState.ids.indexOf(id) !== -1;
     const done = q.check(ctx);
     let statusHtml;
-    if (claimed) statusHtml = '<div class="quest-claimed">✓ รับแล้ว</div>';
+    if (claimed) statusHtml = '<div class="quest-claimed">' + iconHtml('check') + ' รับแล้ว</div>';
     else if (done) statusHtml = '<button class="quest-claim-btn" onclick="claimDailyQuest(\'' + id + '\')">รับ +' + q.xp + ' XP</button>';
     else statusHtml = '<div class="quest-xp-tag">+' + q.xp + ' XP</div>';
     return '<div class="quest-row' + (claimed ? ' done' : '') + '">'
@@ -889,11 +920,11 @@ function renderXpBar() {
  * Purely a label derived from the level that's already computed above —
  * nothing new is stored. Gives the level number a bit of RPG flavor. */
 const RANK_TIERS = [
-  { min: 1, max: 4, title: 'RECRUIT', icon: '🔰' },
-  { min: 5, max: 9, title: 'FIGHTER', icon: '🥋' },
-  { min: 10, max: 14, title: 'WARRIOR', icon: '⚔️' },
-  { min: 15, max: 19, title: 'ELITE', icon: '🛡️' },
-  { min: 20, max: Infinity, title: 'LEGEND', icon: '👑' }
+  { min: 1, max: 4, title: 'RECRUIT', icon: 'rankRecruit' },
+  { min: 5, max: 9, title: 'FIGHTER', icon: 'rankFighter' },
+  { min: 10, max: 14, title: 'WARRIOR', icon: 'rankWarrior' },
+  { min: 15, max: 19, title: 'ELITE', icon: 'rankElite' },
+  { min: 20, max: Infinity, title: 'LEGEND', icon: 'rankLegend' }
 ];
 function rankForLevel(level) {
   return RANK_TIERS.find(r => level >= r.min && level <= r.max) || RANK_TIERS[0];
@@ -902,9 +933,33 @@ function renderRankTag(level) {
   const el = document.getElementById('mascotRank');
   if (!el) return;
   const rank = rankForLevel(level);
-  el.textContent = rank.icon + ' ' + rank.title;
+  el.innerHTML = iconHtml(rank.icon) + ' ' + rank.title;
   RANK_TIERS.forEach(r => el.classList.remove('rank-' + r.title.toLowerCase()));
   el.classList.add('rank-' + rank.title.toLowerCase());
+  applyMascotGearAndAura(rank);
+}
+
+/** Drives the avatar's persistent rank aura (pulsing glow ring) and its
+ * small "gear" badge (worn rank icon), both purely CSS/derived from the
+ * rank tier — nothing new stored. RECRUIT stays plain so the aura/gear
+ * reads as something earned from FIGHTER (LV.5) onward. */
+function applyMascotGearAndAura(rank) {
+  const avatar = document.getElementById('mascotAvatar');
+  const gear = document.getElementById('mascotGearBadge');
+  const tier = rank.title.toLowerCase();
+  if (avatar) {
+    RANK_TIERS.forEach(r => avatar.classList.remove('aura-' + r.title.toLowerCase()));
+    if (tier !== 'recruit') avatar.classList.add('aura-' + tier);
+  }
+  if (gear) {
+    RANK_TIERS.forEach(r => gear.classList.remove('gear-' + r.title.toLowerCase()));
+    if (tier === 'recruit') {
+      gear.classList.remove('show');
+    } else {
+      gear.innerHTML = iconHtml(rank.icon);
+      gear.classList.add('show', 'gear-' + tier);
+    }
+  }
 }
 
 /* ================= STAT ATTRIBUTES (STR / PWR / END) =================
@@ -961,32 +1016,45 @@ const MASCOT_SKINS = [
   { id: 'default', name: 'Classic', filter: 'none', unlock: { type: 'always' } },
 
   { id: 'streak7', name: 'นักสู้ 7 วัน', filter: 'sepia(.35) saturate(1.7) hue-rotate(-8deg)',
+    aura: 'rgba(224,150,61,.55)', accessory: '🧣',
     unlock: { type: 'streak', value: 7 }, cond: 'เปิดหีบ Streak 7 วัน' },
   { id: 'streak14', name: 'นักสู้ 14 วัน', filter: 'grayscale(.25) saturate(1.4) hue-rotate(180deg) brightness(1.08)',
+    aura: 'rgba(80,190,200,.55)', accessory: '🧤',
     unlock: { type: 'streak', value: 14 }, cond: 'เปิดหีบ Streak 14 วัน' },
   { id: 'streak30', name: 'นักรบ 30 วัน', filter: 'sepia(.55) saturate(2.1) hue-rotate(15deg)',
+    aura: 'rgba(255,140,60,.6)', accessory: '🛡️',
     unlock: { type: 'streak', value: 30 }, cond: 'เปิดหีบ Streak 30 วัน' },
   { id: 'streak100', name: 'ตำนาน 100 วัน', filter: 'saturate(2.4) hue-rotate(270deg) brightness(1.15)',
+    aura: 'rgba(190,90,255,.65)', accessory: '👑', strong: true,
     unlock: { type: 'streak', value: 100 }, cond: 'เปิดหีบ Streak 100 วัน' },
 
   { id: 'lv5', name: 'นักเรียนวินัย LV.5', filter: 'hue-rotate(90deg) saturate(1.5)',
+    aura: 'rgba(110,200,90,.5)', accessory: '🥊',
     unlock: { type: 'level', value: 5 }, cond: 'ถึง LV.5' },
   { id: 'lv10', name: 'มือฝึกฝน LV.10', filter: 'hue-rotate(140deg) saturate(1.6) brightness(1.05)',
+    aura: 'rgba(60,210,170,.55)', accessory: '🥋',
     unlock: { type: 'level', value: 10 }, cond: 'ถึง LV.10' },
   { id: 'lv15', name: 'ยอดฝีมือ LV.15', filter: 'hue-rotate(200deg) saturate(1.8)',
+    aura: 'rgba(70,140,255,.6)', accessory: '⚔️',
     unlock: { type: 'level', value: 15 }, cond: 'ถึง LV.15' },
   { id: 'lv20', name: 'จอมพลังกาย LV.20', filter: 'hue-rotate(320deg) saturate(2) contrast(1.1)',
+    aura: 'rgba(255,60,150,.65)', accessory: '🔥', strong: true,
     unlock: { type: 'level', value: 20 }, cond: 'ถึง LV.20' },
 
   { id: 'bossGrinder1', name: 'ผู้พิชิต GRINDER-1', filter: 'hue-rotate(0deg) saturate(1.8) contrast(1.15)',
+    aura: 'rgba(232,80,40,.6)', accessory: '⚙️', strong: true,
     unlock: { type: 'boss', bossId: 'grinder1' }, cond: 'ปราบ GRINDER-1 สำเร็จ' },
   { id: 'bossIronmaw', name: 'ผู้พิชิต IRON MAW', filter: 'hue-rotate(45deg) saturate(1.6)',
+    aura: 'rgba(200,160,80,.6)', accessory: '🦷', strong: true,
     unlock: { type: 'boss', bossId: 'ironmaw' }, cond: 'ปราบ IRON MAW สำเร็จ' },
   { id: 'bossVoid9', name: 'ผู้พิชิต VOID-9', filter: 'hue-rotate(250deg) saturate(2) brightness(.92)',
+    aura: 'rgba(130,60,220,.65)', accessory: '🌀', strong: true,
     unlock: { type: 'boss', bossId: 'void9' }, cond: 'ปราบ VOID-9 สำเร็จ' },
   { id: 'bossWingreaper', name: 'ผู้พิชิต WING REAPER', filter: 'hue-rotate(190deg) saturate(1.7)',
+    aura: 'rgba(70,200,190,.6)', accessory: '🪽', strong: true,
     unlock: { type: 'boss', bossId: 'wingreaper' }, cond: 'ปราบ WING REAPER สำเร็จ' },
   { id: 'bossCorezero', name: 'ผู้พิชิต CORE-ZERO', filter: 'hue-rotate(300deg) saturate(2.2) contrast(1.2) brightness(1.1)',
+    aura: 'rgba(255,80,200,.7)', accessory: '💠', strong: true,
     unlock: { type: 'boss', bossId: 'corezero' }, cond: 'ปราบ CORE-ZERO สำเร็จ' }
 ];
 function isSkinUnlocked(skin) {
@@ -1004,13 +1072,32 @@ function loadActiveSkin() {
 function saveActiveSkin(id) {
   localStorage.setItem(KEY_ACTIVE_SKIN, id);
 }
-/** Applies the current active skin's filter to the mascot image. Falls back
- * to no filter if the saved active skin somehow isn't unlocked anymore. */
+/** Applies the current active skin's filter, aura glow, and accessory badge
+ * to the mascot avatar. Falls back to plain/no-effects if the saved active
+ * skin somehow isn't unlocked anymore. */
 function applyActiveMascotSkinFilter() {
   const img = document.getElementById('mascotImg');
+  const avatar = document.getElementById('mascotAvatar');
+  const accessory = document.getElementById('mascotSkinAccessory');
   if (!img) return;
   const skin = MASCOT_SKINS.find(s => s.id === loadActiveSkin()) || MASCOT_SKINS[0];
-  img.style.filter = isSkinUnlocked(skin) ? skin.filter : 'none';
+  const unlocked = isSkinUnlocked(skin);
+  img.style.filter = unlocked ? skin.filter : 'none';
+
+  if (avatar) {
+    const hasAura = !!(unlocked && skin.aura);
+    avatar.classList.toggle('skin-glow', hasAura);
+    avatar.classList.toggle('skin-glow-strong', hasAura && !!skin.strong);
+    avatar.style.setProperty('--skin-aura', hasAura ? skin.aura : 'transparent');
+  }
+  if (accessory) {
+    if (unlocked && skin.accessory) {
+      accessory.textContent = skin.accessory;
+      accessory.classList.add('show');
+    } else {
+      accessory.classList.remove('show');
+    }
+  }
 }
 function openSkinPicker() {
   renderSkinGrid();
@@ -1025,10 +1112,12 @@ function renderSkinGrid() {
     const isActive = skin.id === activeId;
     const cls = 'skin-item' + (isActive ? ' active' : '') + (unlocked ? '' : ' locked');
     const clickAttr = unlocked ? ' onclick="selectMascotSkin(\'' + skin.id + '\')"' : '';
-    const badgeHtml = isActive ? '<div class="active-check">✓</div>' : (unlocked ? '' : '<div class="lock-icon">🔒</div>');
+    const badgeHtml = isActive ? '<div class="active-check">' + iconHtml('check') + '</div>' : (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>');
     const thumbFilter = unlocked ? skin.filter : 'grayscale(1) brightness(.4)';
+    const thumbShadow = unlocked && skin.aura ? 'box-shadow:0 0 ' + (skin.strong ? '14px 3px' : '9px 2px') + ' ' + skin.aura + ';border-radius:50%;' : '';
+    const accessoryHtml = unlocked && skin.accessory ? '<div class="skin-thumb-accessory">' + skin.accessory + '</div>' : '';
     return '<div class="' + cls + '"' + clickAttr + '>' + badgeHtml +
-      '<img src="mascot-happy.svg" style="filter:' + thumbFilter + ';" alt="" />' +
+      '<div class="skin-thumb-wrap" style="' + thumbShadow + '"><img src="mascot-happy.svg" style="filter:' + thumbFilter + ';" alt="" />' + accessoryHtml + '</div>' +
       '<div class="skin-name">' + skin.name + '</div>' +
       (unlocked ? '' : '<div class="skin-cond">' + skin.cond + '</div>') +
       '</div>';
@@ -1060,7 +1149,7 @@ function renderCollectionBadges() {
     const unlocked = opened.indexOf(m) !== -1;
     const cls = 'skin-item' + (unlocked ? '' : ' locked');
     return '<div class="' + cls + '">'
-      + (unlocked ? '' : '<div class="lock-icon">🔒</div>')
+      + (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>')
       + '<div class="collection-emoji">' + (unlocked ? info.emoji : '❔') + '</div>'
       + '<div class="skin-name">' + info.title + '</div>'
       + (unlocked ? '' : '<div class="skin-cond">Streak ' + m + ' วัน</div>')
@@ -1076,9 +1165,11 @@ function renderCollectionSkins() {
     const isActive = skin.id === activeId;
     const cls = 'skin-item' + (isActive ? ' active' : '') + (unlocked ? '' : ' locked');
     const thumbFilter = unlocked ? skin.filter : 'grayscale(1) brightness(.4)';
+    const thumbShadow = unlocked && skin.aura ? 'box-shadow:0 0 ' + (skin.strong ? '14px 3px' : '9px 2px') + ' ' + skin.aura + ';border-radius:50%;' : '';
+    const accessoryHtml = unlocked && skin.accessory ? '<div class="skin-thumb-accessory">' + skin.accessory + '</div>' : '';
     return '<div class="' + cls + '">'
-      + (isActive ? '<div class="active-check">✓</div>' : (unlocked ? '' : '<div class="lock-icon">🔒</div>'))
-      + '<img src="mascot-happy.svg" style="filter:' + thumbFilter + ';" alt="" />'
+      + (isActive ? '<div class="active-check">' + iconHtml('check') + '</div>' : (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>'))
+      + '<div class="skin-thumb-wrap" style="' + thumbShadow + '"><img src="mascot-happy.svg" style="filter:' + thumbFilter + ';" alt="" />' + accessoryHtml + '</div>'
       + '<div class="skin-name">' + skin.name + '</div>'
       + (unlocked ? '' : '<div class="skin-cond">' + skin.cond + '</div>')
       + '</div>';
@@ -1092,8 +1183,8 @@ function renderCollectionTitles() {
     const unlocked = level >= r.min;
     const cls = 'skin-item' + (unlocked ? '' : ' locked');
     return '<div class="' + cls + '">'
-      + (unlocked ? '' : '<div class="lock-icon">🔒</div>')
-      + '<div class="collection-emoji">' + r.icon + '</div>'
+      + (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>')
+      + '<div class="collection-emoji">' + iconHtml(r.icon) + '</div>'
       + '<div class="skin-name">' + r.title + '</div>'
       + '<div class="skin-cond">LV.' + r.min + (r.max === Infinity ? '+' : ('–' + r.max)) + '</div>'
       + '</div>';
@@ -1270,7 +1361,7 @@ function renderHomeCustomShortcut() {
       <div class="date">${escapeHtml(recent.name)}</div>
       <div class="reps">${detail}</div>
     </div>
-    <div class="rounds" style="color:var(--success);">▶</div>
+    <div class="rounds" style="color:var(--success);">${iconHtml('play')}</div>
   </div>`;
   homeWrap.style.display = 'block';
 }
@@ -1412,7 +1503,7 @@ function refreshAmrapUI(active, remainingMs) {
   document.getElementById('roundsBig').textContent = active.roundsSaved;
   const pbHint = document.getElementById('pbHint');
   pbHint.textContent = currentPB > 0 ? 'PB ' + currentPB + ' ROUNDS' : 'PB —';
-  document.getElementById('saveRoundBtn').textContent = '✓ บันทึกรอบที่ ' + (active.roundsSaved + 1);
+  document.getElementById('saveRoundBtn').innerHTML = iconHtml('check') + ' บันทึกรอบที่ ' + (active.roundsSaved + 1);
 
   const statusPill = document.getElementById('statusPill');
   const pauseBtn = document.getElementById('pauseBtn');
@@ -3509,7 +3600,7 @@ function renderCustomPlayer() {
   const pauseBtn = document.getElementById('playerPauseBtn');
   if (pauseBtn) {
     pauseBtn.style.display = showSkip ? 'flex' : 'none';
-    pauseBtn.textContent = customPlayer.timer.paused ? '▶ เล่นต่อ' : '⏸ หยุดชั่วคราว';
+    pauseBtn.innerHTML = customPlayer.timer.paused ? (iconHtml('play') + ' เล่นต่อ') : (iconHtml('pause') + ' หยุดชั่วคราว');
   }
 }
 

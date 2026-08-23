@@ -44,6 +44,12 @@ body.oled{
   --card-border:#1D2030;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+/* ---- inline SVG icon utility (replaces emoji for small UI icons) ---- */
+.icon-inline{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:1em;height:1em;vertical-align:-0.14em;color:currentColor;
+}
+.icon-inline svg{width:100%;height:100%;display:block;}
 html,body{height:100%;}
 body{
   margin:0;
@@ -208,7 +214,7 @@ body{
   display:flex;align-items:center;justify-content:center;color:var(--text-faint);
   overflow:visible;padding:4px;cursor:pointer;
 }
-.mascot-avatar img{width:100%;height:100%;object-fit:contain;border-radius:10px;overflow:hidden;}
+.mascot-avatar img{width:100%;height:100%;object-fit:contain;border-radius:10px;overflow:hidden;position:relative;z-index:1;}
 .mascot-text{flex:1;min-width:0;}
 .mascot-headline{font-size:14px;font-weight:700;letter-spacing:.2px;}
 .mascot-sub{font-size:12px;color:var(--text-dim);margin-top:3px;line-height:1.4;}
@@ -248,10 +254,20 @@ body{
 .xp-bar-label{font-size:10px;color:var(--text-faint);margin-top:4px;letter-spacing:.3px;}
 
 .mascot-avatar.level-up-glow{animation:levelUpGlow 1.1s ease;border-radius:14px;}
+.mascot-avatar.level-up-glow::after{
+  content:'';position:absolute;inset:-14px;border-radius:50%;z-index:0;pointer-events:none;
+  background:radial-gradient(circle, rgba(255,176,32,.55) 0%, rgba(255,176,32,.22) 40%, transparent 72%);
+  animation:levelUpBurstRing 1.1s ease forwards;
+}
 @keyframes levelUpGlow{
   0%{box-shadow:0 0 0 0 rgba(255,176,32,0);}
   30%{box-shadow:0 0 22px 7px rgba(255,176,32,.85);}
   100%{box-shadow:0 0 0 0 rgba(255,176,32,0);}
+}
+@keyframes levelUpBurstRing{
+  0%{opacity:0;transform:scale(.4);}
+  35%{opacity:1;transform:scale(1);}
+  100%{opacity:0;transform:scale(1.7);}
 }
 .mascot-level-badge.bump{animation:badgeBump .5s ease;}
 @keyframes badgeBump{
@@ -259,6 +275,71 @@ body{
   40%{transform:scale(1.4) rotate(-4deg);}
   100%{transform:scale(1) rotate(0deg);}
 }
+
+/* ---- persistent rank aura + "gear" badge on the mascot avatar itself ----
+   Unlike the skins above (which only recolor the art via filter), these
+   scale up with rank tier: a soft pulsing glow ring around the avatar, plus
+   a small worn badge showing the rank icon. Both start at FIGHTER (LV.5)
+   so RECRUIT stays plain and each tier upgrade visibly "equips" more. */
+.mascot-avatar.aura-fighter{animation:auraPulseBlue 2.6s ease-in-out infinite;}
+.mascot-avatar.aura-warrior{animation:auraPulseOrange 2.6s ease-in-out infinite;}
+.mascot-avatar.aura-elite{animation:auraPulsePurple 2.2s ease-in-out infinite;}
+.mascot-avatar.aura-legend{animation:auraPulseGold 1.8s ease-in-out infinite;}
+@keyframes auraPulseBlue{
+  0%,100%{box-shadow:0 0 0 0 rgba(61,111,224,0),0 0 10px 1px rgba(61,111,224,.35);}
+  50%{box-shadow:0 0 0 3px rgba(61,111,224,.12),0 0 18px 4px rgba(61,111,224,.6);}
+}
+@keyframes auraPulseOrange{
+  0%,100%{box-shadow:0 0 0 0 rgba(255,176,32,0),0 0 10px 1px rgba(255,176,32,.4);}
+  50%{box-shadow:0 0 0 3px rgba(255,176,32,.14),0 0 20px 5px rgba(255,176,32,.65);}
+}
+@keyframes auraPulsePurple{
+  0%,100%{box-shadow:0 0 0 0 rgba(180,140,255,0),0 0 12px 2px rgba(180,140,255,.45);}
+  50%{box-shadow:0 0 0 4px rgba(180,140,255,.16),0 0 22px 6px rgba(180,140,255,.7);}
+}
+@keyframes auraPulseGold{
+  0%,100%{box-shadow:0 0 0 0 rgba(255,215,0,0),0 0 14px 3px rgba(255,215,0,.55);}
+  50%{box-shadow:0 0 0 5px rgba(255,215,0,.2),0 0 26px 8px rgba(255,215,0,.85);}
+}
+.mascot-gear-badge{
+  position:absolute;bottom:-5px;left:-5px;z-index:2;
+  width:20px;height:20px;border-radius:50%;
+  display:none;align-items:center;justify-content:center;font-size:11px;
+  background:var(--bg-elev);border:1.5px solid var(--card-border);
+  box-shadow:0 2px 6px rgba(0,0,0,.35);
+}
+.mascot-gear-badge.show{display:flex;}
+.mascot-gear-badge.gear-fighter{border-color:var(--pull);}
+.mascot-gear-badge.gear-warrior{border-color:var(--squat);}
+.mascot-gear-badge.gear-elite{border-color:#B48CFF;}
+.mascot-gear-badge.gear-legend{
+  border-color:#FFD700;
+  background:radial-gradient(circle,rgba(255,215,0,.3),var(--bg-elev) 70%);
+}
+
+/* ---- per-skin aura + worn accessory ----
+   Unlike the rank aura above (tied to level), this is tied to whichever
+   skin is equipped, so each unlocked skin feels distinct — not just a
+   recolor. --skin-aura is set inline per skin (JS) as an rgba color. */
+.mascot-avatar{--skin-aura:transparent;}
+.mascot-avatar.skin-glow::before{
+  content:'';position:absolute;inset:-11px;border-radius:50%;z-index:0;pointer-events:none;
+  box-shadow:0 0 18px 4px var(--skin-aura);
+  animation:skinAuraPulse 2.4s ease-in-out infinite;
+}
+.mascot-avatar.skin-glow.skin-glow-strong::before{animation-duration:1.7s;box-shadow:0 0 24px 6px var(--skin-aura);}
+@keyframes skinAuraPulse{
+  0%,100%{opacity:.5;transform:scale(1);}
+  50%{opacity:1;transform:scale(1.1);}
+}
+.mascot-skin-accessory{
+  position:absolute;top:-5px;right:-5px;z-index:2;
+  width:20px;height:20px;border-radius:50%;
+  display:none;align-items:center;justify-content:center;font-size:11px;
+  background:var(--bg-elev);border:1.5px solid var(--card-border);
+  box-shadow:0 2px 6px rgba(0,0,0,.35);
+}
+.mascot-skin-accessory.show{display:flex;}
 .mascot-skin-hint{
   position:absolute;bottom:-4px;right:-4px;z-index:2;
   width:18px;height:18px;border-radius:50%;
@@ -286,6 +367,12 @@ body{
   position:absolute;top:4px;right:5px;font-size:11px;line-height:1;
 }
 .skin-item .active-check{color:var(--success);}
+.skin-item .skin-thumb-wrap{position:relative;width:42px;height:42px;margin:0 auto 4px;}
+.skin-item .skin-thumb-wrap img{width:42px;height:42px;object-fit:contain;margin-bottom:0;}
+.skin-item .skin-thumb-accessory{
+  position:absolute;bottom:-3px;right:-4px;font-size:11px;line-height:1;
+  background:var(--bg);border-radius:50%;padding:1px;
+}
 
 /* ---- collection / trophy room ---- */
 .collection-summary{
@@ -302,7 +389,7 @@ body{
   background:linear-gradient(155deg,var(--warning),#c97e00);
   border:2px solid var(--bg);
   display:none;align-items:center;justify-content:center;
-  font-size:19px;line-height:1;cursor:pointer;
+  font-size:19px;line-height:1;cursor:pointer;color:#fff;
   box-shadow:0 4px 12px rgba(255,176,32,.5);
   animation:chestPulse 1.6s ease-in-out infinite;
 }
@@ -808,14 +895,16 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="home-content">
 
       <div class="mascot-card">
-        <div id="treasureChestBtn" class="treasure-chest-btn" onclick="openTreasureChestModal()" aria-label="เปิดหีบรางวัล">🎁</div>
+        <div id="treasureChestBtn" class="treasure-chest-btn" onclick="openTreasureChestModal()" aria-label="เปิดหีบรางวัล"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><rect x="4" y="12" width="16" height="9" rx="1"/><path d="M12 8v13"/><path d="M12 8C10.5 4.5 6.5 4.5 6.5 6.9c0 1.5 2 1.1 5.5 1.1z"/><path d="M12 8c1.5-3.5 5.5-3.9 5.5-1.1 0 1.5-2 1.1-5.5 1.1z"/></svg></span></div>
         <div class="mascot-avatar" id="mascotAvatar" onclick="openSkinPicker()">
           <img id="mascotImg" src="mascot.svg" alt="" />
           <div id="mascotLevelBadge" class="mascot-level-badge">LV.1</div>
-          <div class="mascot-skin-hint">🎨</div>
+          <div id="mascotGearBadge" class="mascot-gear-badge"></div>
+          <div id="mascotSkinAccessory" class="mascot-skin-accessory"></div>
+          <div class="mascot-skin-hint"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 100 18c1.4 0 2-1.1 1.2-2.2-.5-.7-.1-1.8 1-1.8H16a5 5 0 005-5c0-5-4.5-9-9-9z"/><circle cx="7.7" cy="10.5" r="1.15" fill="currentColor" stroke="none"/><circle cx="12" cy="7.3" r="1.15" fill="currentColor" stroke="none"/><circle cx="16.1" cy="10" r="1.15" fill="currentColor" stroke="none"/><circle cx="9.3" cy="15" r="1.15" fill="currentColor" stroke="none"/></svg></span></div>
         </div>
         <div class="mascot-text">
-          <div id="mascotRank" class="mascot-rank rank-recruit">🔰 RECRUIT</div>
+          <div id="mascotRank" class="mascot-rank rank-recruit"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 7.6-7 9-4-1.4-7-4.4-7-9V6z"/></svg></span> RECRUIT</div>
           <div id="mascotHeadline" class="mascot-headline">ยังไม่มีประวัติการเล่น</div>
           <div id="mascotSub" class="mascot-sub">เริ่มวันนี้เลย แล้วมาสร้าง streak กัน</div>
           <div class="xp-bar-wrap">
@@ -1007,7 +1096,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         </div>
       </div>
 
-      <button id="saveRoundBtn" class="btn btn-success save-round-btn" onclick="saveRound()">✓ บันทึกรอบที่ 1</button>
+      <button id="saveRoundBtn" class="btn btn-success save-round-btn" onclick="saveRound()"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg></span> บันทึกรอบที่ 1</button>
 
       <div class="control-row">
         <button id="pauseBtn" class="btn btn-outline btn-sm" onclick="togglePause()">PAUSE</button>
@@ -1362,7 +1451,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <button class="btn btn-outline btn-sm" onclick="adjustPlayerReps(1)">+1</button>
       </div>
 
-      <button id="playerDoneBtn" class="btn btn-success save-round-btn" style="display:none;" onclick="confirmPlayerExerciseDone()">✓ เสร็จแล้ว</button>
+      <button id="playerDoneBtn" class="btn btn-success save-round-btn" style="display:none;" onclick="confirmPlayerExerciseDone()"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg></span> เสร็จแล้ว</button>
       <button id="playerPauseBtn" class="btn btn-outline" style="display:none;" onclick="togglePlayerPause()">⏸ หยุดชั่วคราว</button>
       <button id="playerSkipBtn" class="btn btn-outline" style="display:none;" onclick="skipPlayerStep()">ข้าม</button>
     </div>
