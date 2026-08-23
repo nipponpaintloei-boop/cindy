@@ -11,10 +11,9 @@ const KEY_LAST_SEEN_LEVEL = 'cindy_last_seen_level';
  * buttons, play/pause, and rank badges. Sized via the wrapping element's
  * font-size (icons use 1em/1em + currentColor), so no separate width/height
  * bookkeeping is needed at each call site.
- * Out of scope on purpose: the big celebratory art (treasure-chest reveal,
- * medal reveal modal, PR share-image text, toast flourishes, mascot skin
- * "gear" accessories) keeps its emoji — those are festive/thematic rather
- * than functional UI icons. */
+ * Out of scope on purpose: the PR share-image canvas text and the in-app
+ * "COMBO MAX" flourish keep their plain glyphs — those render straight to
+ * canvas / are one-off text accents, not reusable UI or reward art. */
 const ICONS = {
   lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>',
@@ -26,13 +25,59 @@ const ICONS = {
   rankFighter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 7.6-7 9-4-1.4-7-4.4-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>',
   rankWarrior: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12L12 4l2 2-8 8z"/><path d="M20 12L12 4l-2 2 8 8z"/><path d="M9 9l6 6"/><path d="M4 20l3-3M20 20l-3-3"/></svg>',
   rankElite: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 7.6-7 9-4-1.4-7-4.4-7-9V6z"/><path d="M12 8l1.1 2.3 2.5.3-1.8 1.8.4 2.5-2.2-1.2-2.2 1.2.4-2.5-1.8-1.8 2.5-.3z" fill="currentColor" stroke="none"/></svg>',
-  rankLegend: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5l3.3 2.8L12 5l4.7 6.3 3.3-2.8-1.6 9.5H5.6z"/><path d="M6 19.5h12"/></svg>'
+  rankLegend: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5l3.3 2.8L12 5l4.7 6.3 3.3-2.8-1.6 9.5H5.6z"/><path d="M6 19.5h12"/></svg>',
+  speakerOn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 8.5a5 5 0 010 7"/><path d="M19.8 6a9 9 0 010 12"/></svg>',
+  speakerOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9l5 6M21 9l-5 6"/></svg>',
+  target: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>',
+  web: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 3v18M4 7l16 10M20 7L4 17M2 12h20"/><path d="M12 3a13 13 0 00-5.5 4M12 3a13 13 0 015.5 4M2 12a13 13 0 004 6M22 12a13 13 0 01-4 6"/></svg>',
+  muscle: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 13c0-2 1.3-3 3-3 .3-1.6 1.4-2.5 3-2.5 2 0 3 1.3 3 3.2V15c1.6-1 2.6-.7 3.4.3.5-2 1.7-3 3.6-3 2.3 0 4 1.8 4 4.3 0 3-2.3 5.2-5.6 5.2H8.4C4.8 21.8 2 19 2 15.3z"/></svg>'
 };
 /** Wraps a named icon in an inline span sized/colored by its context (font-
  * size + color/currentColor), so it drops into text flow like the emoji it
  * replaces. */
 function iconHtml(name, cls) {
   return '<span class="icon-inline' + (cls ? ' ' + cls : '') + '">' + (ICONS[name] || '') + '</span>';
+}
+
+/* ================= BADGE / REWARD ART =================
+ * Filled glyphs used inside a .gem-badge disc (see CSS) for collectible,
+ * "you earned this" surfaces: streak-chest medals and mascot skin gear.
+ * Kept separate from ICONS above because these are solid/fill shapes
+ * meant to sit on a colored badge, not currentColor line icons meant to
+ * sit in text. */
+const BADGE_ICONS = {
+  star: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.85 6.32 6.9.68-5.22 4.66 1.55 6.84L12 17.6l-6.08 3.4 1.55-6.84L2.25 9.5l6.9-.68z"/></svg>',
+  gem: '<svg viewBox="0 0 24 24"><path d="M5 3h14l4 6-11 12L1 9z" fill="currentColor"/><path d="M5 3l2.5 6M19 3l-2.5 6M1 9h22M9.5 9L12 21l2.5-12" stroke="rgba(0,0,0,.28)" stroke-width="1" fill="none" stroke-linejoin="round"/></svg>',
+  trophy: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 3h12v4a6 6 0 01-5 5.92V16h2.5a1 1 0 011 1v1H7.5v-1a1 1 0 011-1H11v-3.08A6 6 0 016 7V3z"/><path d="M6 4H2.5v1.5A4 4 0 006 9.4V7a5 5 0 010-.5V4z" opacity=".85"/><path d="M18 4h3.5v1.5A4 4 0 0118 9.4V7a5 5 0 000-.5V4z" opacity=".85"/><rect x="7" y="19" width="10" height="2" rx="1"/></svg>',
+  scarf: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5c1.8 2 4.4 2.4 8 1.4C16 5.4 18 6 19 8c-1.6.2-2.7 1.1-3 2.6-.3 1.6.6 2.6 2 3.4-2 .6-3.4-.1-4.4-1.6-1-1.5-2.6-1.7-4.3-1-1.7.7-2.8 2.4-2.3 4.6.4-1.4 1.4-2 2.6-1.7-1 1.6-.7 3 .8 4.2-2.6.2-4.2-1-4.9-3.4-.5-1.8.1-3.3 1.4-4.2-1.8-.3-3-1.5-3.4-3.4C3 6.5 3.3 5.6 4 5z"/></svg>',
+  mitten: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 3a3 3 0 013 3v3.2c1.6-1.6 3-2.2 4.3-1.8 1.4.4 2.2 1.7 2.2 3.4 0 1-.3 1.8-1 2.6l-3.6 4.1c-.9 1-2.1 1.5-3.5 1.5H8a5 5 0 01-5-5V8a3 3 0 013-3h2z"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l7.5 3v5.6c0 5-3.2 8.3-7.5 9.9-4.3-1.6-7.5-4.9-7.5-9.9V5.5z"/><path d="M9.2 12.1l1.9 1.9 3.7-3.9" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  crown: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 8l4 3 5-6 5 6 4-3-1.6 9.5H4.6z"/><rect x="4.8" y="18.3" width="14.4" height="2.2" rx="1"/></svg>',
+  boxGlove: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 3a3 3 0 013 3v3.4c1.7-1.9 3.2-2.6 4.6-2 1.4.5 2.2 2 2 3.8-.1 1.2-.6 2-1.4 2.8l-3.5 3.4c-1 1-2.3 1.6-3.7 1.6H9a5 5 0 01-5-5V6a3 3 0 013-3h2z"/><rect x="2.3" y="15" width="4.4" height="6.2" rx="1.6"/></svg>',
+  gi: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 2.5L12 5l3-2.5 4.5 3-2 3.4-1.8-1V21H8.3V7.9l-1.8 1-2-3.4z"/><path d="M9.5 9.5l2.5 2.5 2.5-2.5" fill="none" stroke="rgba(0,0,0,.3)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  swordsCross: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l7 7M11 11l-7 7M4 4l2.5-.3M4 4l.3 2.5"/><path d="M20 4l-7 7M13 11l7 7M20 4l-2.5-.3M20 4l-.3 2.5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>',
+  flame: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3-2.5 4.2-2.5 7.3 0 1.2.8 2 1.8 2.1-.6-1.4.2-2.6 1.1-3.3.2 1.4 1 2 1.9 2.9 1.1 1.1 1.7 2.3 1.7 3.8 0 3.4-2.9 6.2-6.5 6.2S2 17.9 2 14.5c0-3.6 2.6-5.6 4.6-8 1.6-1.9 2.8-2.9 5.4-4.5z"/></svg>',
+  gearCog: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8.2a3.8 3.8 0 100 7.6 3.8 3.8 0 000-7.6zm9.2 2.6l-1.9-.3a7.4 7.4 0 00-.7-1.7l1.1-1.6-2-2-1.6 1.1a7.4 7.4 0 00-1.7-.7l-.3-1.9h-2.8l-.3 1.9a7.4 7.4 0 00-1.7.7L7.7 4.7l-2 2 1.1 1.6a7.4 7.4 0 00-.7 1.7l-1.9.3v2.8l1.9.3c.15.6.4 1.2.7 1.7l-1.1 1.6 2 2 1.6-1.1c.5.3 1.1.55 1.7.7l.3 1.9h2.8l.3-1.9c.6-.15 1.2-.4 1.7-.7l1.6 1.1 2-2-1.1-1.6c.3-.5.55-1.1.7-1.7l1.9-.3z"/></svg>',
+  fang: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 2.5c3-1 9-1 12 0 2 3.2 1.6 7-1 9.6L15 21l-2-6.2c-.3-.9-1.7-.9-2 0L9 21l-2-8.9C4.4 9.5 4 5.7 6 2.5z"/></svg>',
+  vortex: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 12c-4-3-8-1-8 3s4 5 7 3-1-6-4-4"/><path d="M12 12c4-3 8-1 8 3s-4 5-7 3 1-6 4-4"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>',
+  wing: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21c-1-4.5-.5-9 1-13.5C14.5 3 17.5 1.6 21 2c-1.3 2.6-1.2 4.7.2 6.7-2.2-.4-3.6.2-4.6 2 1.9.1 3 .9 3.7 2.6-2-.3-3.3.3-4.2 2 1.6.2 2.6 1 3.1 2.5-2.2 0-3.8-.6-5.1-2-.6 2.1-1.2 3.8-2.1 5.2z"/></svg>',
+  core: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/><path d="M12 5v14M5 12h14M7.5 7.5l9 9M16.5 7.5l-9 9" stroke="rgba(255,255,255,.35)" stroke-width="1" fill="none"/></svg>'
+};
+/** Builds a small enamel-pin style badge: a two-tone metallic/gem disc
+ * (sized via the caller's font-size, same 1em convention as .icon-inline)
+ * with a filled glyph centered on it. c1/c2 are the gradient's light→base
+ * stops; opts.glow adds an outer glow (opts.glowColor overrides its
+ * color), opts.ring adds a thin inner rim, opts.cls appends extra classes. */
+function badgeHtml(iconName, c1, c2, opts) {
+  opts = opts || {};
+  const cls = 'gem-badge' + (opts.glow ? ' badge-glow' : '') + (opts.ring ? ' badge-ring' : '') + (opts.cls ? ' ' + opts.cls : '');
+  const style = '--badge-c1:' + c1 + ';--badge-c2:' + c2 + ';--badge-glow:' + (opts.glowColor || c2) + ';';
+  return '<span class="' + cls + '" style="' + style + '">' + (BADGE_ICONS[iconName] || '') + '</span>';
+}
+/** Grey/locked variant of the same badge shell, used where a collectible
+ * hasn't been earned yet (replaces the old "❔" placeholder). */
+function lockedBadgeHtml() {
+  return '<span class="gem-badge badge-locked" style="--badge-c1:#565b6c;--badge-c2:#23252f;">' + ICONS.lock + '</span>';
 }
 
 /* ---- streak milestone treasure chests ---- */
@@ -309,7 +354,7 @@ function speak(text) {
 function toggleVoiceCues() {
   const next = !isVoiceCuesEnabled();
   setVoiceCuesEnabled(next);
-  showToast(next ? 'เปิดเสียงพูดบอกท่าแล้ว 🔊' : 'ปิดเสียงพูดบอกท่าแล้ว 🔇');
+  showToast(next ? 'เปิดเสียงพูดบอกท่าแล้ว' : 'ปิดเสียงพูดบอกท่าแล้ว', next ? 'speakerOn' : 'speakerOff');
   const btn = document.getElementById('playerVoiceBtn');
   if (btn) btn.classList.toggle('sel', next);
 }
@@ -492,8 +537,8 @@ function renderBossCard() {
       saveBossEverDefeated(everDefeated);
     }
     showToast(firstTimeEver
-      ? ('ปราบ ' + state.boss.name + ' สำเร็จ! ปลดล็อคสกิน Mascot ใหม่ 🎨')
-      : ('ปราบ ' + state.boss.name + ' สำเร็จ!'));
+      ? ('ปราบ ' + state.boss.name + ' สำเร็จ! ปลดล็อคสกิน Mascot ใหม่')
+      : ('ปราบ ' + state.boss.name + ' สำเร็จ!'), firstTimeEver ? 'palette' : undefined);
   }
   renderBossDmgBreakdown();
 }
@@ -543,9 +588,11 @@ function dayKey(ts) {
   const d = new Date(ts);
   return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
 }
-function showToast(msg) {
+/** icon is an optional ICONS key — renders a small line icon before the
+ * message (replaces the old inline emoji in a few notable toasts). */
+function showToast(msg, icon) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
+  t.innerHTML = (icon ? '<span class="icon-inline toast-icon">' + (ICONS[icon] || '') + '</span>' : '') + '<span>' + msg + '</span>';
   t.classList.add('show');
   clearTimeout(showToast._h);
   showToast._h = setTimeout(() => t.classList.remove('show'), 1600);
@@ -615,13 +662,15 @@ function loadOpenedChests() {
 function saveOpenedChests(list) {
   localStorage.setItem(KEY_STREAK_CHESTS_OPENED, JSON.stringify(list));
 }
+/* Tiered gem-badge colors for the streak medals: bronze/silver/gold/legend,
+ * plus a gold trophy fallback. icon/c1/c2 feed badgeHtml() directly. */
 function streakBadgeInfo(milestone) {
   switch (milestone) {
-    case 7: return { emoji: '🥉', title: 'นักสู้ 7 วัน', desc: 'สร้าง Streak ครบ 7 วันติดต่อกัน' };
-    case 14: return { emoji: '🥈', title: 'นักสู้ 14 วัน', desc: 'สร้าง Streak ครบ 14 วันติดต่อกัน' };
-    case 30: return { emoji: '🥇', title: 'นักรบ 30 วัน', desc: 'สร้าง Streak ครบ 30 วันติดต่อกัน' };
-    case 100: return { emoji: '💎', title: 'ตำนาน 100 วัน', desc: 'สร้าง Streak ครบ 100 วันติดต่อกัน' };
-    default: return { emoji: '🏆', title: 'Milestone', desc: '' };
+    case 7: return { icon: 'star', c1: '#e8bd8e', c2: '#a5622a', title: 'นักสู้ 7 วัน', desc: 'สร้าง Streak ครบ 7 วันติดต่อกัน' };
+    case 14: return { icon: 'star', c1: '#eef2f5', c2: '#95a0ac', title: 'นักสู้ 14 วัน', desc: 'สร้าง Streak ครบ 14 วันติดต่อกัน' };
+    case 30: return { icon: 'star', c1: '#ffe9a8', c2: '#d69a1f', title: 'นักรบ 30 วัน', desc: 'สร้าง Streak ครบ 30 วันติดต่อกัน' };
+    case 100: return { icon: 'gem', c1: '#e9c8ff', c2: '#8b3fe0', glow: '#b975ff', title: 'ตำนาน 100 วัน', desc: 'สร้าง Streak ครบ 100 วันติดต่อกัน' };
+    default: return { icon: 'trophy', c1: '#ffe9a8', c2: '#d69a1f', title: 'Milestone', desc: '' };
   }
 }
 /** Lowest achieved-but-unopened streak milestone, or null if none pending. */
@@ -644,7 +693,7 @@ function openTreasureChestModal() {
   const info = streakBadgeInfo(milestone);
   const linkedSkin = MASCOT_SKINS.find(s => s.unlock.type === 'streak' && s.unlock.value === milestone);
   document.getElementById('chestMilestoneLabel').textContent = 'STREAK ' + milestone + ' วัน';
-  document.getElementById('chestBadgeEmoji').textContent = info.emoji;
+  document.getElementById('chestBadgeEmoji').innerHTML = badgeHtml(info.icon, info.c1, info.c2, { glow: true, ring: true, glowColor: info.glow });
   document.getElementById('chestBadgeTitle').textContent = info.title;
   document.getElementById('chestBadgeDesc').textContent = info.desc +
     (linkedSkin ? ' — ปลดล็อคสกิน Mascot "' + linkedSkin.name + '" ด้วย!' : '');
@@ -826,7 +875,7 @@ function claimDailyQuest(id) {
   renderDailyQuests();
   renderXpBar();
   vibrate([40, 30, 60]);
-  showToast('รับเควสสำเร็จ +' + q.xp + ' XP 🎯');
+  showToast('รับเควสสำเร็จ +' + q.xp + ' XP', 'target');
 }
 
 function renderMascotCard() {
@@ -1016,45 +1065,45 @@ const MASCOT_SKINS = [
   { id: 'default', name: 'Classic', filter: 'none', unlock: { type: 'always' } },
 
   { id: 'streak7', name: 'นักสู้ 7 วัน', filter: 'sepia(.35) saturate(1.7) hue-rotate(-8deg)',
-    aura: 'rgba(224,150,61,.55)', accessory: '🧣',
+    aura: 'rgba(224,150,61,.55)', accIcon: 'scarf', accC1: '#f6cf94', accC2: '#c07a2a',
     unlock: { type: 'streak', value: 7 }, cond: 'เปิดหีบ Streak 7 วัน' },
   { id: 'streak14', name: 'นักสู้ 14 วัน', filter: 'grayscale(.25) saturate(1.4) hue-rotate(180deg) brightness(1.08)',
-    aura: 'rgba(80,190,200,.55)', accessory: '🧤',
+    aura: 'rgba(80,190,200,.55)', accIcon: 'mitten', accC1: '#a9eaf0', accC2: '#2a97a3',
     unlock: { type: 'streak', value: 14 }, cond: 'เปิดหีบ Streak 14 วัน' },
   { id: 'streak30', name: 'นักรบ 30 วัน', filter: 'sepia(.55) saturate(2.1) hue-rotate(15deg)',
-    aura: 'rgba(255,140,60,.6)', accessory: '🛡️',
+    aura: 'rgba(255,140,60,.6)', accIcon: 'shield', accC1: '#ffd7ad', accC2: '#e0641a',
     unlock: { type: 'streak', value: 30 }, cond: 'เปิดหีบ Streak 30 วัน' },
   { id: 'streak100', name: 'ตำนาน 100 วัน', filter: 'saturate(2.4) hue-rotate(270deg) brightness(1.15)',
-    aura: 'rgba(190,90,255,.65)', accessory: '👑', strong: true,
+    aura: 'rgba(190,90,255,.65)', accIcon: 'crown', accC1: '#fff0b0', accC2: '#d9a71b', strong: true,
     unlock: { type: 'streak', value: 100 }, cond: 'เปิดหีบ Streak 100 วัน' },
 
   { id: 'lv5', name: 'นักเรียนวินัย LV.5', filter: 'hue-rotate(90deg) saturate(1.5)',
-    aura: 'rgba(110,200,90,.5)', accessory: '🥊',
+    aura: 'rgba(110,200,90,.5)', accIcon: 'boxGlove', accC1: '#c8f0b8', accC2: '#4a9a34',
     unlock: { type: 'level', value: 5 }, cond: 'ถึง LV.5' },
   { id: 'lv10', name: 'มือฝึกฝน LV.10', filter: 'hue-rotate(140deg) saturate(1.6) brightness(1.05)',
-    aura: 'rgba(60,210,170,.55)', accessory: '🥋',
+    aura: 'rgba(60,210,170,.55)', accIcon: 'gi', accC1: '#b8f5e0', accC2: '#1f9a7a',
     unlock: { type: 'level', value: 10 }, cond: 'ถึง LV.10' },
   { id: 'lv15', name: 'ยอดฝีมือ LV.15', filter: 'hue-rotate(200deg) saturate(1.8)',
-    aura: 'rgba(70,140,255,.6)', accessory: '⚔️',
+    aura: 'rgba(70,140,255,.6)', accIcon: 'swordsCross', accC1: '#b9d3ff', accC2: '#2f5fdb',
     unlock: { type: 'level', value: 15 }, cond: 'ถึง LV.15' },
   { id: 'lv20', name: 'จอมพลังกาย LV.20', filter: 'hue-rotate(320deg) saturate(2) contrast(1.1)',
-    aura: 'rgba(255,60,150,.65)', accessory: '🔥', strong: true,
+    aura: 'rgba(255,60,150,.65)', accIcon: 'flame', accC1: '#ffc2dd', accC2: '#e0186f', strong: true,
     unlock: { type: 'level', value: 20 }, cond: 'ถึง LV.20' },
 
   { id: 'bossGrinder1', name: 'ผู้พิชิต GRINDER-1', filter: 'hue-rotate(0deg) saturate(1.8) contrast(1.15)',
-    aura: 'rgba(232,80,40,.6)', accessory: '⚙️', strong: true,
+    aura: 'rgba(232,80,40,.6)', accIcon: 'gearCog', accC1: '#ffb89a', accC2: '#c23f14', strong: true,
     unlock: { type: 'boss', bossId: 'grinder1' }, cond: 'ปราบ GRINDER-1 สำเร็จ' },
   { id: 'bossIronmaw', name: 'ผู้พิชิต IRON MAW', filter: 'hue-rotate(45deg) saturate(1.6)',
-    aura: 'rgba(200,160,80,.6)', accessory: '🦷', strong: true,
+    aura: 'rgba(200,160,80,.6)', accIcon: 'fang', accC1: '#f0dba0', accC2: '#a67a1f', strong: true,
     unlock: { type: 'boss', bossId: 'ironmaw' }, cond: 'ปราบ IRON MAW สำเร็จ' },
   { id: 'bossVoid9', name: 'ผู้พิชิต VOID-9', filter: 'hue-rotate(250deg) saturate(2) brightness(.92)',
-    aura: 'rgba(130,60,220,.65)', accessory: '🌀', strong: true,
+    aura: 'rgba(130,60,220,.65)', accIcon: 'vortex', accC1: '#d9b8ff', accC2: '#6a1fc7', strong: true,
     unlock: { type: 'boss', bossId: 'void9' }, cond: 'ปราบ VOID-9 สำเร็จ' },
   { id: 'bossWingreaper', name: 'ผู้พิชิต WING REAPER', filter: 'hue-rotate(190deg) saturate(1.7)',
-    aura: 'rgba(70,200,190,.6)', accessory: '🪽', strong: true,
+    aura: 'rgba(70,200,190,.6)', accIcon: 'wing', accC1: '#a8f0e8', accC2: '#1a8a7d', strong: true,
     unlock: { type: 'boss', bossId: 'wingreaper' }, cond: 'ปราบ WING REAPER สำเร็จ' },
   { id: 'bossCorezero', name: 'ผู้พิชิต CORE-ZERO', filter: 'hue-rotate(300deg) saturate(2.2) contrast(1.2) brightness(1.1)',
-    aura: 'rgba(255,80,200,.7)', accessory: '💠', strong: true,
+    aura: 'rgba(255,80,200,.7)', accIcon: 'core', accC1: '#ffc2ee', accC2: '#c71494', strong: true,
     unlock: { type: 'boss', bossId: 'corezero' }, cond: 'ปราบ CORE-ZERO สำเร็จ' }
 ];
 function isSkinUnlocked(skin) {
@@ -1091,8 +1140,8 @@ function applyActiveMascotSkinFilter() {
     avatar.style.setProperty('--skin-aura', hasAura ? skin.aura : 'transparent');
   }
   if (accessory) {
-    if (unlocked && skin.accessory) {
-      accessory.textContent = skin.accessory;
+    if (unlocked && skin.accIcon) {
+      accessory.innerHTML = badgeHtml(skin.accIcon, skin.accC1, skin.accC2, { glow: !!skin.strong, ring: true });
       accessory.classList.add('show');
     } else {
       accessory.classList.remove('show');
@@ -1112,11 +1161,11 @@ function renderSkinGrid() {
     const isActive = skin.id === activeId;
     const cls = 'skin-item' + (isActive ? ' active' : '') + (unlocked ? '' : ' locked');
     const clickAttr = unlocked ? ' onclick="selectMascotSkin(\'' + skin.id + '\')"' : '';
-    const badgeHtml = isActive ? '<div class="active-check">' + iconHtml('check') + '</div>' : (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>');
+    const cornerHtml = isActive ? '<div class="active-check">' + iconHtml('check') + '</div>' : (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>');
     const thumbFilter = unlocked ? skin.filter : 'grayscale(1) brightness(.4)';
     const thumbShadow = unlocked && skin.aura ? 'box-shadow:0 0 ' + (skin.strong ? '14px 3px' : '9px 2px') + ' ' + skin.aura + ';border-radius:50%;' : '';
-    const accessoryHtml = unlocked && skin.accessory ? '<div class="skin-thumb-accessory">' + skin.accessory + '</div>' : '';
-    return '<div class="' + cls + '"' + clickAttr + '>' + badgeHtml +
+    const accessoryHtml = unlocked && skin.accIcon ? '<div class="skin-thumb-accessory">' + badgeHtml(skin.accIcon, skin.accC1, skin.accC2, { glow: !!skin.strong }) + '</div>' : '';
+    return '<div class="' + cls + '"' + clickAttr + '>' + cornerHtml +
       '<div class="skin-thumb-wrap" style="' + thumbShadow + '"><img src="mascot-happy.svg" style="filter:' + thumbFilter + ';" alt="" />' + accessoryHtml + '</div>' +
       '<div class="skin-name">' + skin.name + '</div>' +
       (unlocked ? '' : '<div class="skin-cond">' + skin.cond + '</div>') +
@@ -1150,7 +1199,7 @@ function renderCollectionBadges() {
     const cls = 'skin-item' + (unlocked ? '' : ' locked');
     return '<div class="' + cls + '">'
       + (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>')
-      + '<div class="collection-emoji">' + (unlocked ? info.emoji : '❔') + '</div>'
+      + '<div class="collection-emoji">' + (unlocked ? badgeHtml(info.icon, info.c1, info.c2, { glow: true, ring: true, glowColor: info.glow }) : lockedBadgeHtml()) + '</div>'
       + '<div class="skin-name">' + info.title + '</div>'
       + (unlocked ? '' : '<div class="skin-cond">Streak ' + m + ' วัน</div>')
       + '</div>';
@@ -1166,7 +1215,7 @@ function renderCollectionSkins() {
     const cls = 'skin-item' + (isActive ? ' active' : '') + (unlocked ? '' : ' locked');
     const thumbFilter = unlocked ? skin.filter : 'grayscale(1) brightness(.4)';
     const thumbShadow = unlocked && skin.aura ? 'box-shadow:0 0 ' + (skin.strong ? '14px 3px' : '9px 2px') + ' ' + skin.aura + ';border-radius:50%;' : '';
-    const accessoryHtml = unlocked && skin.accessory ? '<div class="skin-thumb-accessory">' + skin.accessory + '</div>' : '';
+    const accessoryHtml = unlocked && skin.accIcon ? '<div class="skin-thumb-accessory">' + badgeHtml(skin.accIcon, skin.accC1, skin.accC2, { glow: !!skin.strong }) + '</div>' : '';
     return '<div class="' + cls + '">'
       + (isActive ? '<div class="active-check">' + iconHtml('check') + '</div>' : (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>'))
       + '<div class="skin-thumb-wrap" style="' + thumbShadow + '"><img src="mascot-happy.svg" style="filter:' + thumbFilter + ';" alt="" />' + accessoryHtml + '</div>'
@@ -2166,7 +2215,7 @@ function checkReminder() {
 
   cfg.lastShownDay = todayKey;
   saveReminderConfig(cfg);
-  showToast('ยังไม่ได้เล่น CINDY วันนี้เลยนะ 🕸️');
+  showToast('ยังไม่ได้เล่น CINDY วันนี้เลยนะ', 'web');
   if ('Notification' in window && Notification.permission === 'granted') {
     try {
       if (navigator.serviceWorker && navigator.serviceWorker.ready) {
@@ -2726,7 +2775,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
   updateInstallButton();
-  showToast('ติดตั้ง CINDY สำเร็จ 💪');
+  showToast('ติดตั้ง CINDY สำเร็จ', 'muscle');
 });
 async function handleInstallClick() {
   if (deferredInstallPrompt) {
@@ -3682,7 +3731,7 @@ function finishCustomCompleteFlow() {
     sessions[idx].note = document.getElementById('customNoteInput').value.trim();
     saveCustomWorkoutSessions(sessions);
   }
-  showToast('บันทึก WORKOUT แล้ว 💪');
+  showToast('บันทึก WORKOUT แล้ว', 'muscle');
   go('customlist');
 }
 
