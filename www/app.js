@@ -4,6 +4,48 @@ const KEY_SESSIONS = 'cindy_sessions';
 const KEY_ACTIVE = 'cindy_active_workout';
 const KEY_LAST_SEEN_LEVEL = 'cindy_last_seen_level';
 
+/* ================= SCHEMA / MIGRATIONS =================
+ * Single version stamp in localStorage + a chokepoint that runs once per
+ * app load. Future fields get backfilled onto old data here instead of at
+ * every save/load call site — keeps the fragility in one place instead of
+ * scattered across the many localStorage touches in this file.
+ * Each migration must be idempotent (safe to re-run) since a stamp write
+ * failing mid-way must not corrupt anything on retry. */
+const KEY_SCHEMA_VERSION = 'cindy_schema_version';
+const CURRENT_SCHEMA_VERSION = 1;
+
+const MIGRATIONS = [
+  {
+    version: 1,
+    run: () => {
+      // Baseline stamp for everyone who already has data from before
+      // versioning existed. No data changes yet — this just establishes
+      // the starting point. Future migrations (v2, v3, ...) go here as
+      // new entries, e.g. backfilling a new field on old sessions:
+      //
+      // const sessions = loadSessions();
+      // let changed = false;
+      // sessions.forEach(s => { if (s.newField === undefined) { s.newField = defaultVal; changed = true; } });
+      // if (changed) saveSessions(sessions);
+    }
+  },
+];
+
+function runMigrationsIfNeeded() {
+  let stored = parseInt(localStorage.getItem(KEY_SCHEMA_VERSION), 10);
+  if (!Number.isFinite(stored)) stored = 0;
+  if (stored >= CURRENT_SCHEMA_VERSION) return;
+
+  MIGRATIONS
+    .filter(m => m.version > stored)
+    .sort((a, b) => a.version - b.version)
+    .forEach(m => {
+      try { m.run(); }
+      catch (e) { console.error('Migration ' + m.version + ' failed:', e); }
+      localStorage.setItem(KEY_SCHEMA_VERSION, String(m.version));
+    });
+}
+
 /* ================= ICON SET =================
  * Small inline SVG icons (stroke-based, same visual language as the header
  * icon buttons already in the HTML) used in place of emoji for the small,
@@ -366,6 +408,7 @@ function loadSessions() {
 }
 function saveSessions(list) {
   localStorage.setItem(KEY_SESSIONS, JSON.stringify(list));
+  invalidateXPCache();
 }
 function loadActive() {
   try { return JSON.parse(localStorage.getItem(KEY_ACTIVE)); }
@@ -878,6 +921,69 @@ function claimDailyQuest(id) {
   showToast('รับเควสสำเร็จ +' + q.xp + ' XP', 'target');
 }
 
+/* ================= MASCOT DIALOGUE =================
+ * Pools of lines per mascot "mood" state, all derived from data that's
+ * already tracked (streak, played-today, isPR) — nothing new stored. One
+ * line per pool is picked per day, seeded by date the same way
+ * todaysQuestIds() seeds its pick, so the line is stable across re-renders
+ * within a day but varies day to day instead of repeating the same 3
+ * fixed strings forever. */
+const MASCOT_LINES = {
+  noHistory: [
+    { h: 'ยังไม่มีประวัติการเล่น', s: 'เริ่มวันนี้เลย แล้วมาสร้าง streak กัน' },
+    { h: 'พร้อมเริ่มหรือยัง?', s: 'ทำเซสชันแรกแล้วเราจะไปด้วยกัน' },
+    { h: 'หน้ากระดาษยังว่างอยู่', s: 'เริ่มบทแรกของเรื่องราวคุณตอนนี้เลย' },
+    { h: 'รอวันแรกของคุณอยู่', s: 'ไม่ต้องสมบูรณ์แบบ แค่เริ่มก่อน' },
+  ],
+  playedTodayLowStreak: [ // streak 1-6
+    { h: 'เก่งมาก ทำแล้ว {streak} วันติด', s: 'เล่นแล้ววันนี้ — พักผ่อนหรือจะเก็บอีกโหมดก็ได้' },
+    { h: 'อีกนิดเดียวถึง 7 วัน', s: 'ทำแล้ว {streak} วัน ใกล้ปลดหีบแรกแล้ว' },
+    { h: 'เริ่มติดจังหวะแล้วนะ', s: '{streak} วันติด นี่คือจุดเริ่มของนิสัยดี ๆ' },
+    { h: 'วันนี้ก็ผ่านไปได้สวย', s: 'สะสมไปเรื่อย ๆ {streak} วันแล้ว' },
+  ],
+  playedTodayMidStreak: [ // streak 7-29
+    { h: '{streak} วันติดแล้ว แข็งแกร่งขึ้นทุกวัน', s: 'วันนี้จบไปแล้ว เก็บแรงไว้พรุ่งนี้' },
+    { h: 'สม่ำเสมอสุด ๆ', s: '{streak} วันติดต่อกัน — นี่แหละวินัยของนักสู้ตัวจริง' },
+    { h: 'ผ่านมาไกลแล้วนะ', s: '{streak} วัน ย้อนกลับไปดูวันแรกสิ ต่างกันแค่ไหน' },
+    { h: 'คนอื่นเห็นก็ต้องทึ่ง', s: 'ทำติดกัน {streak} วัน ไม่ใช่เรื่องบังเอิญแล้ว' },
+  ],
+  playedTodayHighStreak: [ // streak 30+
+    { h: 'ตำนานกำลังก่อร่าง — {streak} วัน', s: 'น้อยคนจะมาไกลขนาดนี้ เก่งมาก' },
+    { h: '{streak} วันติด ไม่มีใครหยุดคุณได้', s: 'พักผ่อนซะ พรุ่งนี้ลุยต่อ' },
+    { h: 'นี่คือระดับตำนานแล้ว', s: '{streak} วัน — ทำต่อไปเรื่อย ๆ นะ' },
+  ],
+  notPlayedYetLowStreak: [
+    { h: 'Streak {streak} วัน — อย่าให้ขาดวันนี้', s: 'ยังไม่ได้เล่นวันนี้ ไปต่อกันเลย' },
+    { h: 'รอคุณอยู่นะ', s: '{streak} วันแล้ว อย่าเพิ่งหยุดตอนนี้' },
+    { h: 'แค่เซสชันเดียวก็พอ', s: 'ไม่ต้องหนัก แค่ไปต่อให้ streak {streak} วันไม่ขาด' },
+  ],
+  notPlayedYetHighStreak: [ // streak >= 7
+    { h: 'streak {streak} วันกำลังจะหลุด!', s: 'เล่นวันนี้ก่อนหมดเวลา อย่าให้เสียของ' },
+    { h: 'ใกล้จะเสีย {streak} วันที่สะสมมา', s: 'แค่เซสชันเดียวก็รักษาไว้ได้แล้ว' },
+    { h: 'อย่าให้ {streak} วันสูญเปล่า', s: 'มาไกลขนาดนี้แล้ว อย่าเพิ่งหยุด' },
+  ],
+  newPRToday: [ // played today + hit isPR today
+    { h: 'ทำลายสถิติตัวเองวันนี้!', s: 'PR ใหม่ — เก่งขึ้นกว่าเมื่อวานจริง ๆ' },
+    { h: 'สุดยอดไปเลย', s: 'นี่คือ PR ใหม่ของคุณ จำวันนี้ไว้' },
+  ],
+};
+function pickDailyLine(pool) {
+  const d = new Date();
+  const seed = d.getFullYear() * 372 + d.getMonth() * 31 + d.getDate();
+  return pool[seed % pool.length];
+}
+function fillTemplate(str, vars) {
+  return str.replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : ''));
+}
+/** Whether either session type logged a PR today, used to give the mascot
+ * a one-off celebratory line instead of the usual streak-status line. */
+function todayHasPR() {
+  const todayKey = dayKey(Date.now());
+  const cindyPR = loadSessions().some(s => s.isPR && dayKey(s.finished) === todayKey);
+  const customPR = loadCustomWorkoutSessions().some(s => s.isPR && dayKey(s.completedAt) === todayKey);
+  return cindyPR || customPR;
+}
+
 function renderMascotCard() {
   const headline = document.getElementById('mascotHeadline');
   const sub = document.getElementById('mascotSub');
@@ -885,19 +991,22 @@ function renderMascotCard() {
   if (!headline || !sub) return;
   const streak = computeCombinedStreak();
   const playedToday = didPlayToday();
-  if (streak === 0) {
-    headline.textContent = 'ยังไม่มีประวัติการเล่น';
-    sub.textContent = 'เริ่มวันนี้เลย แล้วมาสร้าง streak กัน';
-    if (img) img.src = 'mascot.png';
-  } else if (playedToday) {
-    headline.textContent = 'เก่งมาก ทำแล้ว ' + streak + ' วันติด';
-    sub.textContent = 'เล่นแล้ววันนี้ — พักผ่อนหรือจะเก็บอีกโหมดก็ได้';
-    if (img) img.src = 'mascot.png';
+
+  let pool;
+  if (streak === 0) pool = MASCOT_LINES.noHistory;
+  else if (playedToday && todayHasPR()) pool = MASCOT_LINES.newPRToday;
+  else if (playedToday) {
+    pool = streak >= 30 ? MASCOT_LINES.playedTodayHighStreak
+         : streak >= 7  ? MASCOT_LINES.playedTodayMidStreak
+         : MASCOT_LINES.playedTodayLowStreak;
   } else {
-    headline.textContent = 'Streak ' + streak + ' วัน — อย่าให้ขาดวันนี้';
-    sub.textContent = 'ยังไม่ได้เล่นวันนี้ ไปต่อกันเลย';
-    if (img) img.src = 'mascot.png';
+    pool = streak >= 7 ? MASCOT_LINES.notPlayedYetHighStreak : MASCOT_LINES.notPlayedYetLowStreak;
   }
+  const line = pickDailyLine(pool);
+  headline.textContent = fillTemplate(line.h, { streak });
+  sub.textContent = fillTemplate(line.s, { streak });
+  if (img) img.src = 'mascot.png';
+
   renderXpBar();
   applyActiveMascotSkinFilter();
 }
@@ -908,9 +1017,26 @@ function renderMascotCard() {
  * levels. Level is fully derived from session history — nothing new is
  * stored except "last seen level", used only to detect a level-up moment
  * so we don't replay the glow/toast on every render. */
-function computeTotalXP() {
+/* ---- XP cache ----
+ * computeTotalXP() used to re-reduce the entire session history on every
+ * call — and one render pass (renderMascotCard → renderXpBar → renderRankTag)
+ * can call it several times, plus it grows unbounded with session count.
+ * Memoized here (in-memory only, never persisted — the session arrays stay
+ * the single source of truth) and invalidated only when sessions actually
+ * change, via saveSessions()/saveCustomWorkoutSessions() above calling
+ * invalidateXPCache() themselves. Every one of their call sites (create,
+ * edit, delete, import-merge) benefits without being touched individually. */
+let _xpCache = null; // { cindyXP, customXP } | null when stale
+function invalidateXPCache() { _xpCache = null; }
+function computeSessionXP() {
+  if (_xpCache) return _xpCache;
   const cindyXP = loadSessions().reduce((sum, s) => sum + (s.total ? s.total.reps : 0), 0);
   const customXP = loadCustomWorkoutSessions().reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
+  _xpCache = { cindyXP, customXP };
+  return _xpCache;
+}
+function computeTotalXP() {
+  const { cindyXP, customXP } = computeSessionXP();
   return cindyXP + customXP + loadQuestBonusXP() + loadComboBonusXP();
 }
 function xpRequiredForLevel(level) {
@@ -2949,6 +3075,7 @@ async function handleInstallClick() {
 
 /* ================= INIT ================= */
 function init() {
+  runMigrationsIfNeeded();
   applyStoredTheme();
   applyProtocolToUI();
   const active = loadActive();
@@ -3176,6 +3303,7 @@ function loadCustomWorkoutSessions() {
 
 function saveCustomWorkoutSessions(list) {
   localStorage.setItem(KEY_CUSTOM_SESSIONS, JSON.stringify(list));
+  invalidateXPCache();
 }
 
 /**
