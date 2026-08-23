@@ -612,7 +612,15 @@ body{
 }
 .program-card-link .title{font-size:15px;font-weight:700;}
 .program-card-link .sub{font-size:12px;color:var(--text-dim);margin-top:2px;}
+.program-card-link .sub2{font-size:11px;font-weight:600;margin-top:3px;}
 .program-card-link .arrow{margin-left:auto;color:var(--text-faint);flex-shrink:0;}
+.program-card-link.mode-cindy .program-card-icon{color:var(--pull);background:rgba(61,111,224,.14);}
+.program-card-link.mode-cindy .sub2{color:var(--pull);}
+.program-card-link.mode-custom .program-card-icon{color:var(--success);background:rgba(62,213,152,.14);}
+.program-card-link.mode-custom .sub2{color:var(--success);}
+.program-card-link.mode-cardio .program-card-icon{color:var(--danger);background:rgba(232,35,42,.14);}
+.program-card-link.mode-cardio .sub2{color:var(--danger);}
+.program-today-badge{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--warning);border:1px solid var(--warning);border-radius:5px;padding:1px 5px;vertical-align:1px;margin-left:4px;}
 
 /* ---- bottom tabbar ---- */
 .tabbar{
@@ -1003,50 +1011,50 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="topbar">
       <div class="brand">PROGRAM</div>
       <div style="display:flex;gap:8px;">
-        <button class="iconbtn" onclick="openSettingsModal()" aria-label="Protocol library">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        <button class="iconbtn" onclick="go('customschedule')" aria-label="Weekly schedule">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
         </button>
       </div>
     </div>
     <div class="home-content">
-      <div class="section-label" style="margin-top:6px;">เลือกโหมด</div>
+      <div class="section-label" style="margin-top:14px;">เลือกโหมด</div>
 
-      <div class="program-card-link" onclick="go('cindy')">
+      <div class="program-card-link mode-cindy" onclick="go('cindy')">
         <div class="program-card-icon">
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
         </div>
         <div>
-          <div class="title">Cindy (Classic)<span id="programCindyStartBadge" class="proto-active-tag" style="display:none;">เริ่มตรงนี้</span></div>
+          <div class="title">Cindy (Classic)<span id="programCindyStartBadge" class="proto-active-tag" style="display:none;">เริ่มตรงนี้</span><span id="programCindyTodayBadge" class="program-today-badge" style="display:none;">วันนี้ตามแผน</span></div>
           <div class="sub">AMRAP 20 นาที Pull-up · Push-up · Squat</div>
-          <div class="sub2" id="programCindyStat" style="font-size:11px;color:var(--text-faint);margin-top:3px;"></div>
+          <div class="sub2" id="programCindyStat"></div>
         </div>
         <div class="arrow">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
         </div>
       </div>
 
-      <div class="program-card-link" onclick="go('customlist')">
+      <div class="program-card-link mode-custom" onclick="go('customlist')">
         <div class="program-card-icon">
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11M4 4l3 3M20 20l-3-3M2.5 9.5l3-3 3 3-3 3zM15.5 22.5l3-3 3 3-3 3zM18.5 2.5l3 3-3 3-3-3zM5.5 15.5l3 3-3 3-3-3z"/></svg>
         </div>
         <div>
-          <div class="title">Custom Workouts</div>
+          <div class="title">Custom Workouts<span id="programCustomTodayBadge" class="program-today-badge" style="display:none;">วันนี้ตามแผน</span></div>
           <div class="sub">สร้างสูตรของคุณเอง ตั้งตารางประจำสัปดาห์</div>
-          <div class="sub2" id="programCustomStat" style="font-size:11px;color:var(--text-faint);margin-top:3px;"></div>
+          <div class="sub2" id="programCustomStat"></div>
         </div>
         <div class="arrow">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
         </div>
       </div>
 
-      <div class="program-card-link" onclick="go('cardiolist')">
+      <div class="program-card-link mode-cardio" onclick="go('cardiolist')">
         <div class="program-card-icon">
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-2.5 4.2-2.5 7.3 0 1.2.8 2 1.8 2.1-.6-1.4.2-2.6 1.1-3.3.2 1.4 1 2 1.9 2.9 1.1 1.1 1.7 2.3 1.7 3.8 0 3.4-2.9 6.2-6.5 6.2S2 17.9 2 14.5c0-3.6 2.6-5.6 4.6-8 1.6-1.9 2.8-2.9 5.4-4.5z" fill="currentColor" stroke="none"/></svg>
         </div>
         <div>
-          <div class="title">Cardio</div>
+          <div class="title">Cardio<span id="programCardioTodayBadge" class="program-today-badge" style="display:none;">วันนี้ตามแผน</span></div>
           <div class="sub">HIIT, Circuit, Tabata พร้อมเล่นทันที</div>
-          <div class="sub2" id="programCardioStat" style="font-size:11px;color:var(--text-faint);margin-top:3px;"></div>
+          <div class="sub2" id="programCardioStat"></div>
         </div>
         <div class="arrow">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
@@ -1415,9 +1423,6 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       </button>
       <div class="brand" style="font-size:16px;">CUSTOM WORKOUTS</div>
       <div style="display:flex;gap:6px;">
-        <button class="iconbtn" onclick="go('customschedule')" aria-label="Weekly schedule">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-        </button>
         <button class="iconbtn" onclick="go('customhistory')" aria-label="History">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>
         </button>
@@ -1429,10 +1434,10 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     </div>
   </section>
 
-  <!-- CUSTOM WORKOUT WEEKLY SCHEDULE -->
+  <!-- WEEKLY SCHEDULE (Cindy / Custom Workout / Cardio) -->
   <section id="screen-customschedule" class="screen">
     <div class="topbar">
-      <button class="iconbtn" onclick="go('customlist')" aria-label="Back">
+      <button class="iconbtn" onclick="go('program')" aria-label="Back">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <div class="brand" style="font-size:16px;">แผนประจำสัปดาห์</div>

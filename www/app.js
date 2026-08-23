@@ -1599,6 +1599,19 @@ function renderProgramHubCards() {
     const brandNew = cindySessions.length === 0 && allCustomSessions.length === 0;
     startBadge.style.display = brandNew ? 'inline-block' : 'none';
   }
+
+  const cindyTodayBadge = document.getElementById('programCindyTodayBadge');
+  const customTodayBadge = document.getElementById('programCustomTodayBadge');
+  const cardioTodayBadge = document.getElementById('programCardioTodayBadge');
+  [cindyTodayBadge, customTodayBadge, cardioTodayBadge].forEach(b => { if (b) b.style.display = 'none'; });
+  const todayEntry = loadWeeklyPlan()[new Date().getDay()];
+  if (todayEntry) {
+    const badge = todayEntry.type === 'cindy' ? cindyTodayBadge
+      : todayEntry.type === 'cardio' ? cardioTodayBadge
+      : todayEntry.type === 'custom' ? customTodayBadge
+      : null;
+    if (badge) badge.style.display = 'inline-block';
+  }
 }
 
 function computeStreak(sessions) {
