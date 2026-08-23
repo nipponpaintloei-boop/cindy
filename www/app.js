@@ -2588,57 +2588,107 @@ async function shareCustomResult(id) {
    XP counters take the max of the two rather than adding, since adding
    would double-count XP that's also embedded in the session history. */
 function exportData() {
-  const sessions = loadSessions();
-  const customWorkouts = loadCustomWorkouts();
-  const customWorkoutSessions = loadCustomWorkoutSessions();
-  const customProtocols = loadCustomProtocols();
-  const streakChestsOpened = loadOpenedChests();
-  const bossEverDefeated = loadBossEverDefeated();
+  try {
+    const sessions = loadSessions();
+    const customWorkouts = loadCustomWorkouts();
+    const customWorkoutSessions = loadCustomWorkoutSessions();
+    const customProtocols = loadCustomProtocols();
+    const streakChestsOpened = loadOpenedChests();
+    const bossEverDefeated = loadBossEverDefeated();
 
-  if (!sessions.length && !customWorkouts.length && !customWorkoutSessions.length &&
-      !customProtocols.length && !streakChestsOpened.length && !bossEverDefeated.length) {
-    showToast('ยังไม่มีข้อมูลให้ส่งออก');
-    return;
-  }
-
-  const payload = {
-    app: 'CINDY',
-    version: 3,
-    exportedAt: Date.now(),
-    sessions,
-    customWorkouts,
-    customWorkoutSessions,
-    customProtocols,
-    progression: {
-      lastSeenLevel: loadLastSeenLevel(),
-      streakChestsOpened,
-      bossEverDefeated,
-      activeSkin: loadActiveSkin()
-    },
-    settings: {
-      theme: localStorage.getItem(KEY_THEME),
-      voiceCues: localStorage.getItem(KEY_VOICE_CUES),
-      activeProtocolId: loadActiveProtocolId(),
-      reminder: loadReminderConfig()
-    },
-    questsAndGoals: {
-      questClaimed: loadQuestClaimState(),
-      questBonusXP: loadQuestBonusXP(),
-      comboBonusXP: loadComboBonusXP(),
-      ringGoals: loadRingGoals(),
-      weeklyPlan: loadWeeklyPlan()
+    if (!sessions.length && !customWorkouts.length && !customWorkoutSessions.length &&
+        !customProtocols.length && !streakChestsOpened.length && !bossEverDefeated.length) {
+      showToast('ยังไม่มีข้อมูลให้ส่งออก');
+      return;
     }
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const d = new Date();
-  const fname = 'cindy_backup_' + d.getFullYear() +
-    String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '.json';
-  const a = document.createElement('a');
-  a.href = url; a.download = fname;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('ส่งออกข้อมูลแล้ว (Cindy + Custom Workout + สกิน/ความคืบหน้า)');
+
+    const payload = {
+      app: 'CINDY',
+      version: 3,
+      exportedAt: Date.now(),
+      sessions,
+      customWorkouts,
+      customWorkoutSessions,
+      customProtocols,
+      progression: {
+        lastSeenLevel: loadLastSeenLevel(),
+        streakChestsOpened,
+        bossEverDefeated,
+        activeSkin: loadActiveSkin()
+      },
+      settings: {
+        theme: localStorage.getItem(KEY_THEME),
+        voiceCues: localStorage.getItem(KEY_VOICE_CUES),
+        activeProtocolId: loadActiveProtocolId(),
+        reminder: loadReminderConfig()
+      },
+      questsAndGoals: {
+        questClaimed: loadQuestClaimState(),
+        questBonusXP: loadQuestBonusXP(),
+        comboBonusXP: loadComboBonusXP(),
+        ringGoals: loadRingGoals(),
+        weeklyPlan: loadWeeklyPlan()
+      }
+    };
+
+    const d = new Date();
+    const fname = 'cindy_backup_' + d.getFullYear() +
+      String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '.json';
+    const json = JSON.stringify(payload, null, 2);
+    deliverExportFile(json, fname);
+  } catch (e) {
+    showToast('ส่งออกไม่สำเร็จ: ' + (e && e.message ? e.message : 'เกิดข้อผิดพลาด'));
+  }
+}
+
+/* Some mobile browsers/in-app WebViews (notably Samsung Internet and
+ * anything rendering this page from a local file:// path rather than a
+ * real http(s) origin) silently ignore the classic <a download> + blob
+ * trick — the click fires, nothing throws, and the user just sees
+ * nothing happen with no error and no download-manager notification.
+ * Prefer the native share sheet where available (this is the reliable
+ * path on Android/Samsung: it hands the file to "Save to My Files",
+ * Drive, etc. and always shows *something* happening), fall back to
+ * the anchor+blob download for normal desktop/browser contexts, and as
+ * a last resort open the JSON in a new tab so the data is at least
+ * visible and can be saved manually rather than vanishing silently. */
+function deliverExportFile(json, fname) {
+  const blob = new Blob([json], { type: 'application/json' });
+
+  if (navigator.share && navigator.canShare && window.File) {
+    try {
+      const file = new File([blob], fname, { type: 'application/json' });
+      if (navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: fname })
+          .then(() => showToast('ส่งออกข้อมูลแล้ว (Cindy + Custom Workout + สกิน/ความคืบหน้า)'))
+          .catch(err => {
+            if (err && err.name === 'AbortError') return; // user cancelled the share sheet
+            fallbackDownload(blob, fname);
+          });
+        return;
+      }
+    } catch (e) { /* fall through to the download-link path below */ }
+  }
+  fallbackDownload(blob, fname);
+}
+
+function fallbackDownload(blob, fname) {
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fname; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    showToast('ส่งออกข้อมูลแล้ว เช็คโฟลเดอร์ Download หรือแอป Files ในเครื่อง');
+  } catch (e) {
+    try {
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      showToast('เปิดไฟล์ข้อมูลในแท็บใหม่ให้แล้ว กด \u2026 เพื่อบันทึกไฟล์');
+    } catch (e2) {
+      showToast('ส่งออกไม่สำเร็จ เบราว์เซอร์นี้ไม่รองรับการดาวน์โหลดไฟล์');
+    }
+  }
 }
 
 function importData(event) {
