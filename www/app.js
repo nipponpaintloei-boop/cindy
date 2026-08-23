@@ -386,15 +386,15 @@ function saveBossDefeatSeenWeek(key) {
 function bossSilhouetteMarkup(bossId) {
   switch (bossId) {
     case 'grinder1':
-      return '<svg viewBox="0 0 120 120"><defs><radialGradient id="bossG1" cx="50%" cy="40%" r="70%"><stop offset="0%" stop-color="#8a8f9e"/><stop offset="100%" stop-color="#4b4f5c"/></radialGradient></defs><g stroke="#FFB020" stroke-width="1.6" fill="none" opacity=".8"><circle cx="60" cy="66" r="36"/></g><circle cx="60" cy="66" r="32" fill="url(#bossG1)"/><g fill="#6b6f7c"><rect x="56" y="26" width="8" height="10" rx="2"/><rect x="30" y="46" width="10" height="8" rx="2" transform="rotate(-40 35 50)"/><rect x="80" y="46" width="10" height="8" rx="2" transform="rotate(40 85 50)"/></g><rect x="10" y="60" width="26" height="14" rx="6" fill="#5a5e6b"/><rect x="84" y="60" width="26" height="14" rx="6" fill="#5a5e6b"/><rect x="42" y="60" width="36" height="7" rx="3.5" fill="#FFB020"/></svg>';
+      return '<img src="boss-grinder1.png" alt="GRINDER-1" style="width:100%;height:100%;object-fit:contain;" />';
     case 'ironmaw':
-      return '<svg viewBox="0 0 120 120"><polygon points="60,18 100,50 86,102 34,102 20,50" fill="#111318" stroke="#E8232A" stroke-width="2"/><line x1="60" y1="18" x2="60" y2="102" stroke="#E8232A" stroke-width="2.4"/><polyline points="40,58 48,64 40,70 48,76 40,82" fill="none" stroke="#E8232A" stroke-width="2.2" stroke-linejoin="round"/><polyline points="80,58 72,64 80,70 72,76 80,82" fill="none" stroke="#E8232A" stroke-width="2.2" stroke-linejoin="round"/></svg>';
+      return '<img src="boss-ironmaw.png" alt="IRON MAW" style="width:100%;height:100%;object-fit:contain;" />';
     case 'void9':
-      return '<svg viewBox="0 0 120 120"><defs><radialGradient id="bossG3" cx="45%" cy="35%" r="75%"><stop offset="0%" stop-color="#5c7fe0"/><stop offset="100%" stop-color="#131a33"/></radialGradient></defs><g stroke="#3D6FE0" stroke-width="2.4" stroke-linecap="round" opacity=".85"><path d="M40 40 L18 22" fill="none"/><path d="M78 38 L100 18" fill="none"/><path d="M30 88 L10 104" fill="none"/><path d="M84 90 L104 108" fill="none"/></g><path d="M60 20 C82 22 96 42 92 62 C100 78 84 100 60 98 C38 100 22 82 26 62 C18 42 38 18 60 20 Z" fill="url(#bossG3)"/></svg>';
+      return '<img src="boss-void9.png" alt="VOID-9" style="width:100%;height:100%;object-fit:contain;" />';
     case 'wingreaper':
-      return '<svg viewBox="0 0 120 120"><polygon points="60,50 14,30 44,66" fill="#3a0d0f" stroke="#E8232A" stroke-width="1.6"/><polygon points="60,50 106,30 76,66" fill="#3a0d0f" stroke="#E8232A" stroke-width="1.6"/><polygon points="60,22 50,50 70,50" fill="#E8232A"/><polygon points="60,50 46,104 74,104" fill="#111318" stroke="#E8232A" stroke-width="1.6"/></svg>';
+      return '<img src="boss-wingreaper.png" alt="WING REAPER" style="width:100%;height:100%;object-fit:contain;" />';
     case 'corezero':
-      return '<svg viewBox="0 0 120 120"><defs><radialGradient id="bossG5" cx="50%" cy="50%" r="60%"><stop offset="0%" stop-color="#fff6da"/><stop offset="60%" stop-color="#FFB020"/><stop offset="100%" stop-color="#7a4c00"/></radialGradient></defs><g fill="none" stroke="#FFB020" stroke-width="1.2" opacity=".8"><ellipse cx="60" cy="60" rx="50" ry="18" transform="rotate(20 60 60)"/><ellipse cx="60" cy="60" rx="50" ry="18" transform="rotate(-20 60 60)"/></g><circle cx="60" cy="60" r="20" fill="url(#bossG5)"/><circle cx="106" cy="52" r="3" fill="#FFB020"/><circle cx="14" cy="68" r="3" fill="#FFB020"/></svg>';
+      return '<img src="boss-corezero.png" alt="CORE-ZERO" style="width:100%;height:100%;object-fit:contain;" />';
     default:
       return '';
   }
@@ -424,10 +424,13 @@ function renderBossCard() {
   const weekKey = bossWeekKey(state.weekIndex);
   const lastSeenDmgKey = KEY_BOSS_DEFEAT_SEEN + '_dmg_' + weekKey;
   const lastSeenDmg = parseFloat(localStorage.getItem(lastSeenDmgKey) || '0');
+  const artEl = stage.querySelector('.boss-art');
+  const boomEl = stage.querySelector('.boss-boom');
   if (state.damage > lastSeenDmg && !state.defeated) {
     stage.classList.remove('boss-hit');
     void stage.offsetWidth;
     stage.classList.add('boss-hit');
+    if (artEl) artEl.addEventListener('animationend', () => stage.classList.remove('boss-hit'), { once: true });
   }
   localStorage.setItem(lastSeenDmgKey, String(state.damage));
 
@@ -436,6 +439,7 @@ function renderBossCard() {
     stage.classList.remove('boss-explode');
     void stage.offsetWidth;
     stage.classList.add('boss-explode');
+    if (boomEl) boomEl.addEventListener('animationend', () => stage.classList.remove('boss-explode'), { once: true });
     vibrate([80, 50, 80, 50, 160]);
     showToast('ปราบ ' + state.boss.name + ' สำเร็จ!');
   }
@@ -584,10 +588,12 @@ function renderXpBar() {
       avatar.classList.remove('level-up-glow');
       void avatar.offsetWidth; // reflow so the animation can replay
       avatar.classList.add('level-up-glow');
+      avatar.addEventListener('animationend', () => avatar.classList.remove('level-up-glow'), { once: true });
     }
     badge.classList.remove('bump');
     void badge.offsetWidth;
     badge.classList.add('bump');
+    badge.addEventListener('animationend', () => badge.classList.remove('bump'), { once: true });
     vibrate([60, 40, 60]);
     showToast('เลเวลอัพ! ตอนนี้ LV.' + info.level);
   }
