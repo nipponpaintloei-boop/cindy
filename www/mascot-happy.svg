@@ -7,8 +7,8 @@
 <path d="M36,40 C34,55 38,72 50,79 C42,72 37,58 38,42 Z" fill="#3D6FE0"/>
 <path d="M84,40 C86,55 82,72 70,79 C78,72 83,58 82,42 Z" fill="#3D6FE0"/>
 <path d="M60,21 L60,104" stroke="#10121A" stroke-width="1.5" opacity="0.5"/>
-<path d="M60,39 Q78,44 90,38" stroke="#10121A" stroke-width="1" opacity="0.3" fill="none"/>
-<path d="M60,39 Q42,44 30,38" stroke="#10121A" stroke-width="1" opacity="0.3" fill="none"/>
-<path d="M52,43 Q44,39 36,45 Q30,49 34,55 Q40,61 50,57 Q56,53 52,43 Z" fill="#F5F4F0" stroke="#10121A" stroke-width="1.5"/>
-<path d="M68,43 Q76,39 84,45 Q90,49 86,55 Q80,61 70,57 Q64,53 68,43 Z" fill="#F5F4F0" stroke="#10121A" stroke-width="1.5"/>
+<path d="M32,49 Q44,37 56,49 Q44,45 32,49 Z" fill="#F5F4F0" stroke="#10121A" stroke-width="1.5"/>
+<path d="M88,49 Q76,37 64,49 Q76,45 88,49 Z" fill="#F5F4F0" stroke="#10121A" stroke-width="1.5"/>
+<path d="M18,10 L20,16 L26,18 L20,20 L18,26 L16,20 L10,18 L16,16 Z" fill="#FFB020"/>
+<path d="M102,10 L104,16 L110,18 L104,20 L102,26 L100,20 L94,18 L100,16 Z" fill="#FFB020"/>
 </svg>

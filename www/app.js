@@ -388,18 +388,22 @@ function computeCombinedStreak() {
 function renderMascotCard() {
   const headline = document.getElementById('mascotHeadline');
   const sub = document.getElementById('mascotSub');
+  const img = document.getElementById('mascotImg');
   if (!headline || !sub) return;
   const streak = computeCombinedStreak();
   const playedToday = didPlayToday();
   if (streak === 0) {
     headline.textContent = 'ยังไม่มีประวัติการเล่น';
     sub.textContent = 'เริ่มวันนี้เลย แล้วมาสร้าง streak กัน';
+    if (img) img.src = 'mascot.svg';
   } else if (playedToday) {
     headline.textContent = 'เก่งมาก ทำแล้ว ' + streak + ' วันติด';
     sub.textContent = 'เล่นแล้ววันนี้ — พักผ่อนหรือจะเก็บอีกโหมดก็ได้';
+    if (img) img.src = 'mascot-happy.svg';
   } else {
     headline.textContent = 'Streak ' + streak + ' วัน — อย่าให้ขาดวันนี้';
     sub.textContent = 'ยังไม่ได้เล่นวันนี้ ไปต่อกันเลย';
+    if (img) img.src = 'mascot-warn.svg';
   }
 }
 
