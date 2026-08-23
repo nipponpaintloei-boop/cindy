@@ -2887,22 +2887,41 @@ function renderCustomProgress(workoutId) {
   });
 }
 
-/* ---- weekly schedule / rest days ---- */
+/* ---- weekly schedule / rest days ----
+   Each day entry is either null (rest day) or {type:'cindy'|'custom', id}.
+   Legacy data (pre-Cindy-scheduling) stored a bare Custom Workout id string
+   per day — loadWeeklyPlan() upconverts that transparently on read so old
+   schedules keep working without a migration step. */
 const KEY_WEEKLY_PLAN = 'cindy_custom_weekly_plan';
 const WEEKDAY_LABELS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+function normalizeWeeklyPlanEntry(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'string') return { type: 'custom', id: v }; // legacy format
+  if (typeof v === 'object' && v.type && v.id) return v;
+  return null;
+}
 function loadWeeklyPlan() {
+  let raw = {};
   try {
     const saved = JSON.parse(localStorage.getItem(KEY_WEEKLY_PLAN));
-    if (saved && typeof saved === 'object') return saved;
+    if (saved && typeof saved === 'object') raw = saved;
   } catch (e) {}
-  return {};
+  const plan = {};
+  Object.keys(raw).forEach(k => { plan[k] = normalizeWeeklyPlanEntry(raw[k]); });
+  return plan;
 }
 function saveWeeklyPlan(plan) {
   localStorage.setItem(KEY_WEEKLY_PLAN, JSON.stringify(plan));
 }
-function setWeeklyPlanDay(dayIdx, workoutId) {
+/** value is "" (rest day) or "type:id" e.g. "cindy:builtin_cindy" / "custom:abc123" */
+function setWeeklyPlanDay(dayIdx, value) {
   const plan = loadWeeklyPlan();
-  plan[dayIdx] = workoutId || null;
+  if (!value) {
+    plan[dayIdx] = null;
+  } else {
+    const sep = value.indexOf(':');
+    plan[dayIdx] = { type: value.slice(0, sep), id: value.slice(sep + 1) };
+  }
   saveWeeklyPlan(plan);
   renderHomeWeeklyPlanCard();
 }
@@ -2910,13 +2929,24 @@ function renderCustomSchedule() {
   const wrap = document.getElementById('customScheduleList');
   if (!wrap) return;
   const workouts = loadCustomWorkouts();
+  const protocols = allProtocols();
   const plan = loadWeeklyPlan();
   wrap.innerHTML = WEEKDAY_LABELS.map((label, i) => {
-    const options = ['<option value="">วันพัก (Rest Day)</option>']
-      .concat(workouts.map(w => `<option value="${w.id}"${plan[i] === w.id ? ' selected' : ''}>${escapeHtml(w.name)}</option>`));
+    const entry = plan[i];
+    const selectedValue = entry ? entry.type + ':' + entry.id : '';
+    const cindyOptions = protocols.map(p =>
+      `<option value="cindy:${p.id}"${selectedValue === 'cindy:' + p.id ? ' selected' : ''}>${escapeHtml(p.name)}</option>`
+    ).join('');
+    const customOptions = workouts.map(w =>
+      `<option value="custom:${w.id}"${selectedValue === 'custom:' + w.id ? ' selected' : ''}>${escapeHtml(w.name)}</option>`
+    ).join('');
     return `<div class="field-row" style="grid-template-columns:90px 1fr;align-items:center;">
       <label>${label}</label>
-      <select class="time-input" onchange="setWeeklyPlanDay(${i}, this.value)">${options.join('')}</select>
+      <select class="time-input" onchange="setWeeklyPlanDay(${i}, this.value)">
+        <option value="">วันพัก (Rest Day)</option>
+        <optgroup label="Cindy">${cindyOptions}</optgroup>
+        <optgroup label="Custom Workout">${customOptions}</optgroup>
+      </select>
     </div>`;
   }).join('');
 }
@@ -2941,8 +2971,8 @@ function renderHomeWeeklyPlanCard() {
     return;
   }
 
-  const workoutId = plan[todayIdx];
-  if (!workoutId) {
+  const entry = plan[todayIdx];
+  if (!entry) {
     wrap.innerHTML = `<div class="plan-cta" style="cursor:default;">
       <div class="eyebrow">แผนวันนี้ (${WEEKDAY_LABELS[todayIdx]})</div>
       <div class="title-row"><div class="title">วันพัก</div></div>
@@ -2950,7 +2980,24 @@ function renderHomeWeeklyPlanCard() {
     </div>`;
     return;
   }
-  const workout = getCustomWorkout(workoutId);
+
+  if (entry.type === 'cindy') {
+    const protocol = allProtocols().find(p => p.id === entry.id);
+    if (!protocol) { wrap.innerHTML = ''; return; }
+    const meta = protocol.mode === 'emom'
+      ? 'EMOM · ' + protocol.pull + '/' + protocol.push + '/' + protocol.squat + ' · ' + protocol.emomRounds + '×' + protocol.emomIntervalSec + 's · แตะเพื่อเริ่ม'
+      : protocol.pull + '/' + protocol.push + '/' + protocol.squat + ' · ' + (protocol.durationMin || 20) + ' นาที · แตะเพื่อเริ่ม';
+    wrap.innerHTML = `<div class="plan-cta" onclick="startPlannedCindy('${protocol.id}')">
+      <div class="eyebrow">แผนวันนี้ (${WEEKDAY_LABELS[todayIdx]})</div>
+      <div class="title-row"><div class="title">${escapeHtml(protocol.name)}</div><div class="arrow">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+      </div></div>
+      <div class="meta">${meta}</div>
+    </div>`;
+    return;
+  }
+
+  const workout = getCustomWorkout(entry.id);
   if (!workout) { wrap.innerHTML = ''; return; }
   wrap.innerHTML = `<div class="plan-cta" onclick="startCustomWorkoutPlayer('${workout.id}')">
     <div class="eyebrow">แผนวันนี้ (${WEEKDAY_LABELS[todayIdx]})</div>
@@ -2959,6 +3006,20 @@ function renderHomeWeeklyPlanCard() {
     </div></div>
     <div class="meta">${workout.exercises.length} ท่า · แตะเพื่อเริ่ม</div>
   </div>`;
+}
+
+/** Starts (or resumes) the Cindy protocol scheduled for today from the Home
+    CTA. Mirrors handleHomeMainBtn(): an in-progress Cindy session always
+    takes priority so tapping the card never silently discards it. */
+function startPlannedCindy(protocolId) {
+  unlockAudio();
+  const active = loadActive();
+  if (active) {
+    enterWorkoutScreen();
+    return;
+  }
+  selectProtocol(protocolId);
+  startNewWorkout();
 }
 
 function renderCustomHistory() {
