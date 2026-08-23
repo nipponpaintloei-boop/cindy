@@ -2829,14 +2829,40 @@ function exportData() {
  * real http(s) origin) silently ignore the classic <a download> + blob
  * trick — the click fires, nothing throws, and the user just sees
  * nothing happen with no error and no download-manager notification.
- * Prefer the native share sheet where available (this is the reliable
- * path on Android/Samsung: it hands the file to "Save to My Files",
- * Drive, etc. and always shows *something* happening), fall back to
- * the anchor+blob download for normal desktop/browser contexts, and as
- * a last resort open the JSON in a new tab so the data is at least
- * visible and can be saved manually rather than vanishing silently. */
-function deliverExportFile(json, fname) {
+ * Preference order:
+ *   1) File System Access API (showSaveFilePicker) — lets the person pick
+ *      the exact folder + filename themselves via the OS's native save
+ *      dialog. Only available in Chromium desktop browsers over a real
+ *      https/localhost origin, so it's fully optional/progressive: any
+ *      browser without it (Safari, Firefox, most mobile browsers) just
+ *      falls straight through to the next option below with no change
+ *      in behavior.
+ *   2) Native share sheet — reliable path on Android/Samsung: hands the
+ *      file to "Save to My Files", Drive, etc. and always shows
+ *      *something* happening.
+ *   3) Classic anchor+blob download for normal desktop/browser contexts.
+ *   4) Last resort: open the JSON in a new tab so the data is at least
+ *      visible and can be saved manually rather than vanishing silently.
+ */
+async function deliverExportFile(json, fname) {
   const blob = new Blob([json], { type: 'application/json' });
+
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: fname,
+        types: [{ description: 'Cindy backup (JSON)', accept: { 'application/json': ['.json'] } }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      showToast('ส่งออกข้อมูลแล้ว (Cindy + Custom Workout + สกิน/ความคืบหน้า)');
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // user cancelled the save dialog
+      // any other failure (e.g. permission denied) falls through below
+    }
+  }
 
   if (navigator.share && navigator.canShare && window.File) {
     try {
