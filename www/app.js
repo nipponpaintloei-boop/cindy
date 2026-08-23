@@ -650,7 +650,7 @@ function go(name) {
     if (t.getAttribute('onclick') === "go('" + name + "')") t.classList.add('active');
   });
   if (name === 'home') renderHome();
-  if (name === 'program') renderProgram();
+  if (name === 'program') { renderProgram(); renderProgramHubCards(); }
   if (name === 'cindy') renderProgram();
   if (name === 'history') renderHistory();
   if (name === 'progress') { renderProgress(); applyReminderToUI(); applyRingGoalsToUI(); }
@@ -1544,6 +1544,61 @@ function renderHomeCustomShortcut() {
     <div class="rounds" style="color:var(--success);">${iconHtml('play')}</div>
   </div>`;
   homeWrap.style.display = 'block';
+}
+
+/**
+ * Fills in the small live-stat line under each of the 3 Program hub cards
+ * (Cindy / Custom Workouts / Cardio) and shows a "เริ่มตรงนี้" nudge on the
+ * Cindy card for a brand-new player who hasn't finished any session of any
+ * kind yet. Cardio sessions live in the same KEY_CUSTOM_SESSIONS array as
+ * Custom Workout sessions (they share the player), so they're told apart
+ * here purely by workoutId matching a CARDIO_PRESETS id — nothing new is
+ * stored to distinguish them.
+ */
+function renderProgramHubCards() {
+  const cindyEl = document.getElementById('programCindyStat');
+  const customEl = document.getElementById('programCustomStat');
+  const cardioEl = document.getElementById('programCardioStat');
+  const startBadge = document.getElementById('programCindyStartBadge');
+  if (!cindyEl || !customEl || !cardioEl) return;
+
+  const cindySessions = loadSessions();
+  const allCustomSessions = loadCustomWorkoutSessions();
+  const cardioIds = new Set(CARDIO_PRESETS.map(p => p.id));
+  const cardioSessions = allCustomSessions.filter(s => cardioIds.has(s.workoutId));
+  const customOnlySessions = allCustomSessions.filter(s => !cardioIds.has(s.workoutId));
+
+  if (cindySessions.length === 0) {
+    cindyEl.textContent = 'ยังไม่เคยเล่น';
+  } else {
+    const best = cindySessions.reduce((m, s) => Math.max(m, s.rounds), 0);
+    const last = cindySessions.reduce((m, s) => Math.max(m, s.finished), 0);
+    cindyEl.textContent = 'Best ' + best + ' รอบ · เล่นล่าสุด ' + fmtDate(last);
+  }
+
+  const workoutCount = loadCustomWorkouts().length;
+  if (workoutCount === 0) {
+    customEl.textContent = 'ยังไม่มีสูตร';
+  } else {
+    let text = workoutCount + ' สูตร';
+    if (customOnlySessions.length > 0) {
+      const last = customOnlySessions.reduce((m, s) => Math.max(m, s.completedAt), 0);
+      text += ' · เล่นล่าสุด ' + fmtDate(last);
+    }
+    customEl.textContent = text;
+  }
+
+  if (cardioSessions.length === 0) {
+    cardioEl.textContent = 'ยังไม่เคยเล่น';
+  } else {
+    const last = cardioSessions.reduce((m, s) => Math.max(m, s.completedAt), 0);
+    cardioEl.textContent = 'เล่นแล้ว ' + cardioSessions.length + ' ครั้ง · ล่าสุด ' + fmtDate(last);
+  }
+
+  if (startBadge) {
+    const brandNew = cindySessions.length === 0 && allCustomSessions.length === 0;
+    startBadge.style.display = brandNew ? 'inline-block' : 'none';
+  }
 }
 
 function computeStreak(sessions) {
@@ -4223,12 +4278,16 @@ function renderCustomSchedule() {
     const customOptions = workouts.map(w =>
       `<option value="custom:${w.id}"${selectedValue === 'custom:' + w.id ? ' selected' : ''}>${escapeHtml(w.name)}</option>`
     ).join('');
+    const cardioOptions = CARDIO_PRESETS.map(p =>
+      `<option value="cardio:${p.id}"${selectedValue === 'cardio:' + p.id ? ' selected' : ''}>${escapeHtml(p.name)}</option>`
+    ).join('');
     return `<div class="field-row" style="grid-template-columns:90px 1fr;align-items:center;">
       <label>${label}</label>
       <select class="time-input" onchange="setWeeklyPlanDay(${i}, this.value)">
         <option value="">วันพัก (Rest Day)</option>
         <optgroup label="Cindy">${cindyOptions}</optgroup>
         <optgroup label="Custom Workout">${customOptions}</optgroup>
+        <optgroup label="Cardio">${cardioOptions}</optgroup>
       </select>
     </div>`;
   }).join('');
@@ -4276,6 +4335,19 @@ function renderHomeWeeklyPlanCard() {
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
       </div></div>
       <div class="meta">${meta}</div>
+    </div>`;
+    return;
+  }
+
+  if (entry.type === 'cardio') {
+    const preset = CARDIO_PRESETS.find(p => p.id === entry.id);
+    if (!preset) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = `<div class="plan-cta" onclick="startCardioPreset('${preset.id}')">
+      <div class="eyebrow">แผนวันนี้ (${WEEKDAY_LABELS[todayIdx]})</div>
+      <div class="title-row"><div class="title">${escapeHtml(preset.name)}</div><div class="arrow">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+      </div></div>
+      <div class="meta">${preset.exercises.length} ท่า · แตะเพื่อเริ่ม</div>
     </div>`;
     return;
   }
