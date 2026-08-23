@@ -176,6 +176,14 @@ body{
 .stat-card .v{font-family:var(--font-display);font-size:30px;line-height:1;}
 .stat-card .l{font-size:11px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;font-weight:600;}
 
+.stat-bar-row{margin-bottom:14px;}
+.stat-bar-row:last-child{margin-bottom:0;}
+.stat-bar-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.stat-bar-label{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text);}
+.stat-bar-lv{font-family:var(--font-display);font-size:14px;color:var(--text-dim);letter-spacing:.5px;}
+.stat-bar-track{height:8px;border-radius:5px;overflow:hidden;background:var(--bg-elev);border:1px solid var(--card-border);}
+.stat-bar-fill{height:100%;border-radius:5px;transition:width .5s ease;}
+
 .section-label{font-size:12px;font-weight:700;letter-spacing:1.5px;color:var(--text-dim);margin:24px 0 10px;}
 .last-workout{
   background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);
@@ -204,6 +212,20 @@ body{
 .mascot-text{flex:1;min-width:0;}
 .mascot-headline{font-size:14px;font-weight:700;letter-spacing:.2px;}
 .mascot-sub{font-size:12px;color:var(--text-dim);margin-top:3px;line-height:1.4;}
+.mascot-rank{
+  display:inline-block;font-size:10px;font-weight:800;letter-spacing:1px;
+  margin-bottom:3px;padding:2px 7px;border-radius:5px;
+  background:var(--bg-elev);border:1px solid var(--card-border);color:var(--text-dim);
+}
+.mascot-rank.rank-recruit{color:var(--text-dim);border-color:var(--card-border);}
+.mascot-rank.rank-fighter{color:var(--pull);border-color:var(--pull);}
+.mascot-rank.rank-warrior{color:var(--squat);border-color:var(--squat);}
+.mascot-rank.rank-elite{color:#B48CFF;border-color:#B48CFF;}
+.mascot-rank.rank-legend{
+  color:#FFD700;border-color:#FFD700;
+  background:linear-gradient(90deg,rgba(255,215,0,.12),rgba(255,215,0,.02));
+  text-shadow:0 0 8px rgba(255,215,0,.5);
+}
 
 .mascot-level-badge{
   position:absolute;top:-7px;left:-7px;z-index:2;
@@ -265,6 +287,14 @@ body{
 }
 .skin-item .active-check{color:var(--success);}
 
+/* ---- collection / trophy room ---- */
+.collection-summary{
+  text-align:center;font-family:var(--font-display);font-size:16px;letter-spacing:.5px;
+  color:var(--text-dim);background:var(--card);border:1px solid var(--card-border);
+  border-radius:var(--radius-sm);padding:12px;margin-top:2px;
+}
+.collection-emoji{font-size:26px;line-height:1;margin-bottom:4px;}
+
 /* ---- streak milestone treasure chest ---- */
 .treasure-chest-btn{
   position:absolute;top:-10px;right:-8px;z-index:3;
@@ -316,6 +346,31 @@ body{
   border:1px solid var(--card-border);border-radius:var(--radius);
   padding:16px 16px 18px;margin-top:12px;
 }
+/* ---- daily quest board ---- */
+.quest-card{
+  background:linear-gradient(155deg,var(--card) 0%,var(--bg-elev) 100%);
+  border:1px solid var(--card-border);border-radius:var(--radius);
+  padding:14px 16px 16px;margin-top:12px;
+}
+.quest-card-title{font-size:11px;font-weight:800;letter-spacing:1.5px;color:var(--text-dim);margin-bottom:8px;}
+.quest-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;}
+.quest-row + .quest-row{border-top:1px solid var(--card-border);}
+.quest-row.done .quest-title, .quest-row.done .quest-desc{color:var(--text-faint);}
+.quest-info{min-width:0;}
+.quest-title{font-size:13px;font-weight:700;}
+.quest-desc{font-size:11px;color:var(--text-dim);margin-top:2px;line-height:1.35;}
+.quest-xp-tag{
+  flex-shrink:0;font-size:11px;font-weight:700;color:var(--text-faint);
+  background:var(--bg-elev);border:1px solid var(--card-border);border-radius:6px;padding:4px 8px;
+}
+.quest-claimed{flex-shrink:0;font-size:11px;font-weight:700;color:var(--success);}
+.quest-claim-btn{
+  flex-shrink:0;font-size:11px;font-weight:800;letter-spacing:.3px;color:#fff;
+  background:linear-gradient(90deg,var(--push),var(--warning));
+  border:none;border-radius:7px;padding:7px 10px;cursor:pointer;
+}
+.quest-claim-btn:active{transform:scale(.95);}
+
 .boss-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
 .boss-name{font-family:var(--font-display);font-size:20px;letter-spacing:1px;}
 .boss-tag{font-size:10px;color:var(--text-faint);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;}
@@ -337,6 +392,14 @@ body{
   transition:width .6s ease;
 }
 .boss-hp-label{font-size:10px;color:var(--text-faint);margin-top:6px;text-align:center;letter-spacing:.3px;}
+
+.boss-dmg-breakdown{margin-top:12px;}
+.boss-dmg-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.boss-dmg-row:last-child{margin-bottom:0;}
+.boss-dmg-name{flex-shrink:0;width:52px;font-size:9.5px;font-weight:800;letter-spacing:.5px;color:var(--text-dim);}
+.boss-dmg-track{flex:1;height:6px;border-radius:4px;overflow:hidden;background:var(--bg-elev);border:1px solid var(--card-border);}
+.boss-dmg-fill{height:100%;border-radius:4px;transition:width .5s ease;}
+.boss-dmg-val{flex-shrink:0;font-size:10.5px;font-weight:700;color:var(--text-faint);min-width:34px;text-align:right;}
 
 /* hit flash — small shake + quick red pulse */
 .boss-stage.boss-hit .boss-art{animation:bossHitShake .4s ease;}
@@ -459,6 +522,23 @@ body{
 .timer-digits{font-family:var(--font-display);font-size:64px;line-height:1;letter-spacing:1px;}
 .timer-sub{font-size:11px;color:var(--text-dim);letter-spacing:2px;margin-top:6px;text-transform:uppercase;}
 
+.combo-badge{
+  position:absolute;top:-6px;left:50%;transform:translateX(-50%) scale(0);
+  font-family:var(--font-display);font-size:16px;letter-spacing:.5px;color:#fff;
+  background:linear-gradient(90deg,var(--push),var(--warning));
+  padding:4px 12px 3px;border-radius:20px;white-space:nowrap;
+  box-shadow:0 3px 12px rgba(255,176,32,.5);
+  opacity:0;transition:transform .25s cubic-bezier(.3,1.4,.4,1), opacity .2s ease;
+  pointer-events:none;
+}
+.combo-badge.show{opacity:1;transform:translateX(-50%) scale(1);}
+.combo-badge.pulse{animation:comboPulse .35s ease;}
+@keyframes comboPulse{
+  0%{transform:translateX(-50%) scale(1);}
+  40%{transform:translateX(-50%) scale(1.25);}
+  100%{transform:translateX(-50%) scale(1);}
+}
+
 .rounds-banner{text-align:center;margin:6px 0 18px;}
 .rounds-banner .num{font-family:var(--font-display);font-size:20px;letter-spacing:1px;}
 .rounds-banner .lbl{font-size:10px;color:var(--text-dim);letter-spacing:2px;}
@@ -542,6 +622,14 @@ body{
 .metric-card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:14px 16px;}
 .metric-card .v{font-family:var(--font-display);font-size:28px;line-height:1;}
 .metric-card .l{font-size:11px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;text-transform:uppercase;}
+
+.combo-result-card{
+  text-align:center;margin-top:12px;
+  background:linear-gradient(155deg,rgba(255,176,32,.14),var(--card));
+  border-color:var(--warning);
+}
+.combo-result-title{font-family:var(--font-display);font-size:20px;letter-spacing:.5px;color:var(--warning);}
+.combo-result-xp{font-size:11px;color:var(--text-dim);margin-top:4px;font-weight:700;letter-spacing:.5px;}
 .breakdown-row{display:flex;justify-content:space-between;align-items:center;padding:11px 4px;border-bottom:1px solid var(--card-border);}
 .breakdown-row:last-child{border-bottom:none;}
 .breakdown-row .dot{width:8px;height:8px;border-radius:50%;margin-right:8px;display:inline-block;}
@@ -706,6 +794,9 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <button id="installBtn" class="iconbtn install-btn" onclick="handleInstallClick()" aria-label="Install app">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v13M7 11l5 5 5-5"/><path d="M4 19h16"/></svg>
         </button>
+        <button class="iconbtn" onclick="go('collection')" aria-label="Collection">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4z"/><path d="M7 6H4a2 2 0 002 4M17 6h3a2 2 0 01-2 4"/></svg>
+        </button>
         <button class="iconbtn" onclick="openRestTimer()" aria-label="Rest Timer">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>
         </button>
@@ -724,6 +815,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
           <div class="mascot-skin-hint">🎨</div>
         </div>
         <div class="mascot-text">
+          <div id="mascotRank" class="mascot-rank rank-recruit">🔰 RECRUIT</div>
           <div id="mascotHeadline" class="mascot-headline">ยังไม่มีประวัติการเล่น</div>
           <div id="mascotSub" class="mascot-sub">เริ่มวันนี้เลย แล้วมาสร้าง streak กัน</div>
           <div class="xp-bar-wrap">
@@ -731,6 +823,11 @@ textarea.note-input::placeholder{color:var(--text-faint);}
             <div id="xpBarLabel" class="xp-bar-label">0 / 100 XP</div>
           </div>
         </div>
+      </div>
+
+      <div class="quest-card">
+        <div class="quest-card-title">DAILY QUEST</div>
+        <div id="dailyQuestList" class="quest-list"></div>
       </div>
 
       <div class="boss-card">
@@ -746,6 +843,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         </div>
         <div class="boss-hp-track"><div id="bossHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
         <div id="bossHpLabel" class="boss-hp-label">0 / 0 HP</div>
+        <div id="bossDmgBreakdown" class="boss-dmg-breakdown"></div>
       </div>
 
       <div id="homeWeeklyPlanWrap"></div>
@@ -865,6 +963,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
           <div id="timerDigits" class="timer-digits tabular">20:00</div>
           <div class="timer-sub">เวลาที่เหลือ</div>
         </div>
+        <div id="comboBadge" class="combo-badge"></div>
       </div>
 
       <div class="rounds-banner">
@@ -933,6 +1032,11 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       <div class="metric-grid">
         <div class="metric-card"><div id="cTotalReps" class="v">0</div><div class="l">TOTAL REPS</div></div>
         <div class="metric-card"><div id="cAvgRound" class="v tabular">00:00</div><div class="l">AVERAGE ROUND</div></div>
+      </div>
+
+      <div id="comboResultCard" class="metric-card combo-result-card" style="display:none;">
+        <div class="combo-result-title">🔥 COMBO MAX <span id="comboResultMax">x0</span></div>
+        <div id="comboResultXp" class="combo-result-xp">+0 XP BONUS</div>
       </div>
 
       <div class="section-label">EXERCISE BREAKDOWN</div>
@@ -1031,6 +1135,11 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       <div class="chart-card">
         <div id="chartBars" class="chart-bars"></div>
       </div>
+      <div class="section-label">STATS</div>
+      <div class="metric-card" style="padding:16px;">
+        <div id="statBarList"></div>
+      </div>
+
       <div class="section-label">STREAK</div>
       <div class="metric-card" style="text-align:center;padding:20px;">
         <div id="progStreak" class="v" style="font-size:28px;">0 DAYS</div>
@@ -1092,6 +1201,29 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       <div class="tab" onclick="go('program')"><div class="dot"></div>PROGRAM</div>
       <div class="tab" onclick="go('history')"><div class="dot"></div>HISTORY</div>
       <div class="tab active" onclick="go('progress')"><div class="dot"></div>PROGRESS</div>
+    </div>
+  </section>
+
+  <!-- COLLECTION / TROPHY ROOM -->
+  <section id="screen-collection" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('home')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">COLLECTION</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div id="collectionSummary" class="collection-summary">สะสมแล้ว 0 / 0</div>
+
+      <div class="section-label" style="margin-top:8px;">BADGES</div>
+      <div id="collectionBadgeGrid" class="skin-grid" style="max-height:none;overflow:visible;"></div>
+
+      <div class="section-label">MASCOT SKINS</div>
+      <div id="collectionSkinGrid" class="skin-grid" style="max-height:none;overflow:visible;"></div>
+
+      <div class="section-label">TITLES</div>
+      <div id="collectionTitleGrid" class="skin-grid" style="max-height:none;overflow:visible;"></div>
     </div>
   </section>
 

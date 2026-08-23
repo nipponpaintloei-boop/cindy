@@ -464,6 +464,44 @@ function renderBossCard() {
       ? ('ปราบ ' + state.boss.name + ' สำเร็จ! ปลดล็อคสกิน Mascot ใหม่ 🎨')
       : ('ปราบ ' + state.boss.name + ' สำเร็จ!'));
   }
+  renderBossDmgBreakdown();
+}
+
+/* ---- elemental damage breakdown ----
+ * Same weekly damage total as above, just split by move so it reads like
+ * three damage types instead of one lump sum. Custom Workout volume can't
+ * be split by move (arbitrary exercises), so it's shown as a 4th "OTHER"
+ * bucket only when it's actually nonzero this week. */
+function currentBossDamageBreakdown() {
+  const startTs = weekStart(Date.now()).getTime();
+  const cindyThisWeek = loadSessions().filter(s => s.finished >= startTs);
+  const pull = cindyThisWeek.reduce((sum, s) => sum + (s.total ? s.total.pull : 0), 0);
+  const push = cindyThisWeek.reduce((sum, s) => sum + (s.total ? s.total.push : 0), 0);
+  const squat = cindyThisWeek.reduce((sum, s) => sum + (s.total ? s.total.squat : 0), 0);
+  const other = loadCustomWorkoutSessions()
+    .filter(s => s.completedAt >= startTs)
+    .reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
+  return { pull, push, squat, other };
+}
+function renderBossDmgBreakdown() {
+  const wrap = document.getElementById('bossDmgBreakdown');
+  if (!wrap) return;
+  const dmg = currentBossDamageBreakdown();
+  const rows = [
+    { label: 'PULL', val: dmg.pull, color: 'var(--pull)' },
+    { label: 'PUSH', val: dmg.push, color: 'var(--push)' },
+    { label: 'SQUAT', val: dmg.squat, color: 'var(--squat)' }
+  ];
+  if (dmg.other > 0) rows.push({ label: 'OTHER', val: dmg.other, color: 'var(--text-faint)' });
+  const maxVal = Math.max(1, ...rows.map(r => r.val));
+  wrap.innerHTML = rows.map(r => {
+    const pct = Math.round((r.val / maxVal) * 100);
+    return '<div class="boss-dmg-row">'
+      + '<div class="boss-dmg-name" style="color:' + r.color + ';">' + r.label + '</div>'
+      + '<div class="boss-dmg-track"><div class="boss-dmg-fill" style="width:' + pct + '%;background:' + r.color + ';"></div></div>'
+      + '<div class="boss-dmg-val">' + r.val + '</div>'
+      + '</div>';
+  }).join('');
 }
 function fmtDate(ts) {
   const d = new Date(ts);
@@ -498,6 +536,7 @@ function go(name) {
   if (name === 'customhistory') renderCustomHistory();
   if (name === 'customprogress') renderCustomProgress();
   if (name === 'customschedule') renderCustomSchedule();
+  if (name === 'collection') renderCollection();
 }
 
 /* ================= HOME (dashboard) ================= */
@@ -515,6 +554,7 @@ function renderHome() {
   renderWeekRing();
   renderHomeLastWorkout();
   renderTreasureChest();
+  renderDailyQuests();
 }
 
 /** Combined streak across Cindy sessions + Custom Workout sessions. */
@@ -619,6 +659,145 @@ function revealTreasureChest() {
   applyActiveMascotSkinFilter();
 }
 
+/* ================= DAILY QUEST BOARD =================
+ * Two short quests per day, derived from today's session data (Cindy +
+ * Custom Workout). Which two quests show up is picked deterministically
+ * from today's date so the board changes daily without needing to store
+ * "today's quests" anywhere. The only new persisted state is (a) which
+ * quest ids were already claimed today, reset automatically once the date
+ * rolls over, and (b) a single running bonus-XP counter that folds into
+ * computeTotalXP() above — same lightweight "ratchets upward" pattern as
+ * the treasure chests. */
+const KEY_QUEST_CLAIMED = 'cindy_daily_quest_claimed_v1';
+const KEY_QUEST_BONUS_XP = 'cindy_quest_bonus_xp';
+const QUEST_POOL = [
+  { id: 'play_any', title: 'ลงสนามวันนี้', desc: 'เล่น Cindy หรือ Custom Workout ให้จบ 1 เซสชัน', xp: 15,
+    check: (ctx) => ctx.playedToday },
+  { id: 'volume100', title: 'สะสมเรพ 100', desc: 'ทำเรพรวมวันนี้ให้ถึง 100 (ทุกท่ารวมกัน)', xp: 20,
+    check: (ctx) => ctx.todayTotalReps >= 100 },
+  { id: 'rounds3', title: 'ทำ 3 รอบรวด', desc: 'ทำ Cindy ให้ครบอย่างน้อย 3 รอบในเซสชันเดียว', xp: 20,
+    check: (ctx) => ctx.todayMaxRounds >= 3 },
+  { id: 'custom_today', title: 'ลอง Custom Workout', desc: 'เล่น Custom Workout โหมดใดก็ได้วันนี้', xp: 15,
+    check: (ctx) => ctx.customPlayedToday }
+];
+function todayQuestContext() {
+  const todayKey = dayKey(Date.now());
+  const cindyToday = loadSessions().filter(s => dayKey(s.finished) === todayKey);
+  const customToday = loadCustomWorkoutSessions().filter(s => dayKey(s.completedAt) === todayKey);
+  const cindyRepsToday = cindyToday.reduce((sum, s) => sum + (s.total ? s.total.reps : 0), 0);
+  const customRepsToday = customToday.reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
+  return {
+    playedToday: cindyToday.length > 0 || customToday.length > 0,
+    customPlayedToday: customToday.length > 0,
+    todayTotalReps: cindyRepsToday + customRepsToday,
+    todayMaxRounds: cindyToday.reduce((m, s) => Math.max(m, s.rounds || 0), 0)
+  };
+}
+function todaysQuestIds() {
+  const d = new Date();
+  const seed = d.getFullYear() * 372 + d.getMonth() * 31 + d.getDate();
+  const n = QUEST_POOL.length;
+  const i1 = seed % n;
+  let i2 = (seed + 1 + (seed % (n - 1))) % n;
+  if (i2 === i1) i2 = (i2 + 1) % n;
+  return [QUEST_POOL[i1].id, QUEST_POOL[i2].id];
+}
+function loadQuestClaimState() {
+  let state;
+  try { state = JSON.parse(localStorage.getItem(KEY_QUEST_CLAIMED)); } catch (e) { state = null; }
+  const todayKey = dayKey(Date.now());
+  if (!state || state.date !== todayKey) {
+    state = { date: todayKey, ids: [] };
+    localStorage.setItem(KEY_QUEST_CLAIMED, JSON.stringify(state));
+  }
+  return state;
+}
+function saveQuestClaimState(state) {
+  localStorage.setItem(KEY_QUEST_CLAIMED, JSON.stringify(state));
+}
+function loadQuestBonusXP() {
+  const n = parseInt(localStorage.getItem(KEY_QUEST_BONUS_XP), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+function addQuestBonusXP(amount) {
+  localStorage.setItem(KEY_QUEST_BONUS_XP, String(loadQuestBonusXP() + amount));
+}
+
+/* ================= COMBO MULTIPLIER (in-workout) =================
+ * Consecutive rounds saved without a skip build a combo; skipping a round
+ * (AMRAP only — EMOM has no skip button, it auto-logs every interval)
+ * resets it to zero. The highest combo reached in a session earns a small
+ * one-time XP bonus at the end, stored the same way as quest bonus XP: a
+ * single running counter folded into computeTotalXP(). */
+const KEY_COMBO_BONUS_XP = 'cindy_combo_bonus_xp';
+const COMBO_BONUS_MIN = 3; // combo streak needed before it starts paying out
+function comboBonusForMaxCombo(maxCombo) {
+  return maxCombo >= COMBO_BONUS_MIN ? maxCombo * 2 : 0;
+}
+function loadComboBonusXP() {
+  const n = parseInt(localStorage.getItem(KEY_COMBO_BONUS_XP), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+function addComboBonusXP(amount) {
+  if (amount <= 0) return;
+  localStorage.setItem(KEY_COMBO_BONUS_XP, String(loadComboBonusXP() + amount));
+}
+let lastRenderedCombo = null;
+function updateComboBadge(active) {
+  const badge = document.getElementById('comboBadge');
+  if (!badge) return;
+  const combo = active.combo || 0;
+  if (combo === lastRenderedCombo) return;
+  const increased = lastRenderedCombo !== null && combo > lastRenderedCombo;
+  lastRenderedCombo = combo;
+  if (combo >= 2) {
+    badge.textContent = 'COMBO x' + combo;
+    badge.classList.add('show');
+    if (increased) {
+      badge.classList.remove('pulse');
+      void badge.offsetWidth;
+      badge.classList.add('pulse');
+      vibrate(20);
+    }
+  } else {
+    badge.classList.remove('show');
+  }
+}
+function renderDailyQuests() {
+  const wrap = document.getElementById('dailyQuestList');
+  if (!wrap) return;
+  const ctx = todayQuestContext();
+  const claimState = loadQuestClaimState();
+  const ids = todaysQuestIds();
+  wrap.innerHTML = ids.map(id => {
+    const q = QUEST_POOL.find(x => x.id === id);
+    if (!q) return '';
+    const claimed = claimState.ids.indexOf(id) !== -1;
+    const done = q.check(ctx);
+    let statusHtml;
+    if (claimed) statusHtml = '<div class="quest-claimed">✓ รับแล้ว</div>';
+    else if (done) statusHtml = '<button class="quest-claim-btn" onclick="claimDailyQuest(\'' + id + '\')">รับ +' + q.xp + ' XP</button>';
+    else statusHtml = '<div class="quest-xp-tag">+' + q.xp + ' XP</div>';
+    return '<div class="quest-row' + (claimed ? ' done' : '') + '">'
+      + '<div class="quest-info"><div class="quest-title">' + escapeHtml(q.title) + '</div><div class="quest-desc">' + escapeHtml(q.desc) + '</div></div>'
+      + statusHtml
+      + '</div>';
+  }).join('');
+}
+function claimDailyQuest(id) {
+  const state = loadQuestClaimState();
+  if (state.ids.indexOf(id) !== -1) return;
+  const q = QUEST_POOL.find(x => x.id === id);
+  if (!q || !q.check(todayQuestContext())) return;
+  state.ids.push(id);
+  saveQuestClaimState(state);
+  addQuestBonusXP(q.xp);
+  renderDailyQuests();
+  renderXpBar();
+  vibrate([40, 30, 60]);
+  showToast('รับเควสสำเร็จ +' + q.xp + ' XP 🎯');
+}
+
 function renderMascotCard() {
   const headline = document.getElementById('mascotHeadline');
   const sub = document.getElementById('mascotSub');
@@ -652,7 +831,7 @@ function renderMascotCard() {
 function computeTotalXP() {
   const cindyXP = loadSessions().reduce((sum, s) => sum + (s.total ? s.total.reps : 0), 0);
   const customXP = loadCustomWorkoutSessions().reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
-  return cindyXP + customXP;
+  return cindyXP + customXP + loadQuestBonusXP() + loadComboBonusXP();
 }
 function xpRequiredForLevel(level) {
   return 100 + (level - 1) * 50;
@@ -703,6 +882,72 @@ function renderXpBar() {
     vibrate([60, 40, 60]);
     showToast('เลเวลอัพ! ตอนนี้ LV.' + info.level);
   }
+  renderRankTag(info.level);
+}
+
+/* ================= RANK / TITLE =================
+ * Purely a label derived from the level that's already computed above —
+ * nothing new is stored. Gives the level number a bit of RPG flavor. */
+const RANK_TIERS = [
+  { min: 1, max: 4, title: 'RECRUIT', icon: '🔰' },
+  { min: 5, max: 9, title: 'FIGHTER', icon: '🥋' },
+  { min: 10, max: 14, title: 'WARRIOR', icon: '⚔️' },
+  { min: 15, max: 19, title: 'ELITE', icon: '🛡️' },
+  { min: 20, max: Infinity, title: 'LEGEND', icon: '👑' }
+];
+function rankForLevel(level) {
+  return RANK_TIERS.find(r => level >= r.min && level <= r.max) || RANK_TIERS[0];
+}
+function renderRankTag(level) {
+  const el = document.getElementById('mascotRank');
+  if (!el) return;
+  const rank = rankForLevel(level);
+  el.textContent = rank.icon + ' ' + rank.title;
+  RANK_TIERS.forEach(r => el.classList.remove('rank-' + r.title.toLowerCase()));
+  el.classList.add('rank-' + rank.title.toLowerCase());
+}
+
+/* ================= STAT ATTRIBUTES (STR / PWR / END) =================
+ * Derived straight from lifetime Cindy rep totals per move — no new data
+ * stored. Each stat levels up on its own curve so it feels like a proper
+ * RPG stat rather than a duplicate of the XP bar. */
+const STAT_DEFS = [
+  { key: 'pull', label: 'STRENGTH', short: 'STR', color: 'var(--pull)' },
+  { key: 'push', label: 'POWER', short: 'PWR', color: 'var(--push)' },
+  { key: 'squat', label: 'ENDURANCE', short: 'END', color: 'var(--squat)' }
+];
+function statReqForLevel(level) {
+  return 30 + (level - 1) * 15;
+}
+function computeStatInfo(totalReps) {
+  let level = 1;
+  let remaining = totalReps;
+  let req = statReqForLevel(level);
+  while (remaining >= req) {
+    remaining -= req;
+    level++;
+    req = statReqForLevel(level);
+  }
+  return { level, pct: req > 0 ? remaining / req : 0 };
+}
+function renderStatBars() {
+  const wrap = document.getElementById('statBarList');
+  if (!wrap) return;
+  const all = loadSessions();
+  const totals = { pull: 0, push: 0, squat: 0 };
+  all.forEach(s => {
+    if (!s.total) return;
+    totals.pull += s.total.pull || 0;
+    totals.push += s.total.push || 0;
+    totals.squat += s.total.squat || 0;
+  });
+  wrap.innerHTML = STAT_DEFS.map(def => {
+    const info = computeStatInfo(totals[def.key]);
+    return '<div class="stat-bar-row">'
+      + '<div class="stat-bar-top"><span class="stat-bar-label">' + def.short + ' · ' + def.label + '</span><span class="stat-bar-lv">LV.' + info.level + '</span></div>'
+      + '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + Math.round(info.pct * 100) + '%;background:' + def.color + ';"></div></div>'
+      + '</div>';
+  }).join('');
 }
 
 /* ================= MASCOT SKINS =================
@@ -789,6 +1034,72 @@ function renderSkinGrid() {
       '</div>';
   }).join('');
 }
+/* ================= COLLECTION / TROPHY ROOM =================
+ * One screen combining the three collectible sets that already exist
+ * elsewhere (chest badges, mascot skins, rank titles). Nothing new is
+ * stored — each grid just reuses the same unlock checks as the chest
+ * modal and skin picker, rendered with the same .skin-item card. */
+function renderCollection() {
+  renderCollectionBadges();
+  renderCollectionSkins();
+  renderCollectionTitles();
+  const badgeCount = STREAK_MILESTONES.filter(m => loadOpenedChests().indexOf(m) !== -1).length;
+  const skinCount = MASCOT_SKINS.filter(isSkinUnlocked).length;
+  const titleCount = RANK_TIERS.filter(r => loadLastSeenLevel() >= r.min).length;
+  const summary = document.getElementById('collectionSummary');
+  if (summary) {
+    summary.textContent = 'สะสมแล้ว ' + (badgeCount + skinCount + titleCount) + ' / ' + (STREAK_MILESTONES.length + MASCOT_SKINS.length + RANK_TIERS.length);
+  }
+}
+function renderCollectionBadges() {
+  const grid = document.getElementById('collectionBadgeGrid');
+  if (!grid) return;
+  const opened = loadOpenedChests();
+  grid.innerHTML = STREAK_MILESTONES.map(m => {
+    const info = streakBadgeInfo(m);
+    const unlocked = opened.indexOf(m) !== -1;
+    const cls = 'skin-item' + (unlocked ? '' : ' locked');
+    return '<div class="' + cls + '">'
+      + (unlocked ? '' : '<div class="lock-icon">🔒</div>')
+      + '<div class="collection-emoji">' + (unlocked ? info.emoji : '❔') + '</div>'
+      + '<div class="skin-name">' + info.title + '</div>'
+      + (unlocked ? '' : '<div class="skin-cond">Streak ' + m + ' วัน</div>')
+      + '</div>';
+  }).join('');
+}
+function renderCollectionSkins() {
+  const grid = document.getElementById('collectionSkinGrid');
+  if (!grid) return;
+  const activeId = loadActiveSkin();
+  grid.innerHTML = MASCOT_SKINS.map(skin => {
+    const unlocked = isSkinUnlocked(skin);
+    const isActive = skin.id === activeId;
+    const cls = 'skin-item' + (isActive ? ' active' : '') + (unlocked ? '' : ' locked');
+    const thumbFilter = unlocked ? skin.filter : 'grayscale(1) brightness(.4)';
+    return '<div class="' + cls + '">'
+      + (isActive ? '<div class="active-check">✓</div>' : (unlocked ? '' : '<div class="lock-icon">🔒</div>'))
+      + '<img src="mascot-happy.svg" style="filter:' + thumbFilter + ';" alt="" />'
+      + '<div class="skin-name">' + skin.name + '</div>'
+      + (unlocked ? '' : '<div class="skin-cond">' + skin.cond + '</div>')
+      + '</div>';
+  }).join('');
+}
+function renderCollectionTitles() {
+  const grid = document.getElementById('collectionTitleGrid');
+  if (!grid) return;
+  const level = loadLastSeenLevel();
+  grid.innerHTML = RANK_TIERS.map(r => {
+    const unlocked = level >= r.min;
+    const cls = 'skin-item' + (unlocked ? '' : ' locked');
+    return '<div class="' + cls + '">'
+      + (unlocked ? '' : '<div class="lock-icon">🔒</div>')
+      + '<div class="collection-emoji">' + r.icon + '</div>'
+      + '<div class="skin-name">' + r.title + '</div>'
+      + '<div class="skin-cond">LV.' + r.min + (r.max === Infinity ? '+' : ('–' + r.max)) + '</div>'
+      + '</div>';
+  }).join('');
+}
+
 function selectMascotSkin(id) {
   const skin = MASCOT_SKINS.find(s => s.id === id);
   if (!skin || !isSkinUnlocked(skin)) return;
@@ -1013,6 +1324,8 @@ function startNewWorkout() {
     roundsSaved: 0,
     roundLog: [], // {number, pull, push, squat, time} time = elapsed seconds since start
     skipLog: [],  // {time} rounds skipped — never counted toward roundsSaved
+    combo: 0,
+    maxCombo: 0,
     emomIntervalMs: MODE === 'emom' ? EMOM_INTERVAL_MS : null,
     emomRounds: MODE === 'emom' ? EMOM_ROUNDS : null,
     emomLastLoggedInterval: -1
@@ -1024,6 +1337,7 @@ function startNewWorkout() {
 function enterWorkoutScreen() {
   go('workout');
   currentPB = loadSessions().reduce((m, s) => Math.max(m, s.rounds), 0);
+  lastRenderedCombo = null;
   acquireWakeLock();
   refreshWorkoutUI();
   startTickLoop();
@@ -1063,6 +1377,7 @@ function refreshWorkoutUI() {
 function refreshAmrapUI(active, remainingMs) {
   const remainingSec = remainingMs / 1000;
   document.getElementById('timerDigits').textContent = fmtTime(remainingSec);
+  updateComboBadge(active);
 
   if (!active.isPaused) {
     if (countdownState.id !== active.id) countdownState = { id: active.id, done: new Set() };
@@ -1133,6 +1448,7 @@ function refreshEmomUI(active, remainingMs) {
   document.getElementById('roundsBig').textContent = active.roundsSaved;
   document.getElementById('pbHint').textContent = 'รอบที่ ' + (currentIntervalIdx + 1) + ' / ' + totalRounds;
   document.getElementById('saveRoundBtn').textContent = active.isPaused ? 'PAUSED' : 'รอบถัดไปใน ' + fmtTime(msLeftInInterval / 1000);
+  updateComboBadge(active);
 
   const secLeft = Math.ceil(msLeftInInterval / 1000);
   if (!active.isPaused) {
@@ -1171,6 +1487,8 @@ function logEmomInterval(active, idx) {
     pull: REPS.pull, push: REPS.push, squat: REPS.squat,
     time: Math.round((idx + 1) * (active.emomIntervalMs / 1000))
   });
+  active.combo = (active.combo || 0) + 1;
+  active.maxCombo = Math.max(active.maxCombo || 0, active.combo);
   vibrate([40, 30, 40]);
   beep(700, 100, 0.15);
 }
@@ -1194,6 +1512,8 @@ function saveRound() {
     pull: REPS.pull, push: REPS.push, squat: REPS.squat,
     time: Math.round(elapsedSec)
   });
+  active.combo = (active.combo || 0) + 1;
+  active.maxCombo = Math.max(active.maxCombo || 0, active.combo);
   saveActive(active);
   vibrate(40);
   beep(880, 90, 0.15);
@@ -1208,8 +1528,10 @@ function skipRound() {
   const elapsedSec = getElapsedMs(active) / 1000;
   if (!active.skipLog) active.skipLog = [];
   active.skipLog.push({ time: Math.round(elapsedSec) });
+  active.combo = 0;
   saveActive(active);
   showToast('ข้ามรอบนี้แล้ว (ไม่นับเป็น Round)');
+  refreshWorkoutUI();
 }
 
 function togglePause() {
@@ -1270,6 +1592,10 @@ function completeWorkout(active, reason) {
   const prevBest = sessions.reduce((m, s) => Math.max(m, s.rounds), 0);
   const isNewPR = rounds > prevBest && rounds > 0;
 
+  const maxCombo = active.maxCombo || 0;
+  const comboBonusXp = comboBonusForMaxCombo(maxCombo);
+  if (comboBonusXp > 0) addComboBonusXP(comboBonusXp);
+
   const session = {
     id: active.id,
     started: active.startTime,
@@ -1282,6 +1608,8 @@ function completeWorkout(active, reason) {
     isPR: isNewPR,
     protocolName: active.protocolName || 'Cindy (Classic)',
     mode: active.mode || 'amrap',
+    maxCombo,
+    comboBonusXp,
     rpe: null,
     feeling: null,
     note: ''
@@ -1306,6 +1634,17 @@ function renderCompleteScreen(session) {
   document.getElementById('bdPull').textContent = session.total.pull;
   document.getElementById('bdPush').textContent = session.total.push;
   document.getElementById('bdSquat').textContent = session.total.squat;
+
+  const comboCard = document.getElementById('comboResultCard');
+  if (comboCard) {
+    if (session.comboBonusXp > 0) {
+      document.getElementById('comboResultMax').textContent = 'x' + session.maxCombo;
+      document.getElementById('comboResultXp').textContent = '+' + session.comboBonusXp + ' XP BONUS';
+      comboCard.style.display = '';
+    } else {
+      comboCard.style.display = 'none';
+    }
+  }
 
   const prBadge = document.getElementById('prBadge');
   const completeHero = prBadge.closest('.complete-hero');
@@ -1552,6 +1891,7 @@ function renderProgress() {
   document.getElementById('pSessions').textContent = all.length;
   document.getElementById('pTotalReps').textContent = totalReps.toLocaleString();
   document.getElementById('progStreak').textContent = computeStreak(all) + ' DAYS';
+  renderStatBars();
 
   let filtered = all;
   if (currentPeriod !== 'all') {
