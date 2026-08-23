@@ -651,6 +651,7 @@ function go(name) {
   });
   if (name === 'home') renderHome();
   if (name === 'program') renderProgram();
+  if (name === 'cindy') renderProgram();
   if (name === 'history') renderHistory();
   if (name === 'progress') { renderProgress(); applyReminderToUI(); applyRingGoalsToUI(); }
   if (name === 'customlist') renderCustomList();
@@ -658,6 +659,7 @@ function go(name) {
   if (name === 'customprogress') renderCustomProgress();
   if (name === 'customschedule') renderCustomSchedule();
   if (name === 'collection') renderCollection();
+  if (name === 'cardiolist') renderCardioList();
 }
 
 /* ================= HOME (dashboard) ================= */
@@ -3194,6 +3196,63 @@ const EXERCISE_CATEGORIES = [
 ];
 const EQUIPMENT_LABEL = { bodyweight: '', dumbbell: 'ดัมเบล', tower: 'Power Tower' };
 
+/* ================= CARDIO PRESETS (READY-MADE) ================= */
+/* Built-in, non-editable Custom Workout "recipes" made from cardio moves
+ * that already exist in EXERCISE_LIBRARY — no new exercises introduced.
+ * Same object shape as a saved Custom Workout (see makeCustomExercise /
+ * saveCustomWorkout above) so they can be handed straight to
+ * beginCustomWorkoutPlayerReal() and reuse its entire play/warmup/complete
+ * flow untouched. These are NOT persisted to KEY_CUSTOM_WORKOUTS — they're
+ * read directly from this array, so there's nothing to migrate or corrupt.
+ * `category: 'cardio'` is carried on the preset object only as a forward-
+ * looking tag (e.g. to filter Custom Workout History/Progress by category
+ * later) — nothing reads it yet, so it has zero effect today. */
+const CARDIO_PRESETS = [
+  {
+    id: 'cardio_hiit_burn',
+    name: 'HIIT เบิร์นไว',
+    category: 'cardio',
+    warmupEnabled: false,
+    exercises: [
+      makeCustomExercise({ order: 0, name: 'Jumping Jack', type: 'time', durationSec: 30, sets: 3, restBetweenSetsSec: 15, restAfterSec: 15 }),
+      makeCustomExercise({ order: 1, name: 'Burpee', type: 'reps', reps: 10, sets: 3, restBetweenSetsSec: 20, restAfterSec: 20 }),
+      makeCustomExercise({ order: 2, name: 'Mountain Climber', type: 'time', durationSec: 30, sets: 3, restBetweenSetsSec: 15, restAfterSec: 15 })
+    ]
+  },
+  {
+    id: 'cardio_classic_circuit',
+    name: 'Cardio Circuit คลาสสิก',
+    category: 'cardio',
+    warmupEnabled: false,
+    exercises: [
+      makeCustomExercise({ order: 0, name: 'High Knees', type: 'time', durationSec: 30, sets: 2, restBetweenSetsSec: 15, restAfterSec: 15 }),
+      makeCustomExercise({ order: 1, name: 'Butt Kick', type: 'time', durationSec: 30, sets: 2, restBetweenSetsSec: 15, restAfterSec: 15 }),
+      makeCustomExercise({ order: 2, name: 'Skater Jump', type: 'time', durationSec: 30, sets: 2, restBetweenSetsSec: 15, restAfterSec: 15 }),
+      makeCustomExercise({ order: 3, name: 'Star Jump', type: 'reps', reps: 15, sets: 2, restBetweenSetsSec: 15, restAfterSec: 15 })
+    ]
+  },
+  {
+    id: 'cardio_tabata_short',
+    name: 'Tabata สั้น กระชับ',
+    category: 'cardio',
+    warmupEnabled: false,
+    // Burpee/Mountain Climber alternate as separate 1-set entries (rather
+    // than "all sets of A, then all sets of B") so the player's normal
+    // exercise-by-exercise flow naturally produces the fast alternation
+    // Tabata calls for, with short rest between each turn.
+    exercises: [
+      makeCustomExercise({ order: 0, name: 'Burpee', type: 'reps', reps: 8, sets: 1, restBetweenSetsSec: 0, restAfterSec: 10 }),
+      makeCustomExercise({ order: 1, name: 'Mountain Climber', type: 'time', durationSec: 20, sets: 1, restBetweenSetsSec: 0, restAfterSec: 10 }),
+      makeCustomExercise({ order: 2, name: 'Burpee', type: 'reps', reps: 8, sets: 1, restBetweenSetsSec: 0, restAfterSec: 10 }),
+      makeCustomExercise({ order: 3, name: 'Mountain Climber', type: 'time', durationSec: 20, sets: 1, restBetweenSetsSec: 0, restAfterSec: 10 }),
+      makeCustomExercise({ order: 4, name: 'Burpee', type: 'reps', reps: 8, sets: 1, restBetweenSetsSec: 0, restAfterSec: 10 }),
+      makeCustomExercise({ order: 5, name: 'Mountain Climber', type: 'time', durationSec: 20, sets: 1, restBetweenSetsSec: 0, restAfterSec: 10 }),
+      makeCustomExercise({ order: 6, name: 'Burpee', type: 'reps', reps: 8, sets: 1, restBetweenSetsSec: 0, restAfterSec: 10 }),
+      makeCustomExercise({ order: 7, name: 'Mountain Climber', type: 'time', durationSec: 20, sets: 1, restBetweenSetsSec: 0, restAfterSec: 10 })
+    ]
+  }
+];
+
 /* ================= CUSTOM WORKOUT (FREE-FORM) — DATA MODEL & STORAGE ================= */
 /* Phase 1: schema + CRUD only. No UI/builder/player yet — those come in later phases.
    Kept completely separate from Cindy's protocol/session storage (different keys)
@@ -3371,6 +3430,26 @@ function renderCustomList() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/></svg>
         </button>
       </div>
+    </div>`;
+  }).join('');
+}
+
+/* ---- cardio preset list screen (read-only, no localStorage) ---- */
+function renderCardioList() {
+  const wrap = document.getElementById('cardioPresetList');
+  if (!wrap) return;
+  wrap.innerHTML = CARDIO_PRESETS.map(p => {
+    const exCount = p.exercises.length;
+    const totalSets = p.exercises.reduce((sum, ex) => sum + (ex.sets || 1), 0);
+    const detail = exCount + ' ท่า · ' + totalSets + ' เซ็ตรวม';
+    return `<div class="history-item protocol-item">
+      <div style="flex:1;min-width:0;">
+        <div class="date">${escapeHtml(p.name)}</div>
+        <div class="reps">${detail}</div>
+      </div>
+      <button class="iconbtn" style="width:32px;height:32px;color:var(--success);flex-shrink:0;" onclick="startCardioPreset('${p.id}')" aria-label="Play">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>
+      </button>
     </div>`;
   }).join('');
 }
@@ -3631,6 +3710,19 @@ const WARMUP_LIBRARY = [
   'High Knees 20 วินาที'
 ];
 let warmupPendingWorkoutId = null;
+
+/**
+ * Starts a built-in Cardio preset. Reads straight from CARDIO_PRESETS (never
+ * touches localStorage) and hands the preset object to
+ * beginCustomWorkoutPlayerReal() exactly as startCustomWorkoutPlayer() does
+ * for a saved Custom Workout — same player, warm-up and complete-screen flow,
+ * with zero new code in any of those.
+ */
+function startCardioPreset(id) {
+  const preset = CARDIO_PRESETS.find(p => p.id === id);
+  if (!preset) return;
+  beginCustomWorkoutPlayerReal(preset);
+}
 
 function startCustomWorkoutPlayer(id) {
   const workout = getCustomWorkout(id);

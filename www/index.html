@@ -1011,6 +1011,70 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="home-content">
       <div class="section-label" style="margin-top:6px;">เลือกโหมด</div>
 
+      <div class="program-card-link" onclick="go('cindy')">
+        <div class="program-card-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+        </div>
+        <div>
+          <div class="title">Cindy (Classic)</div>
+          <div class="sub">AMRAP 20 นาที Pull-up · Push-up · Squat</div>
+        </div>
+        <div class="arrow">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+      </div>
+
+      <div class="program-card-link" onclick="go('customlist')">
+        <div class="program-card-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11M4 4l3 3M20 20l-3-3M2.5 9.5l3-3 3 3-3 3zM15.5 22.5l3-3 3 3-3 3zM18.5 2.5l3 3-3 3-3-3zM5.5 15.5l3 3-3 3-3-3z"/></svg>
+        </div>
+        <div>
+          <div class="title">Custom Workouts</div>
+          <div class="sub">สร้างสูตรของคุณเอง ตั้งตารางประจำสัปดาห์</div>
+        </div>
+        <div class="arrow">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+      </div>
+
+      <div class="program-card-link" onclick="go('cardiolist')">
+        <div class="program-card-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-2.5 4.2-2.5 7.3 0 1.2.8 2 1.8 2.1-.6-1.4.2-2.6 1.1-3.3.2 1.4 1 2 1.9 2.9 1.1 1.1 1.7 2.3 1.7 3.8 0 3.4-2.9 6.2-6.5 6.2S2 17.9 2 14.5c0-3.6 2.6-5.6 4.6-8 1.6-1.9 2.8-2.9 5.4-4.5z" fill="currentColor" stroke="none"/></svg>
+        </div>
+        <div>
+          <div class="title">Cardio</div>
+          <div class="sub">HIIT, Circuit, Tabata พร้อมเล่นทันที</div>
+        </div>
+        <div class="arrow">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+      </div>
+
+      <div id="homeCustomWrap" style="display:none;margin-top:14px;">
+        <div class="section-label" style="margin-top:0;">CUSTOM WORKOUT ล่าสุด</div>
+        <div id="homeCustomCard"></div>
+      </div>
+    </div>
+    <div class="tabbar">
+      <div class="tab" onclick="go('home')"><div class="dot"></div>HOME</div>
+      <div class="tab active" onclick="go('program')"><div class="dot"></div>PROGRAM</div>
+      <div class="tab" onclick="go('history')"><div class="dot"></div>HISTORY</div>
+      <div class="tab" onclick="go('progress')"><div class="dot"></div>PROGRESS</div>
+    </div>
+  </section>
+
+  <!-- CINDY (CLASSIC) -->
+  <section id="screen-cindy" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('program')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">CINDY</div>
+      <button class="iconbtn" onclick="openSettingsModal()" aria-label="Protocol library">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </button>
+    </div>
+    <div class="home-content">
       <div class="hero-card" style="margin-top:8px;">
         <div id="activeProtocolName" style="font-size:11px;letter-spacing:2px;color:var(--text-faint);text-transform:uppercase;margin-bottom:2px;">Cindy (Classic)</div>
         <div id="heroEyebrow" class="hero-eyebrow">20 MIN AMRAP</div>
@@ -1032,31 +1096,21 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <div class="stat-card"><div class="v" id="statTotalRounds">0</div><div class="l">TOTAL ROUNDS</div></div>
         <div class="stat-card"><div class="v" id="statStreak">0</div><div class="l">STREAK</div></div>
       </div>
-
-      <div class="section-label">โหมดกำหนดเอง</div>
-      <div class="program-card-link" onclick="go('customlist')">
-        <div class="program-card-icon">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11M4 4l3 3M20 20l-3-3M2.5 9.5l3-3 3 3-3 3zM15.5 22.5l3-3 3 3-3 3zM18.5 2.5l3 3-3 3-3-3zM5.5 15.5l3 3-3 3-3-3z"/></svg>
-        </div>
-        <div>
-          <div class="title">Custom Workouts</div>
-          <div class="sub">สร้างสูตรของคุณเอง ตั้งตารางประจำสัปดาห์</div>
-        </div>
-        <div class="arrow">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
-        </div>
-      </div>
-
-      <div id="homeCustomWrap" style="display:none;margin-top:14px;">
-        <div class="section-label" style="margin-top:0;">CUSTOM WORKOUT ล่าสุด</div>
-        <div id="homeCustomCard"></div>
-      </div>
     </div>
-    <div class="tabbar">
-      <div class="tab" onclick="go('home')"><div class="dot"></div>HOME</div>
-      <div class="tab active" onclick="go('program')"><div class="dot"></div>PROGRAM</div>
-      <div class="tab" onclick="go('history')"><div class="dot"></div>HISTORY</div>
-      <div class="tab" onclick="go('progress')"><div class="dot"></div>PROGRESS</div>
+  </section>
+
+  <!-- CARDIO PRESETS (built-in, read-only Custom Workout recipes) -->
+  <section id="screen-cardiolist" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('program')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">CARDIO</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div class="empty-hint" style="text-align:left;padding:0 0 10px;">โปรแกรมคาร์ดิโอสำเร็จรูป กดเล่นได้ทันที</div>
+      <div id="cardioPresetList"></div>
     </div>
   </section>
 
