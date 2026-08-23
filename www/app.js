@@ -2,6 +2,7 @@
 const RING_CIRC = 2 * Math.PI * 108;
 const KEY_SESSIONS = 'cindy_sessions';
 const KEY_ACTIVE = 'cindy_active_workout';
+const KEY_LAST_SEEN_LEVEL = 'cindy_last_seen_level';
 
 /* ================= PROTOCOL LIBRARY ================= */
 /* A "protocol" is a saved WOD prescription: either an AMRAP (fixed reps/round,
@@ -404,6 +405,67 @@ function renderMascotCard() {
     headline.textContent = 'Streak ' + streak + ' วัน — อย่าให้ขาดวันนี้';
     sub.textContent = 'ยังไม่ได้เล่นวันนี้ ไปต่อกันเลย';
     if (img) img.src = 'mascot-warn.svg';
+  }
+  renderXpBar();
+}
+
+/* ================= XP / LEVEL =================
+ * 1 rep logged (Cindy or Custom Workout) = 1 XP. Each level requires more XP
+ * than the last (100, 150, 200, ...), so progress naturally slows at higher
+ * levels. Level is fully derived from session history — nothing new is
+ * stored except "last seen level", used only to detect a level-up moment
+ * so we don't replay the glow/toast on every render. */
+function computeTotalXP() {
+  const cindyXP = loadSessions().reduce((sum, s) => sum + (s.total ? s.total.reps : 0), 0);
+  const customXP = loadCustomWorkoutSessions().reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
+  return cindyXP + customXP;
+}
+function xpRequiredForLevel(level) {
+  return 100 + (level - 1) * 50;
+}
+function computeLevelInfo(totalXp) {
+  let level = 1;
+  let remaining = totalXp;
+  let req = xpRequiredForLevel(level);
+  while (remaining >= req) {
+    remaining -= req;
+    level++;
+    req = xpRequiredForLevel(level);
+  }
+  return { level, xpIntoLevel: remaining, xpForNextLevel: req, pct: req > 0 ? remaining / req : 0 };
+}
+function loadLastSeenLevel() {
+  const n = parseInt(localStorage.getItem(KEY_LAST_SEEN_LEVEL), 10);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+function saveLastSeenLevel(level) {
+  localStorage.setItem(KEY_LAST_SEEN_LEVEL, String(level));
+}
+function renderXpBar() {
+  const badge = document.getElementById('mascotLevelBadge');
+  const fill = document.getElementById('xpBarFill');
+  const label = document.getElementById('xpBarLabel');
+  const avatar = document.getElementById('mascotAvatar');
+  if (!badge || !fill || !label) return;
+
+  const info = computeLevelInfo(computeTotalXP());
+  badge.textContent = 'LV.' + info.level;
+  fill.style.width = Math.round(info.pct * 100) + '%';
+  label.textContent = info.xpIntoLevel + ' / ' + info.xpForNextLevel + ' XP';
+
+  const lastSeen = loadLastSeenLevel();
+  if (info.level > lastSeen) {
+    saveLastSeenLevel(info.level);
+    if (avatar) {
+      avatar.classList.remove('level-up-glow');
+      void avatar.offsetWidth; // reflow so the animation can replay
+      avatar.classList.add('level-up-glow');
+    }
+    badge.classList.remove('bump');
+    void badge.offsetWidth;
+    badge.classList.add('bump');
+    vibrate([60, 40, 60]);
+    showToast('เลเวลอัพ! ตอนนี้ LV.' + info.level);
   }
 }
 
