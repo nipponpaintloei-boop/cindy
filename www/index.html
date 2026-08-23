@@ -198,7 +198,7 @@ body{
   flex-shrink:0;width:56px;height:56px;border-radius:14px;
   background:var(--bg-elev);border:1px solid var(--card-border);
   display:flex;align-items:center;justify-content:center;color:var(--text-faint);
-  overflow:visible;padding:4px;
+  overflow:visible;padding:4px;cursor:pointer;
 }
 .mascot-avatar img{width:100%;height:100%;object-fit:contain;border-radius:10px;overflow:hidden;}
 .mascot-text{flex:1;min-width:0;}
@@ -237,6 +237,33 @@ body{
   40%{transform:scale(1.4) rotate(-4deg);}
   100%{transform:scale(1) rotate(0deg);}
 }
+.mascot-skin-hint{
+  position:absolute;bottom:-4px;right:-4px;z-index:2;
+  width:18px;height:18px;border-radius:50%;
+  background:var(--bg-elev);border:1.5px solid var(--card-border);
+  display:flex;align-items:center;justify-content:center;font-size:9px;
+}
+
+/* ---- mascot skin picker ---- */
+.skin-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:9px;
+  max-height:58vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px;
+}
+.skin-item{
+  position:relative;background:var(--bg-elev);border:1.5px solid var(--card-border);
+  border-radius:10px;padding:9px 5px 8px;text-align:center;cursor:pointer;
+  transition:border-color .15s ease;
+}
+.skin-item.active{border-color:var(--success);}
+.skin-item.locked{cursor:default;}
+.skin-item img{width:42px;height:42px;object-fit:contain;margin-bottom:4px;}
+.skin-item .skin-name{font-size:9.5px;font-weight:700;line-height:1.3;color:var(--text);}
+.skin-item.locked .skin-name{color:var(--text-faint);}
+.skin-item .skin-cond{font-size:8.5px;color:var(--text-faint);margin-top:2px;line-height:1.25;}
+.skin-item .lock-icon,.skin-item .active-check{
+  position:absolute;top:4px;right:5px;font-size:11px;line-height:1;
+}
+.skin-item .active-check{color:var(--success);}
 
 /* ---- streak milestone treasure chest ---- */
 .treasure-chest-btn{
@@ -691,9 +718,10 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 
       <div class="mascot-card">
         <div id="treasureChestBtn" class="treasure-chest-btn" onclick="openTreasureChestModal()" aria-label="เปิดหีบรางวัล">🎁</div>
-        <div class="mascot-avatar" id="mascotAvatar">
+        <div class="mascot-avatar" id="mascotAvatar" onclick="openSkinPicker()">
           <img id="mascotImg" src="mascot.svg" alt="" />
           <div id="mascotLevelBadge" class="mascot-level-badge">LV.1</div>
+          <div class="mascot-skin-hint">🎨</div>
         </div>
         <div class="mascot-text">
           <div id="mascotHeadline" class="mascot-headline">ยังไม่มีประวัติการเล่น</div>
@@ -1406,6 +1434,18 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       <button class="btn btn-outline btn-sm" onclick="resetRestTimer()">RESET</button>
       <button id="restTimerToggleBtn" class="btn btn-success btn-sm" onclick="toggleRestTimer()">START</button>
     </div>
+  </div>
+</div>
+
+<!-- Mascot Skin Picker Modal -->
+<div id="skinPickerModal" class="modal-overlay">
+  <div class="modal-card" style="max-width:380px;">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>เลือกสกิน Mascot</span>
+      <span onclick="closeModal('skinPickerModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
+    </div>
+    <div class="modal-body" style="margin-bottom:12px;">ปลดล็อคสกินใหม่ได้จาก Streak, เลเวล, และการปราบ Boss</div>
+    <div id="skinGrid" class="skin-grid"></div>
   </div>
 </div>
 

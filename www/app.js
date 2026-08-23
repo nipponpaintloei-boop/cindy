@@ -337,6 +337,14 @@ const BOSS_ROSTER = [
   { id: 'corezero', name: 'CORE-ZERO', tag: 'FINAL REACTOR', baseHp: 700 }
 ];
 const KEY_BOSS_DEFEAT_SEEN = 'cindy_boss_defeat_seen_week';
+const KEY_BOSS_EVER_DEFEATED = 'cindy_boss_ever_defeated';
+function loadBossEverDefeated() {
+  try { return JSON.parse(localStorage.getItem(KEY_BOSS_EVER_DEFEATED)) || []; }
+  catch (e) { return []; }
+}
+function saveBossEverDefeated(list) {
+  localStorage.setItem(KEY_BOSS_EVER_DEFEATED, JSON.stringify(list));
+}
 
 /** Monday 00:00 of the week containing `ts`. */
 function weekStart(ts) {
@@ -445,7 +453,16 @@ function renderBossCard() {
     stage.classList.add('boss-explode');
     if (boomEl) boomEl.addEventListener('animationend', () => stage.classList.remove('boss-explode'), { once: true });
     vibrate([80, 50, 80, 50, 160]);
-    showToast('ปราบ ' + state.boss.name + ' สำเร็จ!');
+
+    const everDefeated = loadBossEverDefeated();
+    const firstTimeEver = everDefeated.indexOf(state.boss.id) === -1;
+    if (firstTimeEver) {
+      everDefeated.push(state.boss.id);
+      saveBossEverDefeated(everDefeated);
+    }
+    showToast(firstTimeEver
+      ? ('ปราบ ' + state.boss.name + ' สำเร็จ! ปลดล็อคสกิน Mascot ใหม่ 🎨')
+      : ('ปราบ ' + state.boss.name + ' สำเร็จ!'));
   }
 }
 function fmtDate(ts) {
@@ -554,10 +571,12 @@ function openTreasureChestModal() {
   const milestone = nextUnclaimedChestMilestone(computeCombinedStreak());
   if (milestone === null) return;
   const info = streakBadgeInfo(milestone);
+  const linkedSkin = MASCOT_SKINS.find(s => s.unlock.type === 'streak' && s.unlock.value === milestone);
   document.getElementById('chestMilestoneLabel').textContent = 'STREAK ' + milestone + ' วัน';
   document.getElementById('chestBadgeEmoji').textContent = info.emoji;
   document.getElementById('chestBadgeTitle').textContent = info.title;
-  document.getElementById('chestBadgeDesc').textContent = info.desc;
+  document.getElementById('chestBadgeDesc').textContent = info.desc +
+    (linkedSkin ? ' — ปลดล็อคสกิน Mascot "' + linkedSkin.name + '" ด้วย!' : '');
   document.getElementById('treasureChestModal').dataset.milestone = String(milestone);
 
   const icon = document.getElementById('chestIcon');
@@ -597,6 +616,7 @@ function revealTreasureChest() {
     saveOpenedChests(opened);
   }
   renderTreasureChest();
+  applyActiveMascotSkinFilter();
 }
 
 function renderMascotCard() {
@@ -620,6 +640,7 @@ function renderMascotCard() {
     if (img) img.src = 'mascot-warn.svg';
   }
   renderXpBar();
+  applyActiveMascotSkinFilter();
 }
 
 /* ================= XP / LEVEL =================
@@ -682,6 +703,99 @@ function renderXpBar() {
     vibrate([60, 40, 60]);
     showToast('เลเวลอัพ! ตอนนี้ LV.' + info.level);
   }
+}
+
+/* ================= MASCOT SKINS =================
+ * Skins are pure CSS filters applied on top of the existing mascot art —
+ * no new image assets. Unlock state is never stored separately; each skin
+ * derives its unlocked/locked status from state that's already tracked
+ * elsewhere and only ever ratchets upward (opened chests, highest level
+ * ever seen, bosses ever defeated), so there's nothing to keep in sync. */
+const KEY_ACTIVE_SKIN = 'cindy_active_skin';
+const MASCOT_SKINS = [
+  { id: 'default', name: 'Classic', filter: 'none', unlock: { type: 'always' } },
+
+  { id: 'streak7', name: 'นักสู้ 7 วัน', filter: 'sepia(.35) saturate(1.7) hue-rotate(-8deg)',
+    unlock: { type: 'streak', value: 7 }, cond: 'เปิดหีบ Streak 7 วัน' },
+  { id: 'streak14', name: 'นักสู้ 14 วัน', filter: 'grayscale(.25) saturate(1.4) hue-rotate(180deg) brightness(1.08)',
+    unlock: { type: 'streak', value: 14 }, cond: 'เปิดหีบ Streak 14 วัน' },
+  { id: 'streak30', name: 'นักรบ 30 วัน', filter: 'sepia(.55) saturate(2.1) hue-rotate(15deg)',
+    unlock: { type: 'streak', value: 30 }, cond: 'เปิดหีบ Streak 30 วัน' },
+  { id: 'streak100', name: 'ตำนาน 100 วัน', filter: 'saturate(2.4) hue-rotate(270deg) brightness(1.15)',
+    unlock: { type: 'streak', value: 100 }, cond: 'เปิดหีบ Streak 100 วัน' },
+
+  { id: 'lv5', name: 'นักเรียนวินัย LV.5', filter: 'hue-rotate(90deg) saturate(1.5)',
+    unlock: { type: 'level', value: 5 }, cond: 'ถึง LV.5' },
+  { id: 'lv10', name: 'มือฝึกฝน LV.10', filter: 'hue-rotate(140deg) saturate(1.6) brightness(1.05)',
+    unlock: { type: 'level', value: 10 }, cond: 'ถึง LV.10' },
+  { id: 'lv15', name: 'ยอดฝีมือ LV.15', filter: 'hue-rotate(200deg) saturate(1.8)',
+    unlock: { type: 'level', value: 15 }, cond: 'ถึง LV.15' },
+  { id: 'lv20', name: 'จอมพลังกาย LV.20', filter: 'hue-rotate(320deg) saturate(2) contrast(1.1)',
+    unlock: { type: 'level', value: 20 }, cond: 'ถึง LV.20' },
+
+  { id: 'bossGrinder1', name: 'ผู้พิชิต GRINDER-1', filter: 'hue-rotate(0deg) saturate(1.8) contrast(1.15)',
+    unlock: { type: 'boss', bossId: 'grinder1' }, cond: 'ปราบ GRINDER-1 สำเร็จ' },
+  { id: 'bossIronmaw', name: 'ผู้พิชิต IRON MAW', filter: 'hue-rotate(45deg) saturate(1.6)',
+    unlock: { type: 'boss', bossId: 'ironmaw' }, cond: 'ปราบ IRON MAW สำเร็จ' },
+  { id: 'bossVoid9', name: 'ผู้พิชิต VOID-9', filter: 'hue-rotate(250deg) saturate(2) brightness(.92)',
+    unlock: { type: 'boss', bossId: 'void9' }, cond: 'ปราบ VOID-9 สำเร็จ' },
+  { id: 'bossWingreaper', name: 'ผู้พิชิต WING REAPER', filter: 'hue-rotate(190deg) saturate(1.7)',
+    unlock: { type: 'boss', bossId: 'wingreaper' }, cond: 'ปราบ WING REAPER สำเร็จ' },
+  { id: 'bossCorezero', name: 'ผู้พิชิต CORE-ZERO', filter: 'hue-rotate(300deg) saturate(2.2) contrast(1.2) brightness(1.1)',
+    unlock: { type: 'boss', bossId: 'corezero' }, cond: 'ปราบ CORE-ZERO สำเร็จ' }
+];
+function isSkinUnlocked(skin) {
+  switch (skin.unlock.type) {
+    case 'always': return true;
+    case 'streak': return loadOpenedChests().indexOf(skin.unlock.value) !== -1;
+    case 'level': return loadLastSeenLevel() >= skin.unlock.value;
+    case 'boss': return loadBossEverDefeated().indexOf(skin.unlock.bossId) !== -1;
+    default: return false;
+  }
+}
+function loadActiveSkin() {
+  return localStorage.getItem(KEY_ACTIVE_SKIN) || 'default';
+}
+function saveActiveSkin(id) {
+  localStorage.setItem(KEY_ACTIVE_SKIN, id);
+}
+/** Applies the current active skin's filter to the mascot image. Falls back
+ * to no filter if the saved active skin somehow isn't unlocked anymore. */
+function applyActiveMascotSkinFilter() {
+  const img = document.getElementById('mascotImg');
+  if (!img) return;
+  const skin = MASCOT_SKINS.find(s => s.id === loadActiveSkin()) || MASCOT_SKINS[0];
+  img.style.filter = isSkinUnlocked(skin) ? skin.filter : 'none';
+}
+function openSkinPicker() {
+  renderSkinGrid();
+  document.getElementById('skinPickerModal').classList.add('active');
+}
+function renderSkinGrid() {
+  const grid = document.getElementById('skinGrid');
+  if (!grid) return;
+  const activeId = loadActiveSkin();
+  grid.innerHTML = MASCOT_SKINS.map(skin => {
+    const unlocked = isSkinUnlocked(skin);
+    const isActive = skin.id === activeId;
+    const cls = 'skin-item' + (isActive ? ' active' : '') + (unlocked ? '' : ' locked');
+    const clickAttr = unlocked ? ' onclick="selectMascotSkin(\'' + skin.id + '\')"' : '';
+    const badgeHtml = isActive ? '<div class="active-check">✓</div>' : (unlocked ? '' : '<div class="lock-icon">🔒</div>');
+    const thumbFilter = unlocked ? skin.filter : 'grayscale(1) brightness(.4)';
+    return '<div class="' + cls + '"' + clickAttr + '>' + badgeHtml +
+      '<img src="mascot-happy.svg" style="filter:' + thumbFilter + ';" alt="" />' +
+      '<div class="skin-name">' + skin.name + '</div>' +
+      (unlocked ? '' : '<div class="skin-cond">' + skin.cond + '</div>') +
+      '</div>';
+  }).join('');
+}
+function selectMascotSkin(id) {
+  const skin = MASCOT_SKINS.find(s => s.id === id);
+  if (!skin || !isSkinUnlocked(skin)) return;
+  saveActiveSkin(id);
+  renderSkinGrid();
+  applyActiveMascotSkinFilter();
+  showToast('เปลี่ยนสกินเป็น ' + skin.name);
 }
 
 function didPlayToday() {
