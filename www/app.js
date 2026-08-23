@@ -344,7 +344,7 @@ function go(name) {
   if (name === 'home') renderHome();
   if (name === 'program') renderProgram();
   if (name === 'history') renderHistory();
-  if (name === 'progress') { renderProgress(); applyReminderToUI(); }
+  if (name === 'progress') { renderProgress(); applyReminderToUI(); applyRingGoalsToUI(); }
   if (name === 'customlist') renderCustomList();
   if (name === 'customhistory') renderCustomHistory();
   if (name === 'customprogress') renderCustomProgress();
@@ -418,27 +418,60 @@ function countSessionsInLastNDays(timestamps, n) {
   return timestamps.filter(t => t >= cutoff.getTime()).length;
 }
 
-const WEEK_RING_GOAL = 5; // sessions/week considered a "full" ring, per mode
+const DEFAULT_RING_GOAL = 5; // sessions/week considered a "full" ring, per mode
+const KEY_RING_GOALS = 'cindy_week_ring_goals';
+function loadRingGoals() {
+  const goals = { cindy: DEFAULT_RING_GOAL, custom: DEFAULT_RING_GOAL };
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY_RING_GOALS));
+    if (saved && typeof saved === 'object') {
+      if (Number.isFinite(saved.cindy) && saved.cindy > 0) goals.cindy = saved.cindy;
+      if (Number.isFinite(saved.custom) && saved.custom > 0) goals.custom = saved.custom;
+    }
+  } catch (e) {}
+  return goals;
+}
+function saveRingGoals(goals) {
+  localStorage.setItem(KEY_RING_GOALS, JSON.stringify(goals));
+}
+/** Called from the goal inputs on the Progress screen. */
+function setRingGoal(mode, value) {
+  const n = Math.round(Number(value));
+  const goals = loadRingGoals();
+  goals[mode] = (Number.isFinite(n) && n > 0) ? Math.min(14, n) : DEFAULT_RING_GOAL;
+  saveRingGoals(goals);
+  applyRingGoalsToUI();
+  renderWeekRing();
+  showToast('อัปเดตเป้าหมายแล้ว');
+}
+function applyRingGoalsToUI() {
+  const goals = loadRingGoals();
+  const cindyInput = document.getElementById('goalCindyInput');
+  const customInput = document.getElementById('goalCustomInput');
+  if (cindyInput) cindyInput.value = goals.cindy;
+  if (customInput) customInput.value = goals.custom;
+}
 
 function renderWeekRing() {
+  const goals = loadRingGoals();
   const cindyCount = countSessionsInLastNDays(loadSessions().map(s => s.finished), 7);
   const customCount = countSessionsInLastNDays(loadCustomWorkoutSessions().map(s => s.completedAt), 7);
   const cindyCountEl = document.getElementById('weekCindyCount');
   const customCountEl = document.getElementById('weekCustomCount');
-  if (cindyCountEl) cindyCountEl.textContent = cindyCount;
-  if (customCountEl) customCountEl.textContent = customCount;
+  if (cindyCountEl) cindyCountEl.textContent = cindyCount + '/' + goals.cindy;
+  if (customCountEl) customCountEl.textContent = customCount + '/' + goals.custom;
 
   const cindyRing = document.getElementById('weekRingCindy');
   const customRing = document.getElementById('weekRingCustom');
   if (cindyRing) {
     const circ = 2 * Math.PI * 34;
-    const pct = Math.min(1, cindyCount / WEEK_RING_GOAL);
+    const pct = Math.min(1, cindyCount / goals.cindy);
     cindyRing.style.strokeDasharray = circ.toFixed(1);
     cindyRing.style.strokeDashoffset = (circ * (1 - pct)).toFixed(1);
   }
   if (customRing) {
     const circ = 2 * Math.PI * 24;
-    const pct = Math.min(1, customCount / WEEK_RING_GOAL);
+    const pct = Math.min(1, customCount / goals.custom);
     customRing.style.strokeDasharray = circ.toFixed(1);
     customRing.style.strokeDashoffset = (circ * (1 - pct)).toFixed(1);
   }

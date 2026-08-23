@@ -831,6 +831,18 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <div id="progStreak" class="v" style="font-size:28px;">0 DAYS</div>
       </div>
 
+      <div class="section-label">เป้าหมายรายสัปดาห์</div>
+      <div class="metric-card" style="padding:16px;">
+        <div class="field-row" style="margin-bottom:12px;">
+          <label>Cindy (ครั้ง/สัปดาห์)</label>
+          <input type="number" id="goalCindyInput" min="1" max="14" class="time-input" style="width:100%;" onchange="setRingGoal('cindy', this.value)">
+        </div>
+        <div class="field-row" style="margin-bottom:0;">
+          <label>Custom Workout (ครั้ง/สัปดาห์)</label>
+          <input type="number" id="goalCustomInput" min="1" max="14" class="time-input" style="width:100%;" onchange="setRingGoal('custom', this.value)">
+        </div>
+      </div>
+
       <div class="section-label">เตือนเล่นทุกวัน</div>
       <div class="metric-card reminder-card">
         <div class="reminder-row">
