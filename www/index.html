@@ -69,6 +69,14 @@ body.oled{
     0 0.05em 0.12em rgba(0,0,0,.4);
 }
 .gem-badge svg{width:56%;height:56%;color:#fff;filter:drop-shadow(0 1px 1px rgba(0,0,0,.45));}
+/* loot items crop their own illustrated art into the same coin shell
+   instead of a glyph — sized larger than the svg glyphs above (76% vs
+   56%) since real artwork needs more room to read at a glance, but still
+   leaves the rarity-gradient rim showing around the edge. */
+.gem-badge-art{
+  width:76%;height:76%;border-radius:50%;object-fit:cover;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.45));
+}
 .gem-badge.badge-glow{
   box-shadow:
     inset 0 0 0 1px rgba(255,255,255,.35),
@@ -255,8 +263,8 @@ body{
   overflow:visible;cursor:pointer;
 }
 .mascot-avatar img{
-  position:absolute;left:50%;bottom:-2px;
-  width:138%;height:178%;max-width:none;
+  position:absolute;left:50%;bottom:0;
+  width:100%;height:100%;max-width:none;
   transform:translateX(-50%);
   object-fit:contain;object-position:bottom;
   z-index:1;pointer-events:none;
@@ -525,6 +533,29 @@ body{
   position:absolute;top:4px;right:5px;font-family:var(--font-display);
   font-size:10px;color:var(--text-dim);line-height:1;
 }
+/* full illustrated art in the collection grid — bigger + no gem-badge
+   shell (unlike the small mascot-corner version) since there's room here
+   to actually show the artwork. */
+.loot-thumb{
+  width:64px;height:64px;object-fit:contain;margin:0 auto 4px;display:block;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.45));
+}
+
+/* ---- loot item detail popup ---- */
+.loot-detail-img{
+  width:150px;height:150px;object-fit:contain;margin:0 auto 14px;display:block;
+  filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));
+}
+.loot-detail-rarity{
+  font-size:10px;font-weight:800;letter-spacing:1.5px;text-align:center;margin-bottom:4px;
+}
+.loot-detail-name{
+  font-family:var(--font-display);font-size:22px;letter-spacing:.5px;text-align:center;margin-bottom:10px;
+}
+.loot-detail-lore{
+  font-size:13px;color:var(--text-dim);line-height:1.6;text-align:center;
+  padding:0 4px;margin-bottom:18px;
+}
 
 /* ---- character sheet ---- */
 .character-sheet-card{
@@ -534,7 +565,7 @@ body{
 }
 .character-avatar-wrap{display:flex;justify-content:center;}
 #characterAvatar{width:96px;height:96px;}
-#characterAvatar img{width:128%;height:164%;}
+#characterAvatar img{width:100%;height:100%;}
 .character-sheet-card .mascot-rank{margin:14px 0 4px;}
 .character-sheet-card .mascot-skin-title{margin:0;}
 
@@ -604,7 +635,7 @@ body{
 }
 .player-companion-hud.skin-glow{box-shadow:0 4px 14px rgba(0,0,0,.35),0 0 12px 3px var(--skin-aura);}
 .player-companion-hud img{
-  position:absolute;left:50%;bottom:-1px;width:118%;height:150%;max-width:none;
+  position:absolute;left:50%;bottom:0;width:100%;height:100%;max-width:none;
   transform:translateX(-50%);object-fit:contain;object-position:bottom;pointer-events:none;
 }
 .player-companion-hud.companion-react{animation:companionBounce .5s ease;}
@@ -2132,6 +2163,22 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     </div>
     <div class="modal-body" style="margin-bottom:12px;">ปลดล็อคสกินใหม่ได้จาก Streak, เลเวล, และการปราบ Boss</div>
     <div id="skinGrid" class="skin-grid"></div>
+  </div>
+</div>
+
+<!-- Loot Item Detail Modal -->
+<div id="lootDetailModal" class="modal-overlay">
+  <div class="modal-card" style="max-width:340px;">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:0;">
+      <span onclick="closeModal('lootDetailModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
+    </div>
+    <img id="lootDetailImg" class="loot-detail-img" src="" alt="" />
+    <div id="lootDetailRarity" class="loot-detail-rarity"></div>
+    <div id="lootDetailName" class="loot-detail-name"></div>
+    <div id="lootDetailLore" class="loot-detail-lore"></div>
+    <div class="modal-row" style="grid-template-columns:1fr;">
+      <button id="lootDetailEquipBtn" class="btn btn-primary btn-sm" onclick="toggleEquipLootFromDetail()">สวมใส่</button>
+    </div>
   </div>
 </div>
 

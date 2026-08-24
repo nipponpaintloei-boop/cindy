@@ -121,6 +121,19 @@ function badgeHtml(iconName, c1, c2, opts) {
 function lockedBadgeHtml() {
   return '<span class="gem-badge badge-locked" style="--badge-c1:#565b6c;--badge-c2:#23252f;">' + ICONS.lock + '</span>';
 }
+/** Same .gem-badge coin shell as badgeHtml(), but crops the loot item's own
+ * illustrated art into the disc instead of a BADGE_ICONS glyph — used only
+ * for the small "worn on the mascot" surfaces (corner badge, equip slot
+ * icon) where there isn't room for the full artwork. The rarity gradient
+ * still shows as a rim around the cropped art. Collection grid + item
+ * detail popup use the full image directly instead of this. */
+function lootBadgeHtml(item, opts) {
+  opts = opts || {};
+  const rarity = rarityDef(item.rarity);
+  const cls = 'gem-badge' + (opts.glow ? ' badge-glow' : '') + (opts.ring ? ' badge-ring' : '');
+  const style = '--badge-c1:' + rarity.c1 + ';--badge-c2:' + rarity.c2 + ';--badge-glow:' + rarity.glow + ';';
+  return '<span class="' + cls + '" style="' + style + '"><img class="gem-badge-art" src="' + item.img + '" alt="" /></span>';
+}
 
 /* ---- streak milestone treasure chests ---- */
 const STREAK_MILESTONES = [7, 14, 30, 100];
@@ -496,19 +509,45 @@ function rarityDef(id) {
   return RARITY_DEFS.find(r => r.id === id) || RARITY_DEFS[0];
 }
 const LOOT_ITEMS = [
-  { id: 'scrapPlate',    name: 'แผ่นเกราะเศษเหล็ก',   icon: 'gearCog', rarity: 'common' },
-  { id: 'wornGrip',      name: 'ผ้าพันมือเก่า',       icon: 'mitten',  rarity: 'common' },
-  { id: 'basicShield',   name: 'โล่ฝึกหัด',           icon: 'shield',  rarity: 'common' },
-  { id: 'ironFang',      name: 'เขี้ยว IRON MAW',      icon: 'fang',    rarity: 'uncommon' },
-  { id: 'scoutScarf',    name: 'ผ้าพันคอสอดแนม',      icon: 'scarf',   rarity: 'uncommon' },
-  { id: 'trainerGi',     name: 'ชุดฝึกซ้อมเก่าแก่',    icon: 'gi',      rarity: 'uncommon' },
-  { id: 'voidShard',     name: 'เศษเสี้ยว VOID',       icon: 'vortex',  rarity: 'rare' },
-  { id: 'reaperFeather', name: 'ขนปีก WING REAPER',    icon: 'wing',    rarity: 'rare' },
-  { id: 'grinderCog',    name: 'เฟือง GRINDER-1',      icon: 'gearCog', rarity: 'epic' },
-  { id: 'coreFragment',  name: 'ชิ้นส่วนแกนปฏิกรณ์',   icon: 'core',    rarity: 'epic' },
-  { id: 'twinBlades',    name: 'ดาบคู่นักรบ',          icon: 'swordsCross', rarity: 'epic' },
-  { id: 'championCrown', name: 'มงกุฎผู้พิชิต',        icon: 'crown',   rarity: 'mythic' },
-  { id: 'phoenixCore',   name: 'แก่นเพลิงอมตะ',        icon: 'flame',   rarity: 'mythic' }
+  { id: 'scrapPlate',    name: 'แผ่นเกราะเศษเหล็ก',   icon: 'gearCog', rarity: 'common',
+    img: 'assets/loot/scrapPlate.png',
+    lore: 'ปะติดปะต่อจากเศษเกราะที่เก็บได้หลังศึกแรก ๆ ยังไม่สวยหรู แต่กันได้ทุกหมัดแรกที่ไม่มีใครกันให้' },
+  { id: 'wornGrip',      name: 'ผ้าพันมือเก่า',       icon: 'mitten',  rarity: 'common',
+    img: 'assets/loot/wornGrip.png',
+    lore: 'ผ้าพันมือผืนแรกที่แลกมาด้วยเหงื่อ เก่าจนสีซีดแต่ไม่เคยขาดแม้แต่เซตเดียว' },
+  { id: 'basicShield',   name: 'โล่ฝึกหัด',           icon: 'shield',  rarity: 'common',
+    img: 'assets/loot/basicShield.png',
+    lore: 'โล่ไม้แผ่นแรกที่ใช้ฝึกรับแรงกระแทก รอยบุบทุกรอยคือบทเรียนของวันที่ยังไม่แข็งแรงพอ' },
+  { id: 'ironFang',      name: 'เขี้ยว IRON MAW',      icon: 'fang',    rarity: 'uncommon',
+    img: 'assets/loot/ironFang.png',
+    lore: 'เขี้ยวที่หลุดจากขากรรไกรของ IRON MAW ตอนมันพ่ายให้ความแข็งแกร่งที่ฝึกมาไม่หยุด' },
+  { id: 'scoutScarf',    name: 'ผ้าพันคอสอดแนม',      icon: 'scarf',   rarity: 'uncommon',
+    img: 'assets/loot/scoutScarf.png',
+    lore: 'ผ้าพันคอของนักสอดแนมที่แอบตามดูฟอร์มการฝึกอยู่ไกล ๆ ก่อนยอมมอบให้ด้วยความเคารพ' },
+  { id: 'trainerGi',     name: 'ชุดฝึกซ้อมเก่าแก่',    icon: 'gi',      rarity: 'uncommon',
+    img: 'assets/loot/trainerGi.png',
+    lore: 'ชุดฝึกของครูฝึกรุ่นก่อน ส่งต่อกันมาให้คนที่พิสูจน์แล้วว่าไม่ยอมแพ้กลางทาง' },
+  { id: 'voidShard',     name: 'เศษเสี้ยว VOID',       icon: 'vortex',  rarity: 'rare',
+    img: 'assets/loot/voidShard.png',
+    lore: 'เศษเสี้ยวที่หลุดออกจากร่าง VOID-9 หลังมันแตกสลาย ยังสั่นไหวราวกับมีพลังงานเหลืออยู่ในนั้น' },
+  { id: 'reaperFeather', name: 'ขนปีก WING REAPER',    icon: 'wing',    rarity: 'rare',
+    img: 'assets/loot/reaperFeather.png',
+    lore: 'ขนปีกที่ร่วงจาก WING REAPER ตอนมันโฉบลงมาท้าทาย แล้วพ่ายให้ความอึดที่ไม่มีวันหมด' },
+  { id: 'grinderCog',    name: 'เฟือง GRINDER-1',      icon: 'gearCog', rarity: 'epic',
+    img: 'assets/loot/grinderCog.png',
+    lore: 'เฟืองหลักของ GRINDER-1 ที่หยุดหมุนเป็นครั้งแรกในรอบหลายสัปดาห์ เมื่อเจอแรงที่มันหยุดไม่ได้' },
+  { id: 'coreFragment',  name: 'ชิ้นส่วนแกนปฏิกรณ์',   icon: 'core',    rarity: 'epic',
+    img: 'assets/loot/coreFragment.png',
+    lore: 'ชิ้นส่วนแกนปฏิกรณ์จาก CORE-ZERO ยังเปล่งแสงจาง ๆ เหมือนไม่ยอมรับว่าตัวเองพ่ายไปแล้ว' },
+  { id: 'twinBlades',    name: 'ดาบคู่นักรบ',          icon: 'swordsCross', rarity: 'epic',
+    img: 'assets/loot/twinBlades.png',
+    lore: 'ดาบคู่ที่ตีขึ้นจากชัยชนะติดต่อกันหลายศึก แต่ละครั้งที่ฟันคือแรงที่สะสมมาโดยไม่มีวันหยุด' },
+  { id: 'championCrown', name: 'มงกุฎผู้พิชิต',        icon: 'crown',   rarity: 'mythic',
+    img: 'assets/loot/championCrown.png',
+    lore: 'มงกุฎที่มอบให้เฉพาะผู้พิชิตทุก Boss ในสังเวียน สัญลักษณ์ของนักสู้ที่ไม่เคยเลิกกลางคัน' },
+  { id: 'phoenixCore',   name: 'แก่นเพลิงอมตะ',        icon: 'flame',   rarity: 'mythic',
+    img: 'assets/loot/phoenixCore.png',
+    lore: 'แก่นเพลิงที่ไม่เคยดับ แม้ในวันที่ล้มเหลว มันก็ยังคุกรุ่นรอวันลุกขึ้นมาใหม่' }
 ];
 function loadLootInventory() {
   try { return JSON.parse(localStorage.getItem(KEY_LOOT_INVENTORY)) || {}; }
@@ -570,8 +609,7 @@ function applyEquippedLootBadge(elId) {
   if (!el) return;
   const item = equippedLootItem();
   if (item) {
-    const rarity = rarityDef(item.rarity);
-    el.innerHTML = badgeHtml(item.icon, rarity.c1, rarity.c2, { glow: true, ring: true, glowColor: rarity.glow });
+    el.innerHTML = lootBadgeHtml(item, { glow: true, ring: true });
     el.classList.add('show');
   } else {
     el.innerHTML = '';
@@ -613,19 +651,57 @@ function renderLootGrid(containerId) {
     const isEquipped = owned && item.id === equippedId;
     const rarity = rarityDef(item.rarity);
     const cls = 'skin-item loot-item' + (owned ? '' : ' locked') + (isEquipped ? ' active' : '');
-    const clickAttr = owned ? ' onclick="toggleEquipLoot(\'' + item.id + '\')"' : '';
-    const badge = owned
-      ? badgeHtml(item.icon, rarity.c1, rarity.c2, { glow: true, ring: true, glowColor: rarity.glow })
-      : lockedBadgeHtml();
+    const clickAttr = owned ? ' onclick="openLootDetail(\'' + item.id + '\')"' : '';
+    // Full artwork in the grid when owned (mixed approach — see lootBadgeHtml
+    // for the small cropped version used on the mascot itself); locked slots
+    // keep the generic lock glyph so the art stays a surprise until earned.
+    const artHtml = owned
+      ? '<img class="loot-thumb" src="' + item.img + '" alt="' + item.name + '" />'
+      : '<div class="collection-emoji" style="font-size:30px;">' + lockedBadgeHtml() + '</div>';
     const cornerHtml = isEquipped ? '<div class="active-check">' + iconHtml('check') + '</div>'
       : (owned && count > 1 ? '<div class="loot-count">x' + count + '</div>' : (owned ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>'));
     return '<div class="' + cls + '"' + clickAttr + ' style="' + (owned ? '--loot-rarity:' + rarity.glow + ';' : '') + '">'
       + cornerHtml
-      + '<div class="collection-emoji" style="font-size:30px;">' + badge + '</div>'
+      + artHtml
       + '<div class="skin-name" style="color:' + (owned ? rarity.c2 : '') + ';">' + (owned ? item.name : '???') + '</div>'
       + '<div class="skin-cond" style="color:' + (owned ? rarity.c2 : '') + ';">' + (owned ? (isEquipped ? 'สวมใส่อยู่' : rarity.label) : rarity.label) + '</div>'
       + '</div>';
   }).join('');
+}
+
+/* ---- loot item detail popup ----
+ * Opened by tapping an owned tile in the collection grid (locked tiles
+ * aren't clickable, so the art + lore stay a surprise until earned). Shows
+ * the full illustration + lore, with the equip/unequip action moved here
+ * instead of firing straight from the grid tap. */
+function openLootDetail(itemId) {
+  const item = LOOT_ITEMS.find(it => it.id === itemId);
+  const inv = loadLootInventory();
+  if (!item || !(inv[itemId] > 0)) return;
+  const rarity = rarityDef(item.rarity);
+  const count = inv[itemId] || 0;
+  const isEquipped = loadEquippedLootId() === itemId;
+
+  const modal = document.getElementById('lootDetailModal');
+  modal.dataset.itemId = itemId;
+  document.getElementById('lootDetailImg').src = item.img;
+  document.getElementById('lootDetailImg').alt = item.name;
+  document.getElementById('lootDetailRarity').textContent = rarity.label + (count > 1 ? ' · x' + count : '');
+  document.getElementById('lootDetailRarity').style.color = rarity.c2;
+  document.getElementById('lootDetailName').textContent = item.name;
+  document.getElementById('lootDetailLore').textContent = item.lore || '';
+  const btn = document.getElementById('lootDetailEquipBtn');
+  btn.textContent = isEquipped ? 'ถอดออก' : 'สวมใส่';
+  btn.className = 'btn btn-sm ' + (isEquipped ? 'btn-outline' : 'btn-primary');
+
+  modal.classList.add('active');
+}
+function toggleEquipLootFromDetail() {
+  const modal = document.getElementById('lootDetailModal');
+  const itemId = modal.dataset.itemId;
+  if (!itemId) return;
+  toggleEquipLoot(itemId);
+  openLootDetail(itemId); // refresh button label/state in place
 }
 
 /** Monday 00:00 of the week containing `ts`. */
@@ -1532,7 +1608,7 @@ function renderCharacterEquipment() {
   const lootNameEl = document.getElementById('characterEquipLootName');
   if (lootIconEl) {
     lootIconEl.innerHTML = item
-      ? badgeHtml(item.icon, rarityDef(item.rarity).c1, rarityDef(item.rarity).c2, { glow: true, ring: true, glowColor: rarityDef(item.rarity).glow })
+      ? lootBadgeHtml(item, { glow: true, ring: true })
       : lockedBadgeHtml();
   }
   if (lootNameEl) lootNameEl.textContent = item ? item.name : 'ยังไม่ได้สวม';
