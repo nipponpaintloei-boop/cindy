@@ -356,6 +356,14 @@ body{
   40%{transform:translateX(-50%) scale(1.4) rotate(-4deg);}
   100%{transform:translateX(-50%) scale(1) rotate(0deg);}
 }
+/* same bump, without the translateX(-50%) — used only by the character
+   sheet's relocated (statically-positioned) level badge, see
+   .character-hero-info .mascot-level-badge.bump above */
+@keyframes badgeBumpChar{
+  0%{transform:scale(1) rotate(0deg);}
+  40%{transform:scale(1.4) rotate(-4deg);}
+  100%{transform:scale(1) rotate(0deg);}
+}
 
 /* ---- level-badge rank tiers ----
  * Same 5-level RANK_TIERS bands used for the avatar aura/gear badge, applied
@@ -570,11 +578,11 @@ body{
    right. Replaces the old centered-stack card for this screen only —
    Home's small icon avatar (#mascotAvatar) is untouched. */
 .character-sheet-hero{
-  display:flex;align-items:stretch;min-height:248px;
+  display:flex;align-items:stretch;min-height:260px;
   padding:0;overflow:visible;
 }
 .character-hero-img-wrap{
-  position:relative;width:44%;flex-shrink:0;
+  position:relative;width:50%;flex-shrink:0;
   background:radial-gradient(ellipse 140% 100% at 30% 20%,rgba(var(--mascot-accent-rgb),.22),transparent 70%);
 }
 /* fade the art into the card background instead of a hard seam, tinted
@@ -591,13 +599,25 @@ body{
    never clipped — only the photo itself needs the rounded corner. */
 #characterAvatar{position:absolute;inset:0;width:100%;height:100%;}
 #characterAvatar img{
-  width:100%;height:100%;object-fit:cover;object-position:center 12%;
+  width:100%;height:100%;object-fit:cover;object-position:center 8%;
   border-radius:var(--radius) 0 0 var(--radius);
 }
 .character-hero-info{
   flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;
   padding:22px 22px 22px 14px;text-align:right;
 }
+/* level chip relocated here from the avatar's feet (was overlapping the
+   character and floating with no anchor) — right-aligned above the rank
+   pill, enlarged, and switched to normal flow instead of the absolute
+   bottom-center placement it uses on Home's #mascotLevelBadge. Scoped to
+   .character-hero-info only, so Home's own level badge is untouched. */
+.character-hero-info .mascot-level-badge{
+  position:static;align-self:flex-end;transform:none;
+  font-size:22px;letter-spacing:.5px;
+  padding:5px 16px 4px;border-radius:8px;
+  margin-bottom:9px;
+}
+.character-hero-info .mascot-level-badge.bump{animation:badgeBumpChar .5s ease;}
 .character-hero-info .mascot-rank{align-self:flex-end;}
 .character-hero-info .character-cp{margin-top:10px;}
 .character-hero-info .mascot-skin-title{margin:10px 0 0;text-align:right;}
@@ -1788,13 +1808,13 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <div class="character-hero-img-wrap">
           <div class="mascot-avatar" id="characterAvatar">
             <img id="characterMascotImg" src="assets/mascot/mascot.png" alt="" />
-            <div id="characterLevelBadge" class="mascot-level-badge">LV.1</div>
             <div id="characterGearBadge" class="mascot-gear-badge"></div>
             <div id="characterSkinAccessory" class="mascot-skin-accessory"></div>
             <div id="characterLootBadge" class="mascot-loot-badge"></div>
           </div>
         </div>
         <div class="character-hero-info">
+          <div id="characterLevelBadge" class="mascot-level-badge">LV.1</div>
           <div id="characterRank" class="mascot-rank rank-recruit" style="display:inline-block;"></div>
           <div id="characterCP" class="character-cp"></div>
           <div id="characterSkinTitle" class="mascot-skin-title"></div>
