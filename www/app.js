@@ -517,15 +517,15 @@ function saveBossDefeatSeenWeek(key) {
 function bossSilhouetteMarkup(bossId) {
   switch (bossId) {
     case 'grinder1':
-      return '<img src="boss-grinder1.png" alt="GRINDER-1" style="width:100%;height:100%;object-fit:contain;" />';
+      return '<img src="assets/boss/boss-grinder1.png" alt="GRINDER-1" style="width:100%;height:100%;object-fit:contain;" />';
     case 'ironmaw':
-      return '<img src="boss-ironmaw.png" alt="IRON MAW" style="width:100%;height:100%;object-fit:contain;" />';
+      return '<img src="assets/boss/boss-ironmaw.png" alt="IRON MAW" style="width:100%;height:100%;object-fit:contain;" />';
     case 'void9':
-      return '<img src="boss-void9.png" alt="VOID-9" style="width:100%;height:100%;object-fit:contain;" />';
+      return '<img src="assets/boss/boss-void9.png" alt="VOID-9" style="width:100%;height:100%;object-fit:contain;" />';
     case 'wingreaper':
-      return '<img src="boss-wingreaper.png" alt="WING REAPER" style="width:100%;height:100%;object-fit:contain;" />';
+      return '<img src="assets/boss/boss-wingreaper.png" alt="WING REAPER" style="width:100%;height:100%;object-fit:contain;" />';
     case 'corezero':
-      return '<img src="boss-corezero.png" alt="CORE-ZERO" style="width:100%;height:100%;object-fit:contain;" />';
+      return '<img src="assets/boss/boss-corezero.png" alt="CORE-ZERO" style="width:100%;height:100%;object-fit:contain;" />';
     default:
       return '';
   }
@@ -1019,7 +1019,7 @@ function renderMascotCard() {
   const line = pickDailyLine(pool);
   headline.textContent = fillTemplate(line.h, { streak });
   sub.textContent = fillTemplate(line.s, { streak });
-  if (img) img.src = 'mascot.png';
+  if (img) img.src = 'assets/mascot/mascot.png';
 
   renderXpBar();
   applyActiveMascotSkinFilter();
@@ -1223,32 +1223,32 @@ const MASCOT_SKINS = [
     aura: 'rgba(190,90,255,.65)', accIcon: 'crown', accC1: '#fff0b0', accC2: '#d9a71b', strong: true,
     unlock: { type: 'streak', value: 100 }, cond: 'เปิดหีบ Streak 100 วัน' },
 
-  { id: 'lv5', name: 'นักเรียนวินัย LV.5', img: 'skin-lv5.png', filter: 'none',
+  { id: 'lv5', name: 'นักเรียนวินัย LV.5', img: 'assets/mascot/skin-lv5.png', filter: 'none',
     aura: 'rgba(110,200,90,.5)', accIcon: 'boxGlove', accC1: '#c8f0b8', accC2: '#4a9a34',
     unlock: { type: 'level', value: 5 }, cond: 'ถึง LV.5' },
-  { id: 'lv10', name: 'มือฝึกฝน LV.10', img: 'skin-lv10.png', filter: 'none',
+  { id: 'lv10', name: 'มือฝึกฝน LV.10', img: 'assets/mascot/skin-lv10.png', filter: 'none',
     aura: 'rgba(60,210,170,.55)', accIcon: 'gi', accC1: '#b8f5e0', accC2: '#1f9a7a',
     unlock: { type: 'level', value: 10 }, cond: 'ถึง LV.10' },
-  { id: 'lv15', name: 'ยอดฝีมือ LV.15', img: 'skin-lv15.png', filter: 'none',
+  { id: 'lv15', name: 'ยอดฝีมือ LV.15', img: 'assets/mascot/skin-lv15.png', filter: 'none',
     aura: 'rgba(70,140,255,.6)', accIcon: 'swordsCross', accC1: '#b9d3ff', accC2: '#2f5fdb',
     unlock: { type: 'level', value: 15 }, cond: 'ถึง LV.15' },
-  { id: 'lv20', name: 'จอมพลังกาย LV.20', img: 'skin-lv20.png', filter: 'none',
+  { id: 'lv20', name: 'จอมพลังกาย LV.20', img: 'assets/mascot/skin-lv20.png', filter: 'none',
     aura: 'rgba(255,60,150,.65)', accIcon: 'flame', accC1: '#ffc2dd', accC2: '#e0186f', strong: true,
     unlock: { type: 'level', value: 20 }, cond: 'ถึง LV.20' },
 
-  { id: 'bossGrinder1', name: 'ผู้พิชิต GRINDER-1', img: 'skin-bossgrinder1.png', filter: 'none',
+  { id: 'bossGrinder1', name: 'ผู้พิชิต GRINDER-1', img: 'assets/mascot/skin-bossgrinder1.png', filter: 'none',
     aura: 'rgba(232,80,40,.6)', accIcon: 'gearCog', accC1: '#ffb89a', accC2: '#c23f14', strong: true,
     unlock: { type: 'boss', bossId: 'grinder1' }, cond: 'ปราบ GRINDER-1 สำเร็จ' },
-  { id: 'bossIronmaw', name: 'ผู้พิชิต IRON MAW', img: 'skin-bossironmaw.png', filter: 'none',
+  { id: 'bossIronmaw', name: 'ผู้พิชิต IRON MAW', img: 'assets/mascot/skin-bossironmaw.png', filter: 'none',
     aura: 'rgba(200,160,80,.6)', accIcon: 'fang', accC1: '#f0dba0', accC2: '#a67a1f', strong: true,
     unlock: { type: 'boss', bossId: 'ironmaw' }, cond: 'ปราบ IRON MAW สำเร็จ' },
-  { id: 'bossVoid9', name: 'ผู้พิชิต VOID-9', img: 'skin-bossvoid9.png', filter: 'none',
+  { id: 'bossVoid9', name: 'ผู้พิชิต VOID-9', img: 'assets/mascot/skin-bossvoid9.png', filter: 'none',
     aura: 'rgba(130,60,220,.65)', accIcon: 'vortex', accC1: '#d9b8ff', accC2: '#6a1fc7', strong: true,
     unlock: { type: 'boss', bossId: 'void9' }, cond: 'ปราบ VOID-9 สำเร็จ' },
-  { id: 'bossWingreaper', name: 'ผู้พิชิต WING REAPER', img: 'skin-bosswingreaper.png', filter: 'none',
+  { id: 'bossWingreaper', name: 'ผู้พิชิต WING REAPER', img: 'assets/mascot/skin-bosswingreaper.png', filter: 'none',
     aura: 'rgba(70,200,190,.6)', accIcon: 'wing', accC1: '#a8f0e8', accC2: '#1a8a7d', strong: true,
     unlock: { type: 'boss', bossId: 'wingreaper' }, cond: 'ปราบ WING REAPER สำเร็จ' },
-  { id: 'bossCorezero', name: 'ผู้พิชิต CORE-ZERO', img: 'skin-bosscorezero.png', filter: 'none',
+  { id: 'bossCorezero', name: 'ผู้พิชิต CORE-ZERO', img: 'assets/mascot/skin-bosscorezero.png', filter: 'none',
     aura: 'rgba(255,80,200,.7)', accIcon: 'core', accC1: '#ffc2ee', accC2: '#c71494', strong: true,
     unlock: { type: 'boss', bossId: 'corezero' }, cond: 'ปราบ CORE-ZERO สำเร็จ' }
 ];
@@ -1277,7 +1277,7 @@ function applyActiveMascotSkinFilter() {
   if (!img) return;
   const skin = MASCOT_SKINS.find(s => s.id === loadActiveSkin()) || MASCOT_SKINS[0];
   const unlocked = isSkinUnlocked(skin);
-  img.src = (unlocked && skin.img) ? skin.img : 'mascot.png';
+  img.src = (unlocked && skin.img) ? skin.img : 'assets/mascot/mascot.png';
   img.style.filter = unlocked ? skin.filter : 'none';
 
   if (avatar) {
@@ -1312,7 +1312,7 @@ function renderSkinGrid() {
     const thumbFilter = unlocked ? skin.filter : 'grayscale(1) brightness(.4)';
     const thumbShadow = unlocked && skin.aura ? 'box-shadow:0 0 ' + (skin.strong ? '14px 3px' : '9px 2px') + ' ' + skin.aura + ';border-radius:50%;' : '';
     const accessoryHtml = unlocked && skin.accIcon ? '<div class="skin-thumb-accessory">' + badgeHtml(skin.accIcon, skin.accC1, skin.accC2, { glow: !!skin.strong }) + '</div>' : '';
-    const thumbSrc = (unlocked && skin.img) ? skin.img : 'mascot.png';
+    const thumbSrc = (unlocked && skin.img) ? skin.img : 'assets/mascot/mascot.png';
     return '<div class="' + cls + '"' + clickAttr + '>' + cornerHtml +
       '<div class="skin-thumb-wrap" style="' + thumbShadow + '"><img src="' + thumbSrc + '" style="filter:' + thumbFilter + ';" alt="" />' + accessoryHtml + '</div>' +
       '<div class="skin-name">' + skin.name + '</div>' +
@@ -1364,7 +1364,7 @@ function renderCollectionSkins() {
     const thumbFilter = unlocked ? skin.filter : 'grayscale(1) brightness(.4)';
     const thumbShadow = unlocked && skin.aura ? 'box-shadow:0 0 ' + (skin.strong ? '14px 3px' : '9px 2px') + ' ' + skin.aura + ';border-radius:50%;' : '';
     const accessoryHtml = unlocked && skin.accIcon ? '<div class="skin-thumb-accessory">' + badgeHtml(skin.accIcon, skin.accC1, skin.accC2, { glow: !!skin.strong }) + '</div>' : '';
-    const thumbSrc = (unlocked && skin.img) ? skin.img : 'mascot.png';
+    const thumbSrc = (unlocked && skin.img) ? skin.img : 'assets/mascot/mascot.png';
     return '<div class="' + cls + '">'
       + (isActive ? '<div class="active-check">' + iconHtml('check') + '</div>' : (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>'))
       + '<div class="skin-thumb-wrap" style="' + thumbShadow + '"><img src="' + thumbSrc + '" style="filter:' + thumbFilter + ';" alt="" />' + accessoryHtml + '</div>'
