@@ -1597,25 +1597,27 @@ function renderCharacterSheet() {
 }
 
 /* ================= MASCOT SKINS =================
- * Skins are pure CSS filters applied on top of the existing mascot art —
- * no new image assets. Unlock state is never stored separately; each skin
- * derives its unlocked/locked status from state that's already tracked
- * elsewhere and only ever ratchets upward (opened chests, highest level
- * ever seen, bosses ever defeated), so there's nothing to keep in sync. */
+ * Most tiers (streak chests, level milestones, boss kills) use dedicated
+ * full-body art via `img`; a skin without one falls back to the plain
+ * mascot.png with its `filter` applied on top. Unlock state is never
+ * stored separately; each skin derives its unlocked/locked status from
+ * state that's already tracked elsewhere and only ever ratchets upward
+ * (opened chests, highest level ever seen, bosses ever defeated), so
+ * there's nothing to keep in sync. */
 const KEY_ACTIVE_SKIN = 'cindy_active_skin';
 const MASCOT_SKINS = [
   { id: 'default', name: 'Classic', filter: 'none', unlock: { type: 'always' } },
 
-  { id: 'streak7', name: 'นักสู้ 7 วัน', filter: 'sepia(.35) saturate(1.7) hue-rotate(-8deg)',
+  { id: 'streak7', name: 'นักสู้ 7 วัน', img: 'assets/mascot/skin-streak7.png', filter: 'none',
     aura: 'rgba(224,150,61,.55)', accIcon: 'scarf', accC1: '#f6cf94', accC2: '#c07a2a',
     unlock: { type: 'streak', value: 7 }, cond: 'เปิดหีบ Streak 7 วัน' },
-  { id: 'streak14', name: 'นักสู้ 14 วัน', filter: 'grayscale(.25) saturate(1.4) hue-rotate(180deg) brightness(1.08)',
+  { id: 'streak14', name: 'นักสู้ 14 วัน', img: 'assets/mascot/skin-streak14.png', filter: 'none',
     aura: 'rgba(80,190,200,.55)', accIcon: 'mitten', accC1: '#a9eaf0', accC2: '#2a97a3',
     unlock: { type: 'streak', value: 14 }, cond: 'เปิดหีบ Streak 14 วัน' },
-  { id: 'streak30', name: 'นักรบ 30 วัน', filter: 'sepia(.55) saturate(2.1) hue-rotate(15deg)',
+  { id: 'streak30', name: 'นักรบ 30 วัน', img: 'assets/mascot/skin-streak30.png', filter: 'none',
     aura: 'rgba(255,140,60,.6)', accIcon: 'shield', accC1: '#ffd7ad', accC2: '#e0641a',
     unlock: { type: 'streak', value: 30 }, cond: 'เปิดหีบ Streak 30 วัน' },
-  { id: 'streak100', name: 'ตำนาน 100 วัน', filter: 'saturate(2.4) hue-rotate(270deg) brightness(1.15)',
+  { id: 'streak100', name: 'ตำนาน 100 วัน', img: 'assets/mascot/skin-streak100.png', filter: 'none',
     aura: 'rgba(190,90,255,.65)', accIcon: 'crown', accC1: '#fff0b0', accC2: '#d9a71b', strong: true,
     unlock: { type: 'streak', value: 100 }, cond: 'เปิดหีบ Streak 100 วัน' },
 
