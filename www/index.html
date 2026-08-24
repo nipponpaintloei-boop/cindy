@@ -271,6 +271,22 @@ body{
   text-shadow:0 0 8px rgba(255,215,0,.5);
 }
 
+/* ---- title chip, paired with the rank badge (shows equipped skin name) ---- */
+.mascot-skin-title{
+  display:none;font-size:11px;font-weight:700;letter-spacing:.3px;
+  color:var(--text-dim);margin:-2px 0 5px;
+}
+.mascot-skin-title.show{display:block;}
+.mascot-skin-title.title-strong{
+  color:#FFD700;text-shadow:0 0 6px rgba(255,215,0,.4);
+}
+.character-sheet-link{
+  display:inline-flex;align-items:center;gap:4px;margin-top:9px;
+  background:none;border:none;padding:0;font-family:inherit;
+  font-size:11px;font-weight:700;letter-spacing:.4px;color:var(--primary);cursor:pointer;
+}
+.character-sheet-link .icon-inline{width:12px;height:12px;}
+
 .mascot-level-badge{
   position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);z-index:2;
   font-family:var(--font-display);font-size:12px;letter-spacing:.5px;
@@ -475,6 +491,60 @@ body{
   border-radius:var(--radius-sm);padding:12px;margin-top:2px;
 }
 .collection-emoji{font-size:26px;line-height:1;margin-bottom:4px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));}
+
+/* ---- loot drops ---- */
+.loot-item.locked .skin-name{color:var(--text-faint);}
+.loot-count{
+  position:absolute;top:4px;right:5px;font-family:var(--font-display);
+  font-size:10px;color:var(--text-dim);line-height:1;
+}
+
+/* ---- character sheet ---- */
+.character-sheet-card{
+  background:linear-gradient(155deg,var(--card) 0%,var(--bg-elev) 100%);
+  border:1px solid var(--card-border);border-radius:var(--radius);
+  padding:26px 20px 20px;text-align:center;margin-top:6px;
+}
+.character-avatar-wrap{display:flex;justify-content:center;}
+#characterAvatar{width:96px;height:96px;}
+#characterAvatar img{width:128%;height:164%;}
+.character-sheet-card .mascot-rank{margin:14px 0 4px;}
+.character-sheet-card .mascot-skin-title{margin:0;}
+
+/* ---- companion HUD (Custom Workout player) ---- */
+.player-companion-hud{
+  position:fixed;right:16px;bottom:104px;z-index:30;
+  width:52px;height:52px;border-radius:50%;
+  background:var(--bg-elev);border:1.5px solid var(--card-border);
+  display:flex;align-items:center;justify-content:center;overflow:visible;
+  box-shadow:0 4px 14px rgba(0,0,0,.35);
+  --skin-aura:transparent;
+}
+.player-companion-hud.skin-glow{box-shadow:0 4px 14px rgba(0,0,0,.35),0 0 12px 3px var(--skin-aura);}
+.player-companion-hud img{
+  position:absolute;left:50%;bottom:-1px;width:118%;height:150%;max-width:none;
+  transform:translateX(-50%);object-fit:contain;object-position:bottom;pointer-events:none;
+}
+.player-companion-hud.companion-react{animation:companionBounce .5s ease;}
+@keyframes companionBounce{
+  0%{transform:translateY(0) scale(1);}
+  30%{transform:translateY(-9px) scale(1.08);}
+  55%{transform:translateY(0) scale(.97);}
+  100%{transform:translateY(0) scale(1);}
+}
+
+/* ---- rest-skip bonus badge (same pop language as .combo-badge, cooler tone) ---- */
+.rest-bonus-badge{
+  position:absolute;top:-6px;left:50%;transform:translateX(-50%) scale(0);
+  font-family:var(--font-display);font-size:16px;letter-spacing:.5px;color:#fff;
+  background:linear-gradient(90deg,var(--pull),#2ec9c9);
+  padding:4px 12px 3px;border-radius:20px;white-space:nowrap;
+  box-shadow:0 3px 12px rgba(61,111,224,.5);
+  opacity:0;transition:transform .25s cubic-bezier(.3,1.4,.4,1), opacity .2s ease;
+  pointer-events:none;
+}
+.rest-bonus-badge.show{opacity:1;transform:translateX(-50%) scale(1);}
+.rest-bonus-badge.pulse{animation:comboPulse .35s ease;}
 
 /* ---- streak milestone treasure chest ---- */
 .treasure-chest-btn{
@@ -1031,12 +1101,14 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         </div>
         <div class="mascot-text">
           <div id="mascotRank" class="mascot-rank rank-recruit"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 7.6-7 9-4-1.4-7-4.4-7-9V6z"/></svg></span> RECRUIT</div>
+          <div id="mascotSkinTitle" class="mascot-skin-title"></div>
           <div id="mascotHeadline" class="mascot-headline">ยังไม่มีประวัติการเล่น</div>
           <div id="mascotSub" class="mascot-sub">เริ่มวันนี้เลย แล้วมาสร้าง streak กัน</div>
           <div class="xp-bar-wrap">
             <div class="xp-bar-track"><div id="xpBarFill" class="xp-bar-fill" style="width:0%;"></div></div>
             <div id="xpBarLabel" class="xp-bar-label">0 / 100 XP</div>
           </div>
+          <button class="character-sheet-link" onclick="go('character')">ดูตัวละคร <span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></button>
         </div>
       </div>
 
@@ -1502,6 +1574,44 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 
       <div class="section-label">TITLES</div>
       <div id="collectionTitleGrid" class="skin-grid" style="max-height:none;overflow:visible;"></div>
+
+      <div class="section-label" style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span>LOOT (จากการปราบบอส)</span>
+        <span id="collectionLootSummary" style="font-size:10px;color:var(--text-faint);font-weight:600;letter-spacing:.3px;">เก็บได้ 0 / 0 ชิ้น</span>
+      </div>
+      <div id="collectionLootGrid" class="skin-grid" style="max-height:none;overflow:visible;"></div>
+    </div>
+  </section>
+
+  <!-- CHARACTER SHEET -->
+  <section id="screen-character" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('home')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">CHARACTER</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div class="character-sheet-card">
+        <div class="character-avatar-wrap">
+          <div class="mascot-avatar" id="characterAvatar">
+            <img id="characterMascotImg" src="assets/mascot/mascot.png" alt="" />
+            <div id="characterLevelBadge" class="mascot-level-badge">LV.1</div>
+            <div id="characterGearBadge" class="mascot-gear-badge"></div>
+            <div id="characterSkinAccessory" class="mascot-skin-accessory"></div>
+          </div>
+        </div>
+        <div id="characterRank" class="mascot-rank rank-recruit" style="display:inline-block;"></div>
+        <div id="characterSkinTitle" class="mascot-skin-title"></div>
+      </div>
+
+      <div class="section-label">STATS</div>
+      <div class="metric-card" style="padding:16px;">
+        <div id="characterStatBarList"></div>
+      </div>
+
+      <div class="empty-hint" style="padding-top:4px;">ไอเทมที่เก็บได้จากการปราบบอส ดูได้ที่หน้า COLLECTION</div>
     </div>
   </section>
 
@@ -1628,6 +1738,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
           <div id="playerDigits" class="timer-digits tabular">10</div>
           <div id="playerPhaseLabel" class="timer-sub">ทำท่านี้</div>
         </div>
+        <div id="restBonusBadge" class="rest-bonus-badge"></div>
       </div>
 
       <div id="playerExerciseName" style="text-align:center;font-family:var(--font-display);font-size:26px;letter-spacing:.5px;margin:4px 0 20px;"></div>
@@ -1640,6 +1751,9 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       <button id="playerDoneBtn" class="btn btn-success save-round-btn" style="display:none;" onclick="confirmPlayerExerciseDone()"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg></span> เสร็จแล้ว</button>
       <button id="playerPauseBtn" class="btn btn-outline" style="display:none;" onclick="togglePlayerPause()">⏸ หยุดชั่วคราว</button>
       <button id="playerSkipBtn" class="btn btn-outline" style="display:none;" onclick="skipPlayerStep()">ข้าม</button>
+    </div>
+    <div id="playerCompanionHud" class="player-companion-hud">
+      <img id="playerCompanionImg" src="assets/mascot/mascot.png" alt="" />
     </div>
   </section>
 

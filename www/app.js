@@ -475,6 +475,99 @@ function saveBossEverDefeated(list) {
   localStorage.setItem(KEY_BOSS_EVER_DEFEATED, JSON.stringify(list));
 }
 
+/* ================= BOSS LOOT DROPS =================
+ * Every boss kill rolls one random item from a rarity-weighted table —
+ * reuses the same BADGE_ICONS glyph set as the boss/skin accessories, so
+ * no new art assets are needed. The roll is skewed toward rarer tiers the
+ * tougher the fight was (further into BOSS_ROSTER, or further into a
+ * repeat lap — see currentBossState()'s own baseHp+lap scaling), so late-
+ * game boss farming actually feels like it pays off in better loot.
+ * Owned items are a simple id->count map in localStorage; nothing but the
+ * count ever changes, so merge-on-import is just a per-key max/sum. */
+const KEY_LOOT_INVENTORY = 'cindy_loot_inventory';
+const RARITY_DEFS = [
+  { id: 'common',   label: 'COMMON',   c1: '#e2e6ec', c2: '#5b6472', glow: 'rgba(154,165,177,.5)',  weight: 100 },
+  { id: 'uncommon', label: 'UNCOMMON', c1: '#c7f5df', c2: '#1f9a5c', glow: 'rgba(74,217,145,.55)',  weight: 55 },
+  { id: 'rare',     label: 'RARE',     c1: '#c3dcff', c2: '#2f5fdb', glow: 'rgba(61,155,255,.6)',   weight: 24 },
+  { id: 'epic',     label: 'EPIC',     c1: '#ecd2ff', c2: '#8a2fdb', glow: 'rgba(177,101,255,.65)', weight: 10 },
+  { id: 'mythic',   label: 'MYTHIC',   c1: '#ffe9b0', c2: '#d9861b', glow: 'rgba(255,179,64,.75)',  weight: 3 }
+];
+function rarityDef(id) {
+  return RARITY_DEFS.find(r => r.id === id) || RARITY_DEFS[0];
+}
+const LOOT_ITEMS = [
+  { id: 'scrapPlate',    name: 'แผ่นเกราะเศษเหล็ก',   icon: 'gearCog', rarity: 'common' },
+  { id: 'wornGrip',      name: 'ผ้าพันมือเก่า',       icon: 'mitten',  rarity: 'common' },
+  { id: 'basicShield',   name: 'โล่ฝึกหัด',           icon: 'shield',  rarity: 'common' },
+  { id: 'ironFang',      name: 'เขี้ยว IRON MAW',      icon: 'fang',    rarity: 'uncommon' },
+  { id: 'scoutScarf',    name: 'ผ้าพันคอสอดแนม',      icon: 'scarf',   rarity: 'uncommon' },
+  { id: 'trainerGi',     name: 'ชุดฝึกซ้อมเก่าแก่',    icon: 'gi',      rarity: 'uncommon' },
+  { id: 'voidShard',     name: 'เศษเสี้ยว VOID',       icon: 'vortex',  rarity: 'rare' },
+  { id: 'reaperFeather', name: 'ขนปีก WING REAPER',    icon: 'wing',    rarity: 'rare' },
+  { id: 'grinderCog',    name: 'เฟือง GRINDER-1',      icon: 'gearCog', rarity: 'epic' },
+  { id: 'coreFragment',  name: 'ชิ้นส่วนแกนปฏิกรณ์',   icon: 'core',    rarity: 'epic' },
+  { id: 'twinBlades',    name: 'ดาบคู่นักรบ',          icon: 'swordsCross', rarity: 'epic' },
+  { id: 'championCrown', name: 'มงกุฎผู้พิชิต',        icon: 'crown',   rarity: 'mythic' },
+  { id: 'phoenixCore',   name: 'แก่นเพลิงอมตะ',        icon: 'flame',   rarity: 'mythic' }
+];
+function loadLootInventory() {
+  try { return JSON.parse(localStorage.getItem(KEY_LOOT_INVENTORY)) || {}; }
+  catch (e) { return {}; }
+}
+function saveLootInventory(inv) {
+  localStorage.setItem(KEY_LOOT_INVENTORY, JSON.stringify(inv));
+}
+function addLootItem(itemId) {
+  const inv = loadLootInventory();
+  inv[itemId] = (inv[itemId] || 0) + 1;
+  saveLootInventory(inv);
+  return inv[itemId];
+}
+/** 0..1 difficulty score for the boss just defeated — further along the
+ * roster and further into repeat laps skews the loot roll toward rarer
+ * tiers (see rollLootDrop()). */
+function bossDifficultyScore(bossState) {
+  const idx = Math.max(0, BOSS_ROSTER.findIndex(b => b.id === bossState.boss.id));
+  const lap = Math.floor(bossState.weekIndex / BOSS_ROSTER.length);
+  const rosterPos = BOSS_ROSTER.length > 1 ? idx / (BOSS_ROSTER.length - 1) : 0;
+  return Math.min(1, rosterPos * 0.7 + Math.min(lap, 5) * 0.06);
+}
+function rollLootDrop(bossState) {
+  const difficulty = bossDifficultyScore(bossState);
+  const weights = RARITY_DEFS.map(r => r.id === 'common'
+    ? r.weight * (1 - difficulty * 0.55)
+    : r.weight * (1 + difficulty * 2.2));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let roll = Math.random() * total;
+  let chosen = RARITY_DEFS[0];
+  for (let i = 0; i < RARITY_DEFS.length; i++) {
+    if (roll < weights[i]) { chosen = RARITY_DEFS[i]; break; }
+    roll -= weights[i];
+  }
+  const pool = LOOT_ITEMS.filter(it => it.rarity === chosen.id);
+  return pool[Math.floor(Math.random() * pool.length)] || LOOT_ITEMS[0];
+}
+function renderLootGrid(containerId) {
+  const grid = document.getElementById(containerId);
+  if (!grid) return;
+  const inv = loadLootInventory();
+  grid.innerHTML = LOOT_ITEMS.map(item => {
+    const count = inv[item.id] || 0;
+    const owned = count > 0;
+    const rarity = rarityDef(item.rarity);
+    const cls = 'skin-item loot-item' + (owned ? '' : ' locked');
+    const badge = owned
+      ? badgeHtml(item.icon, rarity.c1, rarity.c2, { glow: true, ring: true, glowColor: rarity.glow })
+      : lockedBadgeHtml();
+    return '<div class="' + cls + '" style="' + (owned ? '--loot-rarity:' + rarity.glow + ';' : '') + '">'
+      + (owned && count > 1 ? '<div class="loot-count">x' + count + '</div>' : (owned ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>'))
+      + '<div class="collection-emoji" style="font-size:30px;">' + badge + '</div>'
+      + '<div class="skin-name" style="color:' + (owned ? rarity.c2 : '') + ';">' + (owned ? item.name : '???') + '</div>'
+      + '<div class="skin-cond" style="color:' + (owned ? rarity.c2 : '') + ';">' + rarity.label + '</div>'
+      + '</div>';
+  }).join('');
+}
+
 /** Monday 00:00 of the week containing `ts`. */
 function weekStart(ts) {
   const d = new Date(ts);
@@ -594,9 +687,13 @@ function renderBossCard() {
       everDefeated.push(state.boss.id);
       saveBossEverDefeated(everDefeated);
     }
-    showToast(firstTimeEver
-      ? ('ปราบ ' + state.boss.name + ' สำเร็จ! ปลดล็อคสกิน Mascot ใหม่')
-      : ('ปราบ ' + state.boss.name + ' สำเร็จ!'), firstTimeEver ? 'palette' : undefined);
+    const loot = rollLootDrop(state);
+    const lootCount = addLootItem(loot.id);
+    const lootRarity = rarityDef(loot.rarity);
+    let msg = 'ปราบ ' + state.boss.name + ' สำเร็จ!';
+    if (firstTimeEver) msg += ' ปลดล็อคสกิน Mascot ใหม่ ·';
+    msg += ' ได้ [' + lootRarity.label + '] ' + loot.name + (lootCount > 1 ? ' x' + lootCount : '');
+    showToast(msg, firstTimeEver ? 'palette' : 'gift');
   }
   renderBossDmgBreakdown();
 }
@@ -687,6 +784,7 @@ function go(name) {
   if (name === 'customschedule') renderCustomSchedule();
   if (name === 'collection') renderCollection();
   if (name === 'cardiolist') renderCardioList();
+  if (name === 'character') renderCharacterSheet();
 }
 
 /* ================= HOME (dashboard) ================= */
@@ -1219,8 +1317,8 @@ function computeStatInfo(totalReps) {
   }
   return { level, pct: req > 0 ? remaining / req : 0 };
 }
-function renderStatBars() {
-  const wrap = document.getElementById('statBarList');
+function renderStatBars(containerId) {
+  const wrap = document.getElementById(containerId || 'statBarList');
   if (!wrap) return;
   const all = loadSessions();
   const totals = { pull: 0, push: 0, squat: 0 };
@@ -1237,6 +1335,70 @@ function renderStatBars() {
       + '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + Math.round(info.pct * 100) + '%;background:' + def.color + ';"></div></div>'
       + '</div>';
   }).join('');
+}
+
+/* ================= CHARACTER SHEET =================
+ * Standalone "character" screen combining pieces that already exist
+ * elsewhere: the mascot avatar + its equipped skin (Home), the rank badge
+ * and title (Home), and the STR/PWR/END stat bars (Progress). Nothing new
+ * is computed or stored — this is purely a different arrangement of the
+ * same derived data, laid out like an RPG character sheet (mascot centered,
+ * stats around it) instead of a list item in the Progress screen. */
+function renderCharacterSheet() {
+  const img = document.getElementById('characterMascotImg');
+  const avatar = document.getElementById('characterAvatar');
+  const accessory = document.getElementById('characterSkinAccessory');
+  const levelBadge = document.getElementById('characterLevelBadge');
+  const gear = document.getElementById('characterGearBadge');
+  if (!img || !avatar) return;
+
+  const skin = MASCOT_SKINS.find(s => s.id === loadActiveSkin()) || MASCOT_SKINS[0];
+  const unlocked = isSkinUnlocked(skin);
+  img.src = (unlocked && skin.img) ? skin.img : 'assets/mascot/mascot.png';
+  img.style.filter = unlocked ? skin.filter : 'none';
+
+  const hasAura = !!(unlocked && skin.aura);
+  avatar.classList.toggle('skin-glow', hasAura);
+  avatar.classList.toggle('skin-glow-strong', hasAura && !!skin.strong);
+  avatar.style.setProperty('--skin-aura', hasAura ? skin.aura : 'transparent');
+
+  if (accessory) {
+    if (unlocked && skin.accIcon) {
+      accessory.innerHTML = badgeHtml(skin.accIcon, skin.accC1, skin.accC2, { glow: !!skin.strong, ring: true });
+      accessory.classList.add('show');
+    } else {
+      accessory.classList.remove('show');
+    }
+  }
+
+  const info = computeLevelInfo(computeTotalXP());
+  if (levelBadge) levelBadge.textContent = 'LV.' + info.level;
+  const rank = rankForLevel(info.level);
+  const rankEl = document.getElementById('characterRank');
+  if (rankEl) {
+    rankEl.innerHTML = iconHtml(rank.icon) + ' ' + rank.title;
+    RANK_TIERS.forEach(r => rankEl.classList.remove('rank-' + r.title.toLowerCase()));
+    rankEl.classList.add('rank-' + rank.title.toLowerCase());
+  }
+  const tier = rank.title.toLowerCase();
+  RANK_TIERS.forEach(r => avatar.classList.remove('aura-' + r.title.toLowerCase()));
+  if (tier !== 'recruit') avatar.classList.add('aura-' + tier);
+  if (levelBadge) {
+    RANK_TIERS.forEach(r => levelBadge.classList.remove('lvbadge-' + r.title.toLowerCase()));
+    if (tier !== 'recruit') levelBadge.classList.add('lvbadge-' + tier);
+  }
+  if (gear) {
+    RANK_TIERS.forEach(r => gear.classList.remove('gear-' + r.title.toLowerCase()));
+    if (tier === 'recruit') {
+      gear.classList.remove('show');
+    } else {
+      gear.innerHTML = iconHtml(rank.icon);
+      gear.classList.add('show', 'gear-' + tier);
+    }
+  }
+
+  renderMascotTitle('characterSkinTitle', skin, unlocked);
+  renderStatBars('characterStatBarList');
 }
 
 /* ================= MASCOT SKINS =================
@@ -1333,7 +1495,67 @@ function applyActiveMascotSkinFilter() {
       accessory.classList.remove('show');
     }
   }
+  renderMascotTitle('mascotSkinTitle', skin, unlocked);
 }
+
+/* ================= TITLES (paired with mascot skins) =================
+ * Each unlocked skin's own display name already reads like an RPG title
+ * ("นักสู้ 7 วัน", "ตำนาน 100 วัน", "ผู้พิชิต CORE-ZERO"...) — this just
+ * surfaces that name as a title chip next to the rank badge instead of
+ * introducing a second, separate title system. Default skin shows nothing
+ * (rank badge alone covers that case). */
+function renderMascotTitle(elId, skin, unlocked) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (unlocked && skin.id !== 'default') {
+    el.textContent = skin.name;
+    el.classList.add('show');
+    el.classList.toggle('title-strong', !!skin.strong);
+  } else {
+    el.textContent = '';
+    el.classList.remove('show', 'title-strong');
+  }
+}
+/* ================= COMPANION HUD (Custom Workout player) =================
+ * Small corner mascot shown while a Custom Workout is in progress, wearing
+ * whatever skin is currently equipped on Home — same lookup, just a
+ * different, smaller target element so it isn't a duplicate skin system.
+ * It reacts (a quick bounce) whenever a rest-skip bonus lands, tying the
+ * in-workout moment back to the same mascot card on Home. */
+function applyCompanionHudSkin() {
+  const img = document.getElementById('playerCompanionImg');
+  const hud = document.getElementById('playerCompanionHud');
+  if (!img || !hud) return;
+  const skin = MASCOT_SKINS.find(s => s.id === loadActiveSkin()) || MASCOT_SKINS[0];
+  const unlocked = isSkinUnlocked(skin);
+  img.src = (unlocked && skin.img) ? skin.img : 'assets/mascot/mascot.png';
+  img.style.filter = unlocked ? skin.filter : 'none';
+  const hasAura = !!(unlocked && skin.aura);
+  hud.classList.toggle('skin-glow', hasAura);
+  hud.style.setProperty('--skin-aura', hasAura ? skin.aura : 'transparent');
+}
+/** Rest-skip bonus visual: a bouncing "+N XP" badge on the timer ring
+ * (same pop/scale language as the AMRAP screen's .combo-badge, just a
+ * cooler-toned gradient so it doesn't read as a combo) plus a quick bounce
+ * on the companion mascot HUD. */
+function showRestSkipBonusEffect(bonus) {
+  const badge = document.getElementById('restBonusBadge');
+  if (badge) {
+    badge.textContent = '+' + bonus + ' XP';
+    badge.classList.remove('show', 'pulse');
+    void badge.offsetWidth;
+    badge.classList.add('show', 'pulse');
+    clearTimeout(showRestSkipBonusEffect._h);
+    showRestSkipBonusEffect._h = setTimeout(() => badge.classList.remove('show'), 900);
+  }
+  const hud = document.getElementById('playerCompanionHud');
+  if (hud) {
+    hud.classList.remove('companion-react');
+    void hud.offsetWidth;
+    hud.classList.add('companion-react');
+  }
+}
+
 function openSkinPicker() {
   renderSkinGrid();
   document.getElementById('skinPickerModal').classList.add('active');
@@ -1368,6 +1590,7 @@ function renderCollection() {
   renderCollectionBadges();
   renderCollectionSkins();
   renderCollectionTitles();
+  renderLootGrid('collectionLootGrid');
   const badgeCount = STREAK_MILESTONES.filter(m => loadOpenedChests().indexOf(m) !== -1).length;
   const skinCount = MASCOT_SKINS.filter(isSkinUnlocked).length;
   const titleCount = RANK_TIERS.filter(r => loadLastSeenLevel() >= r.min).length;
@@ -1375,6 +1598,10 @@ function renderCollection() {
   if (summary) {
     summary.textContent = 'สะสมแล้ว ' + (badgeCount + skinCount + titleCount) + ' / ' + (STREAK_MILESTONES.length + MASCOT_SKINS.length + RANK_TIERS.length);
   }
+  const lootInv = loadLootInventory();
+  const lootOwnedCount = LOOT_ITEMS.filter(it => (lootInv[it.id] || 0) > 0).length;
+  const lootSummary = document.getElementById('collectionLootSummary');
+  if (lootSummary) lootSummary.textContent = 'เก็บได้ ' + lootOwnedCount + ' / ' + LOOT_ITEMS.length + ' ชิ้น';
 }
 function renderCollectionBadges() {
   const grid = document.getElementById('collectionBadgeGrid');
@@ -4029,6 +4256,7 @@ function beginCustomWorkoutPlayerReal(workout) {
   go('customplayer');
   const voiceBtn = document.getElementById('playerVoiceBtn');
   if (voiceBtn) voiceBtn.classList.toggle('sel', isVoiceCuesEnabled());
+  applyCompanionHudSkin();
   beginCustomPlayerPhase();
 }
 
@@ -4155,6 +4383,7 @@ function skipPlayerStep() {
       customPlayer.restSkipBonusXP += bonus;
       addRestSkipBonusXP(bonus);
       showToast('พักน้อยลง ร่างกายแบกรับมากขึ้น +' + bonus + ' XP', 'muscle');
+      showRestSkipBonusEffect(bonus);
       vibrate(15);
     }
     onCustomRestDone();
