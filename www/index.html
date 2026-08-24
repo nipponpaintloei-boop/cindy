@@ -450,6 +450,15 @@ body{
   filter:drop-shadow(0 2px 5px rgba(0,0,0,.5));
 }
 .mascot-skin-accessory.show{display:flex;}
+.mascot-loot-badge{
+  position:absolute;top:-8px;left:-8px;z-index:2;
+  width:24px;height:24px;font-size:24px;line-height:1;
+  display:none;align-items:center;justify-content:center;
+  filter:drop-shadow(0 2px 5px rgba(0,0,0,.5));
+}
+.mascot-loot-badge.show{display:flex;}
+#characterAvatar .mascot-loot-badge{top:-4px;left:-4px;width:28px;height:28px;font-size:28px;}
+.player-companion-hud .mascot-loot-badge{top:-5px;left:-5px;width:16px;height:16px;font-size:16px;}
 .mascot-skin-hint{
   position:absolute;bottom:-4px;right:-4px;z-index:2;
   width:18px;height:18px;border-radius:50%;
@@ -494,6 +503,7 @@ body{
 
 /* ---- loot drops ---- */
 .loot-item.locked .skin-name{color:var(--text-faint);}
+.loot-item.active{box-shadow:0 0 0 1px var(--loot-rarity, var(--success)) inset, 0 0 10px 1px var(--loot-rarity, transparent);}
 .loot-count{
   position:absolute;top:4px;right:5px;font-family:var(--font-display);
   font-size:10px;color:var(--text-dim);line-height:1;
@@ -510,6 +520,61 @@ body{
 #characterAvatar img{width:128%;height:164%;}
 .character-sheet-card .mascot-rank{margin:14px 0 4px;}
 .character-sheet-card .mascot-skin-title{margin:0;}
+
+/* ---- CP (power level) ---- */
+.character-cp{margin-top:12px;}
+.character-cp .character-cp-val{
+  font-family:var(--font-display);font-size:38px;line-height:1;
+  background:linear-gradient(180deg,var(--text) 0%,var(--text-dim) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.character-cp .character-cp-lbl{
+  font-size:10px;font-weight:800;letter-spacing:2px;color:var(--text-faint);margin-top:2px;
+}
+
+/* ---- class flavor title (derived from highest stat) ---- */
+.character-class-title{
+  font-size:11px;font-weight:700;letter-spacing:.3px;color:var(--text-dim);margin-top:2px;
+}
+
+/* ---- equipment slots ---- */
+.character-equip-row{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.character-equip-slot{
+  display:flex;align-items:center;gap:10px;text-align:left;
+  background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);
+  padding:10px 12px;cursor:pointer;font-family:inherit;color:inherit;
+}
+.character-equip-icon{
+  width:34px;height:34px;flex-shrink:0;font-size:34px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:50%;background:var(--bg-elev);border:1px solid var(--card-border);
+}
+.character-equip-info{min-width:0;}
+.character-equip-label{font-size:9.5px;font-weight:800;letter-spacing:1px;color:var(--text-faint);}
+.character-equip-name{font-size:12px;font-weight:700;color:var(--text);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ---- boss trophy wall ---- */
+.character-trophy-row{display:flex;justify-content:space-between;gap:6px;}
+.character-trophy-item{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;min-width:0;}
+.character-trophy-item .gem-badge{font-size:30px;}
+.character-trophy-item.locked .gem-badge{filter:grayscale(1);opacity:.55;}
+.character-trophy-item .trophy-name{
+  font-size:8px;font-weight:700;letter-spacing:.2px;color:var(--text-faint);text-align:center;
+  line-height:1.2;
+}
+.character-trophy-item.defeated .trophy-name{color:var(--text-dim);}
+
+/* ---- recent battle log ---- */
+.character-recent-log{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);overflow:hidden;}
+.character-recent-log-item{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 14px;border-bottom:1px solid var(--card-border);
+}
+.character-recent-log-item:last-child{border-bottom:none;}
+.character-recent-log-date{font-size:11px;color:var(--text-dim);font-weight:600;}
+.character-recent-log-meta{font-size:10.5px;color:var(--text-faint);margin-top:2px;}
+.character-recent-log-rounds{font-family:var(--font-display);font-size:18px;color:var(--text);flex-shrink:0;}
 
 /* ---- companion HUD (Custom Workout player) ---- */
 .player-companion-hud{
@@ -1097,6 +1162,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
           <div id="mascotLevelBadge" class="mascot-level-badge">LV.1</div>
           <div id="mascotGearBadge" class="mascot-gear-badge"></div>
           <div id="mascotSkinAccessory" class="mascot-skin-accessory"></div>
+          <div id="mascotLootBadge" class="mascot-loot-badge"></div>
           <div class="mascot-skin-hint"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 100 18c1.4 0 2-1.1 1.2-2.2-.5-.7-.1-1.8 1-1.8H16a5 5 0 005-5c0-5-4.5-9-9-9z"/><circle cx="7.7" cy="10.5" r="1.15" fill="currentColor" stroke="none"/><circle cx="12" cy="7.3" r="1.15" fill="currentColor" stroke="none"/><circle cx="16.1" cy="10" r="1.15" fill="currentColor" stroke="none"/><circle cx="9.3" cy="15" r="1.15" fill="currentColor" stroke="none"/></svg></span></div>
         </div>
         <div class="mascot-text">
@@ -1579,6 +1645,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <span>LOOT (จากการปราบบอส)</span>
         <span id="collectionLootSummary" style="font-size:10px;color:var(--text-faint);font-weight:600;letter-spacing:.3px;">เก็บได้ 0 / 0 ชิ้น</span>
       </div>
+      <div class="empty-hint" style="text-align:left;padding:0 0 8px;">แตะไอเทมที่มีเพื่อสวมใส่เป็นแบดจ์ข้าง mascot (แตะซ้ำเพื่อถอด)</div>
       <div id="collectionLootGrid" class="skin-grid" style="max-height:none;overflow:visible;"></div>
     </div>
   </section>
@@ -1600,10 +1667,13 @@ textarea.note-input::placeholder{color:var(--text-faint);}
             <div id="characterLevelBadge" class="mascot-level-badge">LV.1</div>
             <div id="characterGearBadge" class="mascot-gear-badge"></div>
             <div id="characterSkinAccessory" class="mascot-skin-accessory"></div>
+            <div id="characterLootBadge" class="mascot-loot-badge"></div>
           </div>
         </div>
+        <div id="characterCP" class="character-cp"></div>
         <div id="characterRank" class="mascot-rank rank-recruit" style="display:inline-block;"></div>
         <div id="characterSkinTitle" class="mascot-skin-title"></div>
+        <div id="characterClassTitle" class="character-class-title"></div>
       </div>
 
       <div class="section-label">STATS</div>
@@ -1611,7 +1681,36 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <div id="characterStatBarList"></div>
       </div>
 
-      <div class="empty-hint" style="padding-top:4px;">ไอเทมที่เก็บได้จากการปราบบอส ดูได้ที่หน้า COLLECTION</div>
+      <div class="section-label">EQUIPMENT</div>
+      <div class="character-equip-row">
+        <button class="character-equip-slot" onclick="goToCollectionSection('skin')">
+          <div class="character-equip-icon" id="characterEquipSkinIcon"></div>
+          <div class="character-equip-info">
+            <div class="character-equip-label">SKIN</div>
+            <div class="character-equip-name" id="characterEquipSkinName">Classic</div>
+          </div>
+        </button>
+        <button class="character-equip-slot" onclick="goToCollectionSection('loot')">
+          <div class="character-equip-icon" id="characterEquipLootIcon"></div>
+          <div class="character-equip-info">
+            <div class="character-equip-label">LOOT BADGE</div>
+            <div class="character-equip-name" id="characterEquipLootName">ยังไม่ได้สวม</div>
+          </div>
+        </button>
+      </div>
+
+      <div class="section-label" style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span>TROPHY WALL</span>
+        <span id="characterBossSummary" style="font-size:10px;color:var(--text-faint);font-weight:600;letter-spacing:.3px;">ผู้พิชิต 0/5</span>
+      </div>
+      <div class="metric-card" style="padding:14px 16px;">
+        <div id="characterBossTrophyRow" class="character-trophy-row"></div>
+      </div>
+
+      <div class="section-label">RECENT BATTLE LOG</div>
+      <div id="characterRecentLog" class="character-recent-log"></div>
+
+      <div class="empty-hint" style="padding-top:4px;">แตะไอเทมในหน้า COLLECTION เพื่อสวมใส่เป็นแบดจ์ข้าง mascot</div>
     </div>
   </section>
 
@@ -1754,6 +1853,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     </div>
     <div id="playerCompanionHud" class="player-companion-hud">
       <img id="playerCompanionImg" src="assets/mascot/mascot.png" alt="" />
+      <div id="playerCompanionLootBadge" class="mascot-loot-badge"></div>
     </div>
   </section>
 

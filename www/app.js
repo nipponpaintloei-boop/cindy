@@ -523,6 +523,61 @@ function addLootItem(itemId) {
   saveLootInventory(inv);
   return inv[itemId];
 }
+
+/* ---- equipped loot badge ----
+ * One owned item can be "worn" as a small badge on the mascot, same idea
+ * as MASCOT_SKINS' accessory but a separate slot (top-left vs the skin
+ * accessory's top-right) so both can show at once. Applied everywhere the
+ * mascot already renders: Home, the Character sheet, and the Custom
+ * Workout companion HUD. */
+const KEY_EQUIPPED_LOOT = 'cindy_equipped_loot_id';
+function loadEquippedLootId() {
+  return localStorage.getItem(KEY_EQUIPPED_LOOT) || '';
+}
+function saveEquippedLootId(id) {
+  if (id) localStorage.setItem(KEY_EQUIPPED_LOOT, id);
+  else localStorage.removeItem(KEY_EQUIPPED_LOOT);
+}
+function equippedLootItem() {
+  const id = loadEquippedLootId();
+  if (!id) return null;
+  const inv = loadLootInventory();
+  if (!(inv[id] > 0)) return null; // owned check — in case inventory ever changes
+  return LOOT_ITEMS.find(it => it.id === id) || null;
+}
+function toggleEquipLoot(itemId) {
+  const inv = loadLootInventory();
+  if (!(inv[itemId] > 0)) return;
+  const item = LOOT_ITEMS.find(it => it.id === itemId);
+  if (loadEquippedLootId() === itemId) {
+    saveEquippedLootId('');
+    showToast('ถอดไอเทมออกแล้ว');
+  } else {
+    saveEquippedLootId(itemId);
+    showToast('สวมใส่ ' + (item ? item.name : 'ไอเทม') + ' แล้ว');
+  }
+  renderLootGrid('collectionLootGrid');
+  applyActiveMascotSkinFilter();
+  if (document.getElementById('screen-character') && document.getElementById('screen-character').classList.contains('active')) {
+    renderCharacterSheet();
+  }
+  if (customPlayer) applyCompanionHudSkin();
+}
+/** Renders the equipped-loot badge (if any) into the given container id —
+ * shared by the Home avatar, Character sheet avatar, and companion HUD. */
+function applyEquippedLootBadge(elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const item = equippedLootItem();
+  if (item) {
+    const rarity = rarityDef(item.rarity);
+    el.innerHTML = badgeHtml(item.icon, rarity.c1, rarity.c2, { glow: true, ring: true, glowColor: rarity.glow });
+    el.classList.add('show');
+  } else {
+    el.innerHTML = '';
+    el.classList.remove('show');
+  }
+}
 /** 0..1 difficulty score for the boss just defeated — further along the
  * roster and further into repeat laps skews the loot roll toward rarer
  * tiers (see rollLootDrop()). */
@@ -551,19 +606,24 @@ function renderLootGrid(containerId) {
   const grid = document.getElementById(containerId);
   if (!grid) return;
   const inv = loadLootInventory();
+  const equippedId = loadEquippedLootId();
   grid.innerHTML = LOOT_ITEMS.map(item => {
     const count = inv[item.id] || 0;
     const owned = count > 0;
+    const isEquipped = owned && item.id === equippedId;
     const rarity = rarityDef(item.rarity);
-    const cls = 'skin-item loot-item' + (owned ? '' : ' locked');
+    const cls = 'skin-item loot-item' + (owned ? '' : ' locked') + (isEquipped ? ' active' : '');
+    const clickAttr = owned ? ' onclick="toggleEquipLoot(\'' + item.id + '\')"' : '';
     const badge = owned
       ? badgeHtml(item.icon, rarity.c1, rarity.c2, { glow: true, ring: true, glowColor: rarity.glow })
       : lockedBadgeHtml();
-    return '<div class="' + cls + '" style="' + (owned ? '--loot-rarity:' + rarity.glow + ';' : '') + '">'
-      + (owned && count > 1 ? '<div class="loot-count">x' + count + '</div>' : (owned ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>'))
+    const cornerHtml = isEquipped ? '<div class="active-check">' + iconHtml('check') + '</div>'
+      : (owned && count > 1 ? '<div class="loot-count">x' + count + '</div>' : (owned ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>'));
+    return '<div class="' + cls + '"' + clickAttr + ' style="' + (owned ? '--loot-rarity:' + rarity.glow + ';' : '') + '">'
+      + cornerHtml
       + '<div class="collection-emoji" style="font-size:30px;">' + badge + '</div>'
       + '<div class="skin-name" style="color:' + (owned ? rarity.c2 : '') + ';">' + (owned ? item.name : '???') + '</div>'
-      + '<div class="skin-cond" style="color:' + (owned ? rarity.c2 : '') + ';">' + rarity.label + '</div>'
+      + '<div class="skin-cond" style="color:' + (owned ? rarity.c2 : '') + ';">' + (owned ? (isEquipped ? 'สวมใส่อยู่' : rarity.label) : rarity.label) + '</div>'
       + '</div>';
   }).join('');
 }
@@ -1317,9 +1377,11 @@ function computeStatInfo(totalReps) {
   }
   return { level, pct: req > 0 ? remaining / req : 0 };
 }
-function renderStatBars(containerId) {
-  const wrap = document.getElementById(containerId || 'statBarList');
-  if (!wrap) return;
+/** Lifetime Cindy rep totals per stat (pull/push/squat) — the same raw
+ * numbers computeStatInfo() levels up, shared by the stat bars, the
+ * derived "class" flavor title, and the CP number so none of them drift
+ * out of sync with each other. */
+function loadStatTotals() {
   const all = loadSessions();
   const totals = { pull: 0, push: 0, squat: 0 };
   all.forEach(s => {
@@ -1328,11 +1390,131 @@ function renderStatBars(containerId) {
     totals.push += s.total.push || 0;
     totals.squat += s.total.squat || 0;
   });
+  return totals;
+}
+function renderStatBars(containerId) {
+  const wrap = document.getElementById(containerId || 'statBarList');
+  if (!wrap) return;
+  const totals = loadStatTotals();
   wrap.innerHTML = STAT_DEFS.map(def => {
     const info = computeStatInfo(totals[def.key]);
     return '<div class="stat-bar-row">'
       + '<div class="stat-bar-top"><span class="stat-bar-label">' + def.short + ' · ' + def.label + '</span><span class="stat-bar-lv">LV.' + info.level + '</span></div>'
       + '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + Math.round(info.pct * 100) + '%;background:' + def.color + ';"></div></div>'
+      + '</div>';
+  }).join('');
+}
+
+/* ---- derived "class" flavor title — whichever stat (STR/PWR/END) has
+ * the most lifetime reps gets a title, so two people at the same level
+ * can feel like a different build. Pure lookup on loadStatTotals(),
+ * nothing new stored. */
+const STAT_CLASS_TITLES = { pull: 'นักดึงข้อ', push: 'นักทุบพลัง', squat: 'นักวิ่งทน' };
+function computeClassTitle(totals) {
+  if (!totals.pull && !totals.push && !totals.squat) return '';
+  let best = 'pull';
+  ['push', 'squat'].forEach(k => { if (totals[k] > totals[best]) best = k; });
+  return STAT_CLASS_TITLES[best];
+}
+
+/* ---- CP (power level) — a single big number combining total XP with
+ * the summed levels of all 3 stats, purely derived from numbers already
+ * computed elsewhere (computeTotalXP, computeStatInfo). */
+function computeCharacterPower() {
+  const totalXp = computeTotalXP();
+  const totals = loadStatTotals();
+  const statLevelSum = STAT_DEFS.reduce((sum, def) => sum + computeStatInfo(totals[def.key]).level, 0);
+  return Math.round(totalXp) + statLevelSum;
+}
+
+/* ---- boss trophy wall — reuses loadBossEverDefeated() (already tracked
+ * for skin unlocks) and the icon/colors already defined per-boss on each
+ * "ผู้พิชิต ..." skin in MASCOT_SKINS, so no new art or storage. */
+function renderCharacterBossTrophyRow() {
+  const wrap = document.getElementById('characterBossTrophyRow');
+  const summary = document.getElementById('characterBossSummary');
+  if (!wrap) return;
+  const defeated = loadBossEverDefeated();
+  wrap.innerHTML = BOSS_ROSTER.map(b => {
+    const isDefeated = defeated.indexOf(b.id) !== -1;
+    const skin = MASCOT_SKINS.find(s => s.unlock && s.unlock.type === 'boss' && s.unlock.bossId === b.id);
+    const badge = (isDefeated && skin)
+      ? badgeHtml(skin.accIcon, skin.accC1, skin.accC2, { glow: true, ring: true })
+      : lockedBadgeHtml();
+    return '<div class="character-trophy-item' + (isDefeated ? ' defeated' : ' locked') + '">'
+      + badge
+      + '<div class="trophy-name">' + b.name + '</div>'
+      + '</div>';
+  }).join('');
+  if (summary) summary.textContent = 'ผู้พิชิต ' + defeated.length + '/' + BOSS_ROSTER.length;
+}
+
+/* ---- equipment slots — the equipped skin + equipped loot badge, both
+ * already tracked (loadActiveSkin / equippedLootItem) for the mascot
+ * avatar itself; this just surfaces the same two picks as RPG-style
+ * equipment slots that link back to where they're changed. */
+function renderCharacterEquipment() {
+  const skin = MASCOT_SKINS.find(s => s.id === loadActiveSkin()) || MASCOT_SKINS[0];
+  const skinIconEl = document.getElementById('characterEquipSkinIcon');
+  const skinNameEl = document.getElementById('characterEquipSkinName');
+  if (skinIconEl) {
+    skinIconEl.innerHTML = skin.accIcon
+      ? badgeHtml(skin.accIcon, skin.accC1, skin.accC2, { glow: !!skin.strong, ring: true })
+      : iconHtml('palette');
+  }
+  if (skinNameEl) skinNameEl.textContent = skin.name;
+
+  const item = equippedLootItem();
+  const lootIconEl = document.getElementById('characterEquipLootIcon');
+  const lootNameEl = document.getElementById('characterEquipLootName');
+  if (lootIconEl) {
+    lootIconEl.innerHTML = item
+      ? badgeHtml(item.icon, rarityDef(item.rarity).c1, rarityDef(item.rarity).c2, { glow: true, ring: true, glowColor: rarityDef(item.rarity).glow })
+      : lockedBadgeHtml();
+  }
+  if (lootNameEl) lootNameEl.textContent = item ? item.name : 'ยังไม่ได้สวม';
+}
+/** Jumps to the Collection screen and scrolls straight to the relevant
+ * section (skins or loot) — used by the Character sheet's equipment
+ * slots so tapping one goes right to where it's changed. */
+function goToCollectionSection(section) {
+  go('collection');
+  const targetId = section === 'loot' ? 'collectionLootGrid' : 'collectionSkinGrid';
+  setTimeout(() => {
+    const el = document.getElementById(targetId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 60);
+}
+
+/* ---- recent battle log — the last few entries from the same combined
+ * Cindy + Custom Workout history used on the History screen, just
+ * re-laid-out as a short list here; doesn't touch renderHistory(). */
+function renderCharacterRecentLog() {
+  const wrap = document.getElementById('characterRecentLog');
+  if (!wrap) return;
+  const cindyItems = loadSessions().map(s => ({ kind: 'cindy', ts: s.finished, data: s }));
+  const customItems = loadCustomWorkoutSessions().map(s => ({ kind: 'custom', ts: s.completedAt, data: s }));
+  const merged = cindyItems.concat(customItems).sort((a, b) => b.ts - a.ts).slice(0, 4);
+
+  if (merged.length === 0) {
+    wrap.innerHTML = '<div class="empty-hint">ยังไม่มีประวัติการเล่น</div>';
+    return;
+  }
+  wrap.innerHTML = merged.map(item => {
+    if (item.kind === 'cindy') {
+      const s = item.data;
+      return '<div class="character-recent-log-item">'
+        + '<div><div class="character-recent-log-date">' + fmtDate(s.finished) + '<span class="type-tag cindy">CINDY</span></div>'
+        + '<div class="character-recent-log-meta">' + s.total.reps + ' REPS · ' + escapeHtml(s.protocolName || 'Cindy') + '</div></div>'
+        + '<div class="character-recent-log-rounds">' + s.rounds + 'R</div>'
+        + '</div>';
+    }
+    const s = item.data;
+    const meta = s.setsCompleted + ' เซ็ต · ' + fmtTime(s.totalDurationSec);
+    return '<div class="character-recent-log-item">'
+      + '<div><div class="character-recent-log-date">' + fmtDate(s.completedAt) + '<span class="type-tag custom">' + escapeHtml((s.workoutName || 'CUSTOM').toUpperCase()) + '</span></div>'
+      + '<div class="character-recent-log-meta">' + meta + '</div></div>'
+      + '<div class="character-recent-log-rounds">' + fmtTime(s.totalDurationSec) + '</div>'
       + '</div>';
   }).join('');
 }
@@ -1398,7 +1580,20 @@ function renderCharacterSheet() {
   }
 
   renderMascotTitle('characterSkinTitle', skin, unlocked);
+  applyEquippedLootBadge('characterLootBadge');
   renderStatBars('characterStatBarList');
+
+  const cpEl = document.getElementById('characterCP');
+  if (cpEl) {
+    cpEl.innerHTML = '<div class="character-cp-val">' + computeCharacterPower().toLocaleString() + '</div>'
+      + '<div class="character-cp-lbl">CP</div>';
+  }
+  const classEl = document.getElementById('characterClassTitle');
+  if (classEl) classEl.textContent = computeClassTitle(loadStatTotals());
+
+  renderCharacterEquipment();
+  renderCharacterBossTrophyRow();
+  renderCharacterRecentLog();
 }
 
 /* ================= MASCOT SKINS =================
@@ -1496,6 +1691,7 @@ function applyActiveMascotSkinFilter() {
     }
   }
   renderMascotTitle('mascotSkinTitle', skin, unlocked);
+  applyEquippedLootBadge('mascotLootBadge');
 }
 
 /* ================= TITLES (paired with mascot skins) =================
@@ -1533,6 +1729,7 @@ function applyCompanionHudSkin() {
   const hasAura = !!(unlocked && skin.aura);
   hud.classList.toggle('skin-glow', hasAura);
   hud.style.setProperty('--skin-aura', hasAura ? skin.aura : 'transparent');
+  applyEquippedLootBadge('playerCompanionLootBadge');
 }
 /** Rest-skip bonus visual: a bouncing "+N XP" badge on the timer ring
  * (same pop/scale language as the AMRAP screen's .combo-badge, just a
