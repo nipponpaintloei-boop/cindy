@@ -1199,6 +1199,7 @@ function renderMascotCard() {
   const headline = document.getElementById('mascotHeadline');
   const sub = document.getElementById('mascotSub');
   const img = document.getElementById('mascotImg');
+  const imgGlow = document.getElementById('mascotImgGlow');
   if (!headline || !sub) return;
   const streak = computeCombinedStreak();
   const playedToday = didPlayToday();
@@ -1217,6 +1218,7 @@ function renderMascotCard() {
   headline.textContent = fillTemplate(line.h, { streak });
   sub.textContent = fillTemplate(line.s, { streak });
   if (img) img.src = 'assets/mascot/mascot.png';
+  if (imgGlow) imgGlow.src = 'assets/mascot/mascot.png';
 
   renderXpBar();
   applyActiveMascotSkinFilter();
@@ -1312,6 +1314,11 @@ const RANK_TIERS = [
   { min: 15, max: 19, title: 'ELITE', icon: 'rankElite' },
   { min: 20, max: Infinity, title: 'LEGEND', icon: 'rankLegend' }
 ];
+// same rank colors already used for .mascot-rank text/border — reused here as
+// the --mascot-accent-rgb driving the .mascot-card rarity border + wash
+const RANK_ACCENT_HEX = {
+  recruit: '#8D93A6', fighter: '#3D6FE0', warrior: '#FFB020', elite: '#B48CFF', legend: '#FFD700'
+};
 function rankForLevel(level) {
   return RANK_TIERS.find(r => level >= r.min && level <= r.max) || RANK_TIERS[0];
 }
@@ -1334,7 +1341,9 @@ function applyMascotGearAndAura(rank) {
   const avatar = document.getElementById('mascotAvatar');
   const gear = document.getElementById('mascotGearBadge');
   const levelBadge = document.getElementById('mascotLevelBadge');
+  const card = document.querySelector('.mascot-card');
   const tier = rank.title.toLowerCase();
+  if (card) card.style.setProperty('--mascot-accent-rgb', hexToRgbTriplet(RANK_ACCENT_HEX[tier] || RANK_ACCENT_HEX.recruit));
   if (avatar) {
     RANK_TIERS.forEach(r => avatar.classList.remove('aura-' + r.title.toLowerCase()));
     if (tier !== 'recruit') avatar.classList.add('aura-' + tier);
@@ -1670,6 +1679,7 @@ function saveActiveSkin(id) {
  * skin somehow isn't unlocked anymore. */
 function applyActiveMascotSkinFilter() {
   const img = document.getElementById('mascotImg');
+  const imgGlow = document.getElementById('mascotImgGlow');
   const avatar = document.getElementById('mascotAvatar');
   const accessory = document.getElementById('mascotSkinAccessory');
   if (!img) return;
@@ -1677,6 +1687,10 @@ function applyActiveMascotSkinFilter() {
   const unlocked = isSkinUnlocked(skin);
   img.src = (unlocked && skin.img) ? skin.img : 'assets/mascot/mascot.png';
   img.style.filter = unlocked ? skin.filter : 'none';
+  // glow clone always mirrors the real src so the rank-aura silhouette matches
+  // whichever skin is equipped — its own filter (brightness(0)+drop-shadow) is
+  // set entirely by CSS via .aura-* classes, never touched here
+  if (imgGlow) imgGlow.src = img.src;
 
   if (avatar) {
     const hasAura = !!(unlocked && skin.aura);
