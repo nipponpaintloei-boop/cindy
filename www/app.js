@@ -448,13 +448,23 @@ function fmtTime(totalSeconds) {
  * Boss index cycles through BOSS_ROSTER by ISO week number; each full lap
  * around the roster raises the HP target so it stays a real fight.
  */
+/* Each boss carries its own accent color so the whole card (background
+   glow, HP bar, name) reskins per-boss instead of staying one flat gradient
+   for all five — small touch, but it makes the weekly boss rotation
+   actually feel like a different fight instead of the same card relabeled. */
 const BOSS_ROSTER = [
-  { id: 'grinder1', name: 'GRINDER-1', tag: 'SCRAP BRAWLER', baseHp: 250 },
-  { id: 'ironmaw', name: 'IRON MAW', tag: 'SPLIT JAW', baseHp: 350 },
-  { id: 'void9', name: 'VOID-9', tag: 'FORMLESS THREAT', baseHp: 450 },
-  { id: 'wingreaper', name: 'WING REAPER', tag: 'SKY HUNTER', baseHp: 550 },
-  { id: 'corezero', name: 'CORE-ZERO', tag: 'FINAL REACTOR', baseHp: 700 }
+  { id: 'grinder1', name: 'GRINDER-1', tag: 'SCRAP BRAWLER', baseHp: 250, accent: '#ff6a3d' },
+  { id: 'ironmaw', name: 'IRON MAW', tag: 'SPLIT JAW', baseHp: 350, accent: '#8aa0b8' },
+  { id: 'void9', name: 'VOID-9', tag: 'FORMLESS THREAT', baseHp: 450, accent: '#a855f7' },
+  { id: 'wingreaper', name: 'WING REAPER', tag: 'SKY HUNTER', baseHp: 550, accent: '#38bdf8' },
+  { id: 'corezero', name: 'CORE-ZERO', tag: 'FINAL REACTOR', baseHp: 700, accent: '#fbbf24' }
 ];
+/** '#rrggbb' -> 'r,g,b' so CSS can build rgba() at any alpha via var(). */
+function hexToRgbTriplet(hex) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+  if (!m) return '255,255,255';
+  return [1, 2, 3].map(i => parseInt(m[i], 16)).join(',');
+}
 const KEY_BOSS_DEFEAT_SEEN = 'cindy_boss_defeat_seen_week';
 const KEY_BOSS_EVER_DEFEATED = 'cindy_boss_ever_defeated';
 function loadBossEverDefeated() {
@@ -546,11 +556,16 @@ function renderBossCard() {
     const art = stage.querySelector('.boss-art');
     if (art) art.innerHTML = bossSilhouetteMarkup(state.boss.id);
   }
+  const bossCard = stage.closest('.boss-card');
+  if (bossCard) bossCard.style.setProperty('--boss-accent-rgb', hexToRgbTriplet(state.boss.accent));
+
   const pct = state.targetHp > 0 ? Math.max(0, Math.min(1, state.hp / state.targetHp)) : 0;
   hpFill.style.width = Math.round(pct * 100) + '%';
   if (hpLabel) hpLabel.textContent = Math.round(state.hp) + ' / ' + state.targetHp + ' HP';
 
   stage.classList.toggle('boss-defeated', state.defeated);
+  // last stretch of a fight gets a red pulse — the "finish it off" nudge
+  stage.classList.toggle('boss-critical', !state.defeated && pct > 0 && pct <= 0.25);
 
   const weekKey = bossWeekKey(state.weekIndex);
   const lastSeenDmgKey = KEY_BOSS_DEFEAT_SEEN + '_dmg_' + weekKey;
@@ -879,6 +894,30 @@ function addComboBonusXP(amount) {
   if (amount <= 0) return;
   localStorage.setItem(KEY_COMBO_BONUS_XP, String(loadComboBonusXP() + amount));
 }
+
+/* ================= REST-SKIP BONUS XP (Custom Workout player) =================
+ * Skipping rest early means the body carries more fatigue into the next set —
+ * that's worth something. Every time skipPlayerStep() fires during a rest
+ * phase (restSet/restEx), whatever time was still left on the clock converts
+ * into bonus XP at REST_SKIP_BONUS_RATE per second, folded into the same
+ * running-counter pattern as combo/quest bonus XP above. Skips this close to
+ * the rest naturally finishing (< REST_SKIP_BONUS_MIN_SEC left) pay nothing,
+ * so mashing skip right at 0:01 isn't a meaningful farm. */
+const KEY_REST_SKIP_BONUS_XP = 'cindy_rest_skip_bonus_xp';
+const REST_SKIP_BONUS_RATE = 0.5;   // XP per second of rest skipped
+const REST_SKIP_BONUS_MIN_SEC = 3;  // below this, no bonus — not worth the toast spam
+function restSkipBonusXP(remainingSec) {
+  if (!Number.isFinite(remainingSec) || remainingSec < REST_SKIP_BONUS_MIN_SEC) return 0;
+  return Math.round(remainingSec * REST_SKIP_BONUS_RATE);
+}
+function loadRestSkipBonusXP() {
+  const n = parseInt(localStorage.getItem(KEY_REST_SKIP_BONUS_XP), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+function addRestSkipBonusXP(amount) {
+  if (amount <= 0) return;
+  localStorage.setItem(KEY_REST_SKIP_BONUS_XP, String(loadRestSkipBonusXP() + amount));
+}
 let lastRenderedCombo = null;
 function updateComboBadge(active) {
   const badge = document.getElementById('comboBadge');
@@ -1051,7 +1090,7 @@ function computeSessionXP() {
 }
 function computeTotalXP() {
   const { cindyXP, customXP } = computeSessionXP();
-  return cindyXP + customXP + loadQuestBonusXP() + loadComboBonusXP();
+  return cindyXP + customXP + loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP();
 }
 function xpRequiredForLevel(level) {
   return 100 + (level - 1) * 50;
@@ -2246,16 +2285,27 @@ function setMetric(m) {
 
 function renderProgress() {
   const all = loadSessions();
+  const customAll = loadCustomWorkoutSessions();
   const best = all.reduce((m, s) => Math.max(m, s.rounds), 0);
   const avg = all.length ? (all.reduce((sum, s) => sum + s.rounds, 0) / all.length) : 0;
-  const totalReps = all.reduce((sum, s) => sum + s.total.reps, 0);
+  // combined across Cindy + Custom Workout — matches how HISTORY, the Home
+  // mascot streak, and the weekly Boss Fight already treat "activity"
+  const combinedTotalXP = all.reduce((sum, s) => sum + (s.total ? s.total.reps : 0), 0)
+    + customAll.reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
+  const combinedSessions = all.length + customAll.length;
 
   document.getElementById('pBest').textContent = best + ' R';
   document.getElementById('pAvg').textContent = avg.toFixed(1) + ' R';
-  document.getElementById('pSessions').textContent = all.length;
-  document.getElementById('pTotalReps').textContent = totalReps.toLocaleString();
-  document.getElementById('progStreak').textContent = computeStreak(all) + ' DAYS';
+  document.getElementById('pSessions').textContent = combinedSessions;
+  document.getElementById('pTotalReps').textContent = combinedTotalXP.toLocaleString();
+  document.getElementById('progStreak').textContent = computeCombinedStreak() + ' DAYS';
   renderStatBars();
+  renderProgressRecords();
+
+  if (currentMetric === 'xp') {
+    renderCombinedXpChart();
+    return;
+  }
 
   let filtered = all;
   if (currentPeriod !== 'all') {
@@ -2283,6 +2333,90 @@ function renderProgress() {
       <div class="chart-xlabel">${d.getDate()}/${d.getMonth()+1}</div>`;
     chart.appendChild(col);
   });
+}
+
+/* "XP (ALL)" chart mode — combined Cindy + Custom Workout volume bucketed
+   by calendar day, same 14-bar/period-filter shape as the per-metric chart
+   above, but pooling both modes since XP itself is already mode-agnostic
+   (see computeSessionXP()). Gives a single RPG-style "how much did I grind"
+   view instead of two disconnected charts. */
+function renderCombinedXpChart() {
+  const cindyItems = all_progress_cindy_items();
+  const customItems = loadCustomWorkoutSessions().map(s => ({ ts: s.completedAt, xp: totalVolumeOfCustomSession(s) }));
+  let merged = cindyItems.concat(customItems);
+
+  if (currentPeriod !== 'all') {
+    const days = parseInt(currentPeriod, 10);
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    merged = merged.filter(item => item.ts >= cutoff);
+  }
+
+  const chart = document.getElementById('chartBars');
+  chart.innerHTML = '';
+  if (merged.length === 0) {
+    chart.innerHTML = '<div class="empty-hint" style="width:100%;">ยังไม่มีข้อมูลในช่วงนี้</div>';
+    return;
+  }
+
+  const byDay = {};
+  merged.forEach(item => {
+    const d = new Date(item.ts);
+    d.setHours(0, 0, 0, 0);
+    const key = d.getTime();
+    byDay[key] = (byDay[key] || 0) + item.xp;
+  });
+  const dayKeys = Object.keys(byDay).map(Number).sort((a, b) => a - b);
+  const maxVal = Math.max(1, ...dayKeys.map(k => byDay[k]));
+  dayKeys.slice(-14).forEach(key => {
+    const val = byDay[key];
+    const col = document.createElement('div');
+    col.className = 'chart-col';
+    const barH = Math.max(4, (val / maxVal) * 118);
+    const d = new Date(key);
+    col.innerHTML = `<div class="chart-bar xp" style="height:${barH}px;" title="${val} XP"></div>
+      <div class="chart-xlabel">${d.getDate()}/${d.getMonth() + 1}</div>`;
+    chart.appendChild(col);
+  });
+}
+function all_progress_cindy_items() {
+  return loadSessions().map(s => ({ ts: s.finished, xp: s.total ? s.total.reps : 0 }));
+}
+
+/* "RECENT RECORDS" — merges every isPR-flagged session from both Cindy and
+   Custom Workout into one reverse-chronological list, since a PR is a PR
+   regardless of which mode it happened in. Read-only, taps route into each
+   mode's own detail screen exactly like the HISTORY tab does. */
+function renderProgressRecords() {
+  const wrap = document.getElementById('progressRecordsList');
+  if (!wrap) return;
+  const cindyPRs = loadSessions().filter(s => s.isPR).map(s => ({ kind: 'cindy', ts: s.finished, data: s }));
+  const customPRs = loadCustomWorkoutSessions().filter(s => s.isPR).map(s => ({ kind: 'custom', ts: s.completedAt, data: s }));
+  const merged = cindyPRs.concat(customPRs).sort((a, b) => b.ts - a.ts).slice(0, 8);
+
+  if (merged.length === 0) {
+    wrap.innerHTML = '<div class="empty-hint">ยังไม่มีสถิติใหม่ — ลุยต่อแล้วเดี๋ยวก็มา</div>';
+    return;
+  }
+  wrap.innerHTML = merged.map(item => {
+    if (item.kind === 'cindy') {
+      const s = item.data;
+      return `<div class="history-item" onclick="openDetail('${s.id}')">
+        <div>
+          <div class="date">${fmtDate(s.finished)}<span class="type-tag cindy">CINDY</span></div>
+          <div class="reps">${s.total.reps} REPS · ${escapeHtml(s.protocolName || 'Cindy')}</div>
+        </div>
+        <div class="rounds" style="color:var(--warning);">${s.rounds} R</div>
+      </div>`;
+    }
+    const s = item.data;
+    return `<div class="history-item" onclick="openCustomHistoryDetail('${s.id}')">
+      <div>
+        <div class="date">${fmtDate(s.completedAt)}<span class="type-tag custom">${escapeHtml((s.workoutName || 'CUSTOM').toUpperCase())}</span></div>
+        <div class="reps">${s.setsCompleted} เซ็ต · ${fmtTime(s.totalDurationSec)}</div>
+      </div>
+      <div class="rounds tabular" style="color:var(--warning);">🏆</div>
+    </div>`;
+  }).join('');
 }
 
 /* ---------- daily reminder ---------- */
@@ -2847,6 +2981,7 @@ function exportData() {
         questClaimed: loadQuestClaimState(),
         questBonusXP: loadQuestBonusXP(),
         comboBonusXP: loadComboBonusXP(),
+        restSkipBonusXP: loadRestSkipBonusXP(),
         ringGoals: loadRingGoals(),
         weeklyPlan: loadWeeklyPlan()
       }
@@ -3062,6 +3197,10 @@ function importData(event) {
         if (Number.isFinite(incomingQuestsAndGoals.comboBonusXP)) {
           const bump = incomingQuestsAndGoals.comboBonusXP - loadComboBonusXP();
           if (bump > 0) addComboBonusXP(bump);
+        }
+        if (Number.isFinite(incomingQuestsAndGoals.restSkipBonusXP)) {
+          const bump = incomingQuestsAndGoals.restSkipBonusXP - loadRestSkipBonusXP();
+          if (bump > 0) addRestSkipBonusXP(bump);
         }
         if (incomingQuestsAndGoals.ringGoals && localStorage.getItem(KEY_RING_GOALS) === null) {
           saveRingGoals(incomingQuestsAndGoals.ringGoals);
@@ -3499,6 +3638,7 @@ function recordCustomWorkoutSession(session) {
     setsCompleted: session.setsCompleted || 0,
     // e.g. [{ name:'Push-up', exIndex:0, setNumber:1, repsOrSecDone:15, type:'reps' }, ...]
     exerciseLog: Array.isArray(session.exerciseLog) ? session.exerciseLog : [],
+    restSkipBonusXP: session.restSkipBonusXP > 0 ? session.restSkipBonusXP : 0,
     isPR: !!session.isPR,
     rpe: null,
     feeling: null,
@@ -3880,6 +4020,7 @@ function beginCustomWorkoutPlayerReal(workout) {
     phase: 'exercise',           // 'exercise' | 'restSet' | 'restEx'
     startedAt: Date.now(),
     exerciseLog: [],
+    restSkipBonusXP: 0,
     currentValue: 0,
     timer: { endTime: null, totalMs: 0, running: false, paused: false, remainingMs: 0, handle: null, onDone: null }
   };
@@ -4007,7 +4148,15 @@ function skipPlayerStep() {
     logCurrentCustomExercise(elapsedSec);
     advanceAfterCustomExercise();
   } else if (customPlayer.phase === 'restSet' || customPlayer.phase === 'restEx') {
+    const remainingSec = Math.round(remainingMs / 1000);
+    const bonus = restSkipBonusXP(remainingSec);
     clearCustomPlayerTimer();
+    if (bonus > 0) {
+      customPlayer.restSkipBonusXP += bonus;
+      addRestSkipBonusXP(bonus);
+      showToast('พักน้อยลง ร่างกายแบกรับมากขึ้น +' + bonus + ' XP', 'muscle');
+      vibrate(15);
+    }
     onCustomRestDone();
   }
 }
@@ -4073,6 +4222,7 @@ function finishCustomPlayerWorkout() {
     totalDurationSec,
     setsCompleted: customPlayer.exerciseLog.length,
     exerciseLog: customPlayer.exerciseLog,
+    restSkipBonusXP: customPlayer.restSkipBonusXP || 0,
     isPR: isNewPR
   });
 
@@ -4174,6 +4324,16 @@ function renderCustomCompleteScreen(session) {
   }
 
   document.getElementById('customBreakdown').innerHTML = buildCustomExerciseBreakdownHtml(session.exerciseLog || []);
+
+  const bonusRow = document.getElementById('customRestBonusRow');
+  if (bonusRow) {
+    if (session.restSkipBonusXP > 0) {
+      bonusRow.style.display = 'flex';
+      document.getElementById('cCustomRestBonus').textContent = '+' + session.restSkipBonusXP + ' XP';
+    } else {
+      bonusRow.style.display = 'none';
+    }
+  }
 
   pendingCustomFeedback = { rpe: null, feeling: null };
   document.getElementById('customNoteInput').value = '';

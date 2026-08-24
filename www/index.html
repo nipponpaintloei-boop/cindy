@@ -524,11 +524,19 @@ body{
 
 /* ---- boss fight card ---- */
 .boss-card{
+  --boss-accent-rgb:232,35,42; /* default until renderBossCard() sets this boss's own color */
   position:relative;
   background:linear-gradient(155deg,var(--card) 0%,#0d0e14 100%);
   border:1px solid var(--card-border);border-radius:var(--radius);
   padding:16px 16px 18px;margin-top:12px;
+  overflow:hidden;
 }
+/* faint accent wash behind the whole card, tinted per-boss */
+.boss-card::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 140% 90% at 50% -10%,rgba(var(--boss-accent-rgb),.16),transparent 60%);
+}
+.boss-name{color:rgb(var(--boss-accent-rgb));text-shadow:0 0 14px rgba(var(--boss-accent-rgb),.5);transition:color .4s ease,text-shadow .4s ease;}
 /* ---- daily quest board ---- */
 .quest-card{
   background:linear-gradient(155deg,var(--card) 0%,var(--bg-elev) 100%);
@@ -556,12 +564,13 @@ body{
 
 .boss-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
 .boss-name{font-family:var(--font-display);font-size:20px;letter-spacing:1px;}
-.boss-tag{font-size:10px;color:var(--text-faint);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;}
+.boss-tag{font-size:10px;color:rgba(var(--boss-accent-rgb),.75);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;font-weight:700;}
 .boss-stage{
   position:relative;width:120px;height:120px;margin:6px auto 12px;
   display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(circle,rgba(255,255,255,.04),transparent 70%);
+  background:radial-gradient(circle,rgba(var(--boss-accent-rgb),.14),transparent 70%);
   border-radius:14px;overflow:visible;
+  transition:background .4s ease;
 }
 .boss-art{width:100px;height:100px;transition:opacity .4s ease, filter .4s ease;}
 .boss-art svg{width:100%;height:100%;display:block;}
@@ -571,9 +580,18 @@ body{
 }
 .boss-hp-fill{
   height:100%;border-radius:5px;width:100%;
-  background:linear-gradient(90deg,var(--push),#ff6a3d);
-  transition:width .6s ease;
+  background:linear-gradient(90deg,rgb(var(--boss-accent-rgb)),#ff6a3d);
+  transition:width .6s ease,background .4s ease;
 }
+
+/* last 25% of HP — a slow red pulse around the stage as urgency to finish
+   the fight, on top of whatever the boss's own accent color is doing */
+.boss-stage.boss-critical{animation:bossCriticalPulse 1.6s ease-in-out infinite;}
+@keyframes bossCriticalPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(232,35,42,0);}
+  50%{box-shadow:0 0 22px 4px rgba(232,35,42,.45);}
+}
+.boss-stage.boss-critical.boss-defeated{animation:none;box-shadow:none;}
 .boss-hp-label{font-size:10px;color:var(--text-faint);margin-top:6px;text-align:center;letter-spacing:.3px;}
 
 .boss-dmg-breakdown{margin-top:12px;}
@@ -888,6 +906,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 .chart-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
 .chart-bar{width:100%;max-width:22px;background:var(--primary);border-radius:5px 5px 2px 2px;min-height:3px;}
 .chart-bar.pb{background:var(--success);}
+.chart-bar.xp{background:linear-gradient(180deg,#ffd76a,var(--warning));}
 .chart-xlabel{font-size:8px;color:var(--text-faint);margin-top:6px;}
 
 /* ---- reminder ---- */
@@ -1385,10 +1404,15 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <div class="period-pill" data-m="pull" onclick="setMetric('pull')">PULL-UP</div>
         <div class="period-pill" data-m="push" onclick="setMetric('push')">PUSH-UP</div>
         <div class="period-pill" data-m="squat" onclick="setMetric('squat')">SQUAT</div>
+        <div class="period-pill" data-m="xp" onclick="setMetric('xp')">⚡ XP (ALL)</div>
       </div>
       <div class="chart-card">
         <div id="chartBars" class="chart-bars"></div>
       </div>
+
+      <div class="section-label">🏆 RECENT RECORDS</div>
+      <div id="progressRecordsList"></div>
+
       <div class="section-label">STATS</div>
       <div class="metric-card" style="padding:16px;">
         <div id="statBarList"></div>
@@ -1632,6 +1656,14 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       <div class="metric-grid">
         <div class="metric-card"><div id="cCustomTotalTime" class="v tabular">00:00</div><div class="l">TOTAL TIME</div></div>
         <div class="metric-card"><div id="cCustomSets" class="v">0</div><div class="l">SETS COMPLETED</div></div>
+      </div>
+
+      <div id="customRestBonusRow" class="metric-card" style="display:none;padding:12px 16px;margin-top:10px;align-items:center;justify-content:space-between;border-color:var(--push);">
+        <div>
+          <div style="font-size:12px;font-weight:800;letter-spacing:.5px;">⚡ REST-SKIP BONUS</div>
+          <div style="font-size:10.5px;color:var(--text-faint);margin-top:2px;">พักน้อยลง ร่างกายแบกรับมากขึ้น</div>
+        </div>
+        <div id="cCustomRestBonus" class="v tabular" style="color:var(--push);font-size:20px;">+0 XP</div>
       </div>
 
       <div class="section-label">EXERCISE BREAKDOWN</div>
