@@ -1,0 +1,2296 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#0A0A0D" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="CINDY" />
+<title>CINDY — Fitness RPG Workout</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --bg:#0A0A0D;
+  --bg-elev:#12141B;
+  --card:#161821;
+  --card-border:#2B2E3D;
+  --primary:#E8232A;
+  --primary-text:#F5F4F0;
+  --primary-dim:#3A3A3C;
+  --success:#3ED598;
+  --warning:#FFB020;
+  --danger:#E8232A;
+  --text:#F5F4F0;
+  --text-dim:#8D93A6;
+  --text-faint:#4E5468;
+  --web:#3D6FE0;
+  --pull:#3D6FE0;
+  --push:#E8232A;
+  --squat:#FFB020;
+  --radius:14px;
+  --radius-sm:10px;
+  --font-display:"Bebas Neue",Impact,"Arial Narrow",sans-serif;
+}
+body.oled{
+  --bg:#000000;
+  --bg-elev:#08090C;
+  --card:#0C0D12;
+  --card-border:#1D2030;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+/* ---- inline SVG icon utility (replaces emoji for small UI icons) ---- */
+.icon-inline{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:1em;height:1em;vertical-align:-0.14em;color:currentColor;
+}
+.icon-inline svg{width:100%;height:100%;display:block;}
+/* ---- gem-badge: enamel-pin style reward/gear badge, replaces flat emoji
+   on collectible surfaces (chest medals, mascot skin gear). Sized the same
+   way as .icon-inline — 1em box driven by the caller's font-size — so it
+   drops into the existing emoji-sized hooks with no layout changes. Two
+   gradient stops + an optional glow are set per instance via CSS vars so
+   every tier/skin keeps a distinct, "earned" look instead of one sticker
+   recolored. */
+.gem-badge{
+  position:relative;display:inline-flex;align-items:center;justify-content:center;
+  width:1em;height:1em;border-radius:50%;flex-shrink:0;
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,.65), rgba(255,255,255,0) 46%),
+    linear-gradient(155deg, var(--badge-c1,#fff) 0%, var(--badge-c2,#888) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.28),
+    inset 0 -0.08em 0.1em rgba(0,0,0,.4),
+    0 0.05em 0.12em rgba(0,0,0,.4);
+}
+.gem-badge svg{width:56%;height:56%;color:#fff;filter:drop-shadow(0 1px 1px rgba(0,0,0,.45));}
+.gem-badge.badge-glow{
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.35),
+    inset 0 -0.08em 0.1em rgba(0,0,0,.4),
+    0 0 0.32em 0.05em var(--badge-glow, var(--badge-c2)),
+    0 0.05em 0.12em rgba(0,0,0,.5);
+}
+.gem-badge.badge-ring::after{
+  content:"";position:absolute;inset:9%;border-radius:50%;
+  border:1px solid rgba(255,255,255,.32);pointer-events:none;
+}
+.gem-badge.badge-locked{opacity:.9;}
+html,body{height:100%;}
+body{
+  margin:0;
+  background:
+    repeating-conic-gradient(from 0deg at 50% -10%, rgba(232,35,42,.05) 0deg 1deg, transparent 1deg 15deg),
+    radial-gradient(circle at 50% -10%, rgba(61,111,224,.10), transparent 55%),
+    repeating-radial-gradient(circle at 50% -10%, rgba(255,255,255,.035) 0 1px, transparent 1px 46px),
+    var(--bg);
+  color:var(--text);
+  font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  overscroll-behavior:none;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+  min-height:100dvh;
+}
+#app{
+  max-width:480px;
+  margin:0 auto;
+  height:100vh;
+  height:100dvh;
+  display:flex;
+  flex-direction:column;
+  position:relative;
+  overflow:hidden;
+  padding-top:env(safe-area-inset-top);
+}
+.screen{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden;animation:fadeIn .18s ease;}
+.screen.active{display:flex;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.tabular{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";}
+
+/* ---- top nav ---- */
+.topbar{
+  flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 20px 8px;
+}
+.brand{
+  font-family:var(--font-display);
+  font-size:30px;line-height:1;font-weight:400;letter-spacing:2px;color:var(--text);
+  position:relative;padding-left:2px;
+  text-shadow:0 0 14px rgba(232,35,42,.35);
+}
+.brand::after{
+  content:"";display:block;width:34px;height:4px;
+  background:linear-gradient(90deg,var(--push) 0 55%,var(--web) 55%);
+  margin-top:3px;border-radius:2px;
+}
+.iconbtn{
+  position:relative;overflow:hidden;
+  width:38px;height:38px;border-radius:10px;background:var(--card);
+  border:1px solid rgba(61,111,224,.35);display:flex;align-items:center;justify-content:center;
+  color:var(--text-dim);transition:transform .08s ease;
+}
+.iconbtn::after{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:radial-gradient(circle, rgba(120,170,255,.6) 0%, rgba(120,170,255,0) 65%);
+  opacity:0;transform:scale(.25);transition:opacity .32s ease, transform .38s ease;
+}
+.iconbtn:active{transform:scale(.92);}
+.iconbtn:active::after{opacity:1;transform:scale(1.6);transition:opacity .04s ease, transform .04s ease;}
+.iconbtn.install-btn{display:none;color:var(--text);border-color:var(--text-faint);}
+.iconbtn.install-btn.show{display:flex;}
+.iconbtn.sel{color:var(--success);border-color:var(--success);}
+
+/* ---- home ---- */
+.home-content{padding:0 20px 32px;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.hero-card{
+  position:relative;
+  background:
+    repeating-linear-gradient(45deg, rgba(255,255,255,.02) 0 1px, transparent 1px 7px),
+    linear-gradient(155deg,var(--card) 0%,var(--bg-elev) 100%);
+  border:1px solid var(--card-border);
+  border-radius:var(--radius);
+  padding:30px 22px 26px;
+  margin-top:22px;
+  text-align:center;
+}
+.hero-card::before{
+  content:"";position:absolute;top:0;right:0;width:110px;height:110px;
+  border-radius:0 var(--radius) 0 0;
+  overflow:hidden;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%233D6FE0' stroke-width='1.1' opacity='0.4'%3E%3Cpath d='M100 0 L0 100'/%3E%3Cpath d='M100 22 L22 100'/%3E%3Cpath d='M100 44 L44 100'/%3E%3Cpath d='M100 66 L66 100'/%3E%3Cpath d='M100 0 Q60 40 100 100'/%3E%3Cpath d='M100 0 Q75 55 78 100'/%3E%3Cpath d='M100 0 Q88 65 92 100'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:contain;background-position:top right;background-repeat:no-repeat;
+  pointer-events:none;z-index:0;
+}
+.hero-eyebrow{
+  position:absolute;top:-14px;left:20px;z-index:1;
+  background:var(--push);color:#fff;
+  font-size:11px;font-weight:800;letter-spacing:2.5px;
+  padding:6px 12px;border-radius:4px;
+  transform:rotate(-2deg);
+  box-shadow:0 4px 10px rgba(232,35,42,.4);
+}
+.hero-title{position:relative;z-index:1;font-size:15px;color:var(--text-dim);margin:6px 0 20px;font-weight:600;letter-spacing:.5px;}
+.hero-protocol{position:relative;z-index:1;display:flex;justify-content:center;gap:10px;margin-bottom:22px;}
+.proto-chip{
+  flex:1;background:var(--bg-elev);border:1px solid var(--card-border);
+  border-radius:var(--radius-sm);padding:12px 6px;
+}
+.proto-chip .n{font-family:var(--font-display);font-size:30px;line-height:1;letter-spacing:.5px;}
+.proto-chip .l{font-size:10px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;font-weight:600;}
+.proto-chip.pull .n{color:var(--pull)}
+.proto-chip.push .n{color:var(--push)}
+.proto-chip.squat .n{color:var(--squat)}
+.btn{
+  position:relative;overflow:hidden;
+  border:none;border-radius:10px;font-weight:800;font-size:15px;letter-spacing:1px;text-transform:uppercase;
+  padding:18px;width:100%;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .08s ease, opacity .15s ease;
+}
+.btn::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(circle, rgba(120,170,255,.55) 0%, rgba(120,170,255,0) 62%);
+  opacity:0;transform:scale(.25);
+  transition:opacity .32s ease, transform .38s ease;
+}
+.btn:active{transform:scale(.97);}
+.btn:active::after{opacity:1;transform:scale(1.5);transition:opacity .04s ease, transform .04s ease;}
+.btn-primary{background:var(--primary);color:var(--primary-text);}
+.btn-resume{background:var(--warning);color:#1a1200;}
+.btn-outline{background:transparent;border:1.5px solid rgba(61,111,224,.4);color:var(--text);}
+.btn-ghost{background:var(--bg-elev);color:var(--text-dim);}
+.btn-danger{background:var(--danger);color:#fff;}
+.btn-success{background:var(--success);color:#04140c;}
+.btn-sm{padding:12px;font-size:12px;border-radius:8px;}
+
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;}
+.stat-card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:14px 16px;}
+.stat-card .v{font-family:var(--font-display);font-size:30px;line-height:1;}
+.stat-card .l{font-size:11px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;font-weight:600;}
+
+.stat-bar-row{margin-bottom:14px;}
+.stat-bar-row:last-child{margin-bottom:0;}
+.stat-bar-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.stat-bar-label{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text);}
+.stat-bar-lv{font-family:var(--font-display);font-size:14px;color:var(--text-dim);letter-spacing:.5px;}
+.stat-bar-track{height:8px;border-radius:5px;overflow:hidden;background:var(--bg-elev);border:1px solid var(--card-border);}
+.stat-bar-fill{height:100%;border-radius:5px;transition:width .5s ease;}
+
+.section-label{font-size:12px;font-weight:700;letter-spacing:1.5px;color:var(--text-dim);margin:24px 0 10px;}
+.last-workout{
+  background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);
+  padding:14px 16px;display:flex;justify-content:space-between;align-items:center;
+}
+.last-workout .date{font-size:13px;color:var(--text-dim);}
+.last-workout .rounds{font-family:var(--font-display);font-size:22px;}
+.empty-hint{color:var(--text-faint);font-size:13px;text-align:center;padding:18px 0;}
+
+/* ---- home dashboard ---- */
+.mascot-card{
+  --mascot-accent-rgb:141,147,166; /* RECRUIT grey, until applyMascotGearAndAura() sets the earned rank color */
+  position:relative;
+  background:linear-gradient(155deg,var(--card) 0%,var(--bg-elev) 100%);
+  border:1px solid rgba(var(--mascot-accent-rgb),.5);border-radius:var(--radius);
+  padding:22px 22px 22px 26px;margin-top:38px;
+  display:flex;align-items:center;gap:18px;
+  overflow:visible;
+  transition:border-color .4s ease;
+}
+/* faint rarity wash behind the whole card, tinted per rank — same pattern as .boss-card::before */
+.mascot-card::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(ellipse 130% 85% at 15% 0%,rgba(var(--mascot-accent-rgb),.14),transparent 62%);
+  transition:background .4s ease;
+}
+.mascot-avatar{
+  position:relative;
+  flex-shrink:0;width:76px;height:76px;border-radius:0;
+  background:transparent;border:none;
+  display:flex;align-items:center;justify-content:center;color:var(--text-faint);
+  overflow:visible;cursor:pointer;
+}
+.mascot-avatar img{
+  position:absolute;left:50%;bottom:0;
+  width:100%;height:100%;max-width:none;
+  transform:translateX(-50%);
+  object-fit:contain;object-position:bottom;
+  z-index:1;pointer-events:none;
+}
+/* glow clone — sits directly behind #mascotImg, same src, brightness(0) turns its
+   visible pixels solid black while keeping the PNG's alpha shape. Fully hidden
+   under the real (correctly skin-tinted) image on top; only the animated
+   drop-shadow's blur, which follows that alpha shape, peeks out past the edges.
+   This keeps the rank aura pulse off #mascotImg's own filter entirely, so it
+   never fights with the skin recolor filter set inline by applyActiveMascotSkinFilter(). */
+#mascotImgGlow{z-index:0;filter:brightness(0);}
+.mascot-text{flex:1;min-width:0;}
+.mascot-headline{font-size:16px;font-weight:700;letter-spacing:.2px;}
+.mascot-sub{font-size:13px;color:var(--text-dim);margin-top:4px;line-height:1.4;}
+.mascot-rank{
+  display:inline-block;font-size:11px;font-weight:800;letter-spacing:1px;
+  margin-bottom:4px;padding:3px 8px;border-radius:5px;
+  background:var(--bg-elev);border:1px solid var(--card-border);color:var(--text-dim);
+}
+.mascot-rank.rank-recruit{color:var(--text-dim);border-color:var(--card-border);}
+.mascot-rank.rank-fighter{color:var(--pull);border-color:var(--pull);}
+.mascot-rank.rank-warrior{color:var(--squat);border-color:var(--squat);}
+.mascot-rank.rank-elite{color:#B48CFF;border-color:#B48CFF;}
+.mascot-rank.rank-legend{
+  color:#FFD700;border-color:#FFD700;
+  background:linear-gradient(90deg,rgba(255,215,0,.12),rgba(255,215,0,.02));
+  text-shadow:0 0 8px rgba(255,215,0,.5);
+}
+
+/* ---- title chip, paired with the rank badge (shows equipped skin name) ---- */
+.mascot-skin-title{
+  display:none;font-size:11px;font-weight:700;letter-spacing:.3px;
+  color:var(--text-dim);margin:-2px 0 5px;
+}
+.mascot-skin-title.show{display:block;}
+.mascot-skin-title.title-strong{
+  color:#FFD700;text-shadow:0 0 6px rgba(255,215,0,.4);
+}
+.character-sheet-link{
+  display:inline-flex;align-items:center;gap:4px;margin-top:9px;
+  background:none;border:none;padding:0;font-family:inherit;
+  font-size:11px;font-weight:700;letter-spacing:.4px;color:var(--primary);cursor:pointer;
+}
+.character-sheet-link .icon-inline{width:12px;height:12px;}
+
+.mascot-level-badge{
+  position:absolute;bottom:-15px;left:50%;transform:translateX(-50%);z-index:2;
+  font-family:var(--font-display);font-size:12px;letter-spacing:.5px;
+  background:var(--primary);color:#fff;
+  padding:3px 8px 2px;border-radius:6px;
+  border:1.5px solid var(--bg);
+  box-shadow:0 2px 8px rgba(232,35,42,.5);
+  white-space:nowrap;
+}
+.xp-bar-wrap{margin-top:9px;}
+.xp-bar-track{
+  height:6px;border-radius:4px;overflow:hidden;
+  background:var(--bg-elev);border:1px solid var(--card-border);
+}
+.xp-bar-fill{
+  height:100%;border-radius:4px;width:0%;
+  background:linear-gradient(90deg,var(--push),var(--warning));
+  transition:width .5s ease;
+}
+.xp-bar-label{font-size:10px;color:var(--text-faint);margin-top:4px;letter-spacing:.3px;}
+
+.mascot-avatar.level-up-glow{animation:levelUpGlow 1.1s ease;border-radius:50%;}
+.mascot-avatar.level-up-glow::after{
+  content:'';position:absolute;inset:-14px;border-radius:50%;z-index:0;pointer-events:none;
+  background:radial-gradient(circle, rgba(255,176,32,.55) 0%, rgba(255,176,32,.22) 40%, transparent 72%);
+  animation:levelUpBurstRing 1.1s ease forwards;
+}
+@keyframes levelUpGlow{
+  0%{box-shadow:0 0 0 0 rgba(255,176,32,0);}
+  30%{box-shadow:0 0 22px 7px rgba(255,176,32,.85);}
+  100%{box-shadow:0 0 0 0 rgba(255,176,32,0);}
+}
+@keyframes levelUpBurstRing{
+  0%{opacity:0;transform:scale(.4);}
+  35%{opacity:1;transform:scale(1);}
+  100%{opacity:0;transform:scale(1.7);}
+}
+.mascot-level-badge.bump{animation:badgeBump .5s ease;}
+@keyframes badgeBump{
+  0%{transform:translateX(-50%) scale(1) rotate(0deg);}
+  40%{transform:translateX(-50%) scale(1.4) rotate(-4deg);}
+  100%{transform:translateX(-50%) scale(1) rotate(0deg);}
+}
+
+/* ---- level-badge rank tiers ----
+ * Same 5-level RANK_TIERS bands used for the avatar aura/gear badge, applied
+ * to the "LV.N" chip itself so it escalates in color + effect as you climb:
+ * RECRUIT stays the plain default look, then each tier gets a richer
+ * gradient and a stronger glow pulse, and the top two tiers (ELITE/LEGEND)
+ * add a diagonal shine sweep on top of the pulse so the badge reads as
+ * visibly "leveled up" gear rather than just a recolored label. */
+.mascot-level-badge.lvbadge-fighter{
+  background:linear-gradient(135deg,var(--pull),#28407f);
+  animation:lvBadgePulseBlue 2.6s ease-in-out infinite;
+}
+.mascot-level-badge.lvbadge-warrior{
+  background:linear-gradient(135deg,var(--squat),#b3690a);
+  animation:lvBadgePulseOrange 2.3s ease-in-out infinite;
+}
+.mascot-level-badge.lvbadge-elite{
+  background:linear-gradient(135deg,#B48CFF,#5c2fc9);
+  animation:lvBadgePulsePurple 2s ease-in-out infinite;
+  overflow:hidden;
+}
+.mascot-level-badge.lvbadge-elite::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.5) 50%,transparent 65%);
+  background-size:220% 100%;
+  animation:lvBadgeShine 2.4s ease-in-out infinite;
+}
+.mascot-level-badge.lvbadge-legend{
+  color:#2a1900;
+  background:linear-gradient(135deg,#FFD700,#FF9F1C,#FFD700);
+  background-size:220% 220%;
+  animation:lvBadgePulseGold 1.7s ease-in-out infinite, lvBadgeGoldShift 3.2s linear infinite;
+  overflow:hidden;
+}
+.mascot-level-badge.lvbadge-legend::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(115deg,transparent 28%,rgba(255,255,255,.8) 50%,transparent 72%);
+  background-size:220% 100%;
+  animation:lvBadgeShine 1.6s ease-in-out infinite;
+}
+@keyframes lvBadgePulseBlue{
+  0%,100%{box-shadow:0 2px 8px rgba(61,111,224,.45);}
+  50%{box-shadow:0 2px 15px 2px rgba(61,111,224,.8);}
+}
+@keyframes lvBadgePulseOrange{
+  0%,100%{box-shadow:0 2px 9px rgba(255,176,32,.5);}
+  50%{box-shadow:0 2px 17px 2px rgba(255,176,32,.85);}
+}
+@keyframes lvBadgePulsePurple{
+  0%,100%{box-shadow:0 2px 10px rgba(180,140,255,.55);}
+  50%{box-shadow:0 2px 20px 3px rgba(180,140,255,.9);}
+}
+@keyframes lvBadgePulseGold{
+  0%,100%{box-shadow:0 2px 12px rgba(255,215,0,.6);}
+  50%{box-shadow:0 2px 26px 4px rgba(255,215,0,1);}
+}
+@keyframes lvBadgeGoldShift{
+  0%{background-position:0% 50%;}
+  100%{background-position:200% 50%;}
+}
+@keyframes lvBadgeShine{
+  0%,15%{background-position:220% 0;}
+  85%,100%{background-position:-220% 0;}
+}
+
+/* ---- persistent rank aura + "gear" badge on the mascot avatar itself ----
+   Unlike the skins above (which only recolor the art via filter), these
+   scale up with rank tier: a soft pulsing glow ring around the avatar, plus
+   a small worn badge showing the rank icon. Both start at FIGHTER (LV.5)
+   so RECRUIT stays plain and each tier upgrade visibly "equips" more. */
+.mascot-avatar.aura-fighter #mascotImgGlow{animation:auraPulseBlue 2.6s ease-in-out infinite;}
+.mascot-avatar.aura-warrior #mascotImgGlow{animation:auraPulseOrange 2.6s ease-in-out infinite;}
+.mascot-avatar.aura-elite #mascotImgGlow{animation:auraPulsePurple 2.2s ease-in-out infinite;}
+.mascot-avatar.aura-legend #mascotImgGlow{animation:auraPulseGold 1.8s ease-in-out infinite;}
+/* each step re-declares brightness(0) — filter is a single value, so the pulse
+   has to carry it forward every keyframe or the black-silhouette base is lost */
+@keyframes auraPulseBlue{
+  0%,100%{filter:brightness(0) drop-shadow(0 0 2px rgba(61,111,224,.4)) drop-shadow(0 0 7px rgba(61,111,224,.3));}
+  50%{filter:brightness(0) drop-shadow(0 0 6px rgba(61,111,224,.85)) drop-shadow(0 0 14px rgba(61,111,224,.6));}
+}
+@keyframes auraPulseOrange{
+  0%,100%{filter:brightness(0) drop-shadow(0 0 2px rgba(255,176,32,.45)) drop-shadow(0 0 8px rgba(255,176,32,.32));}
+  50%{filter:brightness(0) drop-shadow(0 0 6px rgba(255,176,32,.9)) drop-shadow(0 0 15px rgba(255,176,32,.62));}
+}
+@keyframes auraPulsePurple{
+  0%,100%{filter:brightness(0) drop-shadow(0 0 3px rgba(180,140,255,.5)) drop-shadow(0 0 9px rgba(180,140,255,.35));}
+  50%{filter:brightness(0) drop-shadow(0 0 7px rgba(180,140,255,.95)) drop-shadow(0 0 17px rgba(180,140,255,.68));}
+}
+@keyframes auraPulseGold{
+  0%,100%{filter:brightness(0) drop-shadow(0 0 3px rgba(255,215,0,.55)) drop-shadow(0 0 10px rgba(255,215,0,.4));}
+  50%{filter:brightness(0) drop-shadow(0 0 8px rgba(255,215,0,1)) drop-shadow(0 0 20px rgba(255,215,0,.75));}
+}
+.mascot-gear-badge{
+  position:absolute;bottom:-6px;left:-6px;z-index:2;
+  width:23px;height:23px;border-radius:50%;
+  display:none;align-items:center;justify-content:center;font-size:12px;
+  background:var(--bg-elev);border:1.5px solid var(--card-border);
+  box-shadow:0 2px 6px rgba(0,0,0,.35);
+}
+.mascot-gear-badge.show{display:flex;}
+.mascot-gear-badge.gear-fighter{border-color:var(--pull);}
+.mascot-gear-badge.gear-warrior{border-color:var(--squat);}
+.mascot-gear-badge.gear-elite{border-color:#B48CFF;}
+.mascot-gear-badge.gear-legend{
+  border-color:#FFD700;
+  background:radial-gradient(circle,rgba(255,215,0,.3),var(--bg-elev) 70%);
+}
+
+/* ---- per-skin aura + worn accessory ----
+   Unlike the rank aura above (tied to level), this is tied to whichever
+   skin is equipped, so each unlocked skin feels distinct — not just a
+   recolor. --skin-aura is set inline per skin (JS) as an rgba color. */
+.mascot-avatar{--skin-aura:transparent;}
+.mascot-avatar.skin-glow{box-shadow:none;}
+.mascot-avatar.skin-glow.skin-glow-strong{box-shadow:none;}
+.mascot-skin-accessory{
+  position:absolute;top:-8px;right:-8px;z-index:2;
+  width:26px;height:26px;font-size:26px;line-height:1;
+  display:none;align-items:center;justify-content:center;
+  filter:drop-shadow(0 2px 5px rgba(0,0,0,.5));
+}
+.mascot-skin-accessory.show{display:flex;}
+.mascot-loot-badge{
+  position:absolute;top:-8px;left:-8px;z-index:2;
+  width:24px;height:24px;font-size:24px;line-height:1;
+  display:none;align-items:center;justify-content:center;
+  filter:drop-shadow(0 2px 5px rgba(0,0,0,.5));
+}
+.mascot-loot-badge.show{display:flex;}
+#characterAvatar .mascot-loot-badge{top:-4px;left:-4px;width:28px;height:28px;font-size:28px;}
+.player-companion-hud .mascot-loot-badge{top:-5px;left:-5px;width:16px;height:16px;font-size:16px;}
+.mascot-skin-hint{
+  position:absolute;bottom:-4px;right:-4px;z-index:2;
+  width:18px;height:18px;border-radius:50%;
+  background:var(--bg-elev);border:1.5px solid var(--card-border);
+  display:flex;align-items:center;justify-content:center;font-size:9px;
+}
+
+/* ---- mascot skin picker ---- */
+.skin-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:9px;
+  max-height:58vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px;
+}
+.skin-item{
+  position:relative;background:var(--bg-elev);border:1.5px solid var(--card-border);
+  border-radius:10px;padding:9px 5px 8px;text-align:center;cursor:pointer;
+  transition:border-color .15s ease;
+}
+.skin-item.active{border-color:var(--success);}
+.skin-item.locked{cursor:default;}
+.skin-item img{width:42px;height:42px;object-fit:contain;margin-bottom:4px;}
+.skin-item .skin-name{font-size:9.5px;font-weight:700;line-height:1.3;color:var(--text);}
+.skin-item.locked .skin-name{color:var(--text-faint);}
+.skin-item .skin-cond{font-size:8.5px;color:var(--text-faint);margin-top:2px;line-height:1.25;}
+.skin-item .lock-icon,.skin-item .active-check{
+  position:absolute;top:4px;right:5px;font-size:11px;line-height:1;
+}
+.skin-item .active-check{color:var(--success);}
+.skin-item .skin-thumb-wrap{position:relative;width:42px;height:42px;margin:0 auto 4px;}
+.skin-item .skin-thumb-wrap img{width:42px;height:42px;object-fit:contain;margin-bottom:0;}
+.skin-item .skin-thumb-accessory{
+  position:absolute;bottom:-4px;right:-5px;width:17px;height:17px;font-size:17px;line-height:1;
+  filter:drop-shadow(0 1px 3px rgba(0,0,0,.55));
+}
+
+/* ---- collection / trophy room ---- */
+.collection-summary{
+  text-align:center;font-family:var(--font-display);font-size:16px;letter-spacing:.5px;
+  color:var(--text-dim);background:var(--card);border:1px solid var(--card-border);
+  border-radius:var(--radius-sm);padding:12px;margin-top:2px;
+}
+.collection-emoji{font-size:26px;line-height:1;margin-bottom:4px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));}
+
+/* ---- loot drops ---- */
+.loot-item.locked .skin-name{color:var(--text-faint);}
+.loot-item.active{box-shadow:0 0 0 1px var(--loot-rarity, var(--success)) inset, 0 0 10px 1px var(--loot-rarity, transparent);}
+.loot-count{
+  position:absolute;top:4px;right:5px;font-family:var(--font-display);
+  font-size:10px;color:var(--text-dim);line-height:1;
+}
+
+/* ---- character sheet ---- */
+.character-sheet-card{
+  background:linear-gradient(155deg,var(--card) 0%,var(--bg-elev) 100%);
+  border:1px solid var(--card-border);border-radius:var(--radius);
+  padding:26px 20px 20px;text-align:center;margin-top:6px;
+}
+.character-avatar-wrap{display:flex;justify-content:center;}
+#characterAvatar{width:96px;height:96px;}
+#characterAvatar img{width:100%;height:100%;}
+.character-sheet-card .mascot-rank{margin:14px 0 4px;}
+.character-sheet-card .mascot-skin-title{margin:0;}
+
+/* ---- CP (power level) ---- */
+.character-cp{margin-top:12px;}
+.character-cp .character-cp-val{
+  font-family:var(--font-display);font-size:38px;line-height:1;
+  background:linear-gradient(180deg,var(--text) 0%,var(--text-dim) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.character-cp .character-cp-lbl{
+  font-size:10px;font-weight:800;letter-spacing:2px;color:var(--text-faint);margin-top:2px;
+}
+
+/* ---- class flavor title (derived from highest stat) ---- */
+.character-class-title{
+  font-size:11px;font-weight:700;letter-spacing:.3px;color:var(--text-dim);margin-top:2px;
+}
+
+/* ---- equipment slots ---- */
+.character-equip-row{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.character-equip-slot{
+  display:flex;align-items:center;gap:10px;text-align:left;
+  background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);
+  padding:10px 12px;cursor:pointer;font-family:inherit;color:inherit;
+}
+.character-equip-icon{
+  width:34px;height:34px;flex-shrink:0;font-size:34px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:50%;background:var(--bg-elev);border:1px solid var(--card-border);
+}
+.character-equip-info{min-width:0;}
+.character-equip-label{font-size:9.5px;font-weight:800;letter-spacing:1px;color:var(--text-faint);}
+.character-equip-name{font-size:12px;font-weight:700;color:var(--text);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ---- boss trophy wall ---- */
+.character-trophy-row{display:flex;justify-content:space-between;gap:6px;}
+.character-trophy-item{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;min-width:0;}
+.character-trophy-item .gem-badge{font-size:30px;}
+.character-trophy-item.locked .gem-badge{filter:grayscale(1);opacity:.55;}
+.character-trophy-item .trophy-name{
+  font-size:8px;font-weight:700;letter-spacing:.2px;color:var(--text-faint);text-align:center;
+  line-height:1.2;
+}
+.character-trophy-item.defeated .trophy-name{color:var(--text-dim);}
+
+/* ---- recent battle log ---- */
+.character-recent-log{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);overflow:hidden;}
+.character-recent-log-item{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 14px;border-bottom:1px solid var(--card-border);
+}
+.character-recent-log-item:last-child{border-bottom:none;}
+.character-recent-log-date{font-size:11px;color:var(--text-dim);font-weight:600;}
+.character-recent-log-meta{font-size:10.5px;color:var(--text-faint);margin-top:2px;}
+.character-recent-log-rounds{font-family:var(--font-display);font-size:18px;color:var(--text);flex-shrink:0;}
+
+/* ---- companion HUD (Custom Workout player) ---- */
+.player-companion-hud{
+  position:fixed;right:16px;bottom:104px;z-index:30;
+  width:52px;height:52px;border-radius:50%;
+  background:var(--bg-elev);border:1.5px solid var(--card-border);
+  display:flex;align-items:center;justify-content:center;overflow:visible;
+  box-shadow:0 4px 14px rgba(0,0,0,.35);
+  --skin-aura:transparent;
+}
+.player-companion-hud.skin-glow{box-shadow:0 4px 14px rgba(0,0,0,.35),0 0 12px 3px var(--skin-aura);}
+.player-companion-hud img{
+  position:absolute;left:50%;bottom:0;width:100%;height:100%;max-width:none;
+  transform:translateX(-50%);object-fit:contain;object-position:bottom;pointer-events:none;
+}
+.player-companion-hud.companion-react{animation:companionBounce .5s ease;}
+@keyframes companionBounce{
+  0%{transform:translateY(0) scale(1);}
+  30%{transform:translateY(-9px) scale(1.08);}
+  55%{transform:translateY(0) scale(.97);}
+  100%{transform:translateY(0) scale(1);}
+}
+
+/* ---- rest-skip bonus badge (same pop language as .combo-badge, cooler tone) ---- */
+.rest-bonus-badge{
+  position:absolute;top:-6px;left:50%;transform:translateX(-50%) scale(0);
+  font-family:var(--font-display);font-size:16px;letter-spacing:.5px;color:#fff;
+  background:linear-gradient(90deg,var(--pull),#2ec9c9);
+  padding:4px 12px 3px;border-radius:20px;white-space:nowrap;
+  box-shadow:0 3px 12px rgba(61,111,224,.5);
+  opacity:0;transition:transform .25s cubic-bezier(.3,1.4,.4,1), opacity .2s ease;
+  pointer-events:none;
+}
+.rest-bonus-badge.show{opacity:1;transform:translateX(-50%) scale(1);}
+.rest-bonus-badge.pulse{animation:comboPulse .35s ease;}
+
+/* ---- streak milestone treasure chest ---- */
+.treasure-chest-btn{
+  position:absolute;top:-10px;right:-8px;z-index:3;
+  width:38px;height:38px;border-radius:50%;
+  background:linear-gradient(155deg,var(--warning),#c97e00);
+  border:2px solid var(--bg);
+  display:none;align-items:center;justify-content:center;
+  font-size:19px;line-height:1;cursor:pointer;color:#fff;
+  box-shadow:0 4px 12px rgba(255,176,32,.5);
+  animation:chestPulse 1.6s ease-in-out infinite;
+}
+.treasure-chest-btn.show{display:flex;}
+.treasure-chest-btn:active{transform:scale(.9);animation:none;}
+@keyframes chestPulse{
+  0%,100%{transform:scale(1);box-shadow:0 4px 12px rgba(255,176,32,.5);}
+  50%{transform:scale(1.12);box-shadow:0 4px 18px rgba(255,176,32,.75);}
+}
+.chest-stage{
+  position:relative;width:130px;height:130px;margin:8px auto 14px;
+  display:flex;align-items:center;justify-content:center;
+}
+.chest-icon{
+  font-size:68px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  filter:drop-shadow(0 6px 10px rgba(0,0,0,.5));
+  transition:transform .22s ease, opacity .22s ease;
+}
+.chest-icon.chest-shake{animation:chestShake .5s ease;}
+@keyframes chestShake{
+  0%,100%{transform:rotate(0deg);}
+  20%{transform:rotate(-8deg);}
+  40%{transform:rotate(7deg);}
+  60%{transform:rotate(-5deg);}
+  80%{transform:rotate(4deg);}
+}
+.chest-icon.chest-opened{opacity:0;transform:scale(.5);}
+.chest-badge-reveal{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  opacity:0;transform:scale(.3);
+  transition:opacity .35s ease, transform .35s cubic-bezier(.2,.9,.3,1.3);
+}
+.chest-badge-reveal.show{opacity:1;transform:scale(1);}
+.chest-badge-reveal .emoji{font-size:60px;line-height:1;filter:drop-shadow(0 4px 10px rgba(255,176,32,.5));}
+.chest-reward-text{opacity:0;transition:opacity .3s ease .1s;}
+.chest-reward-text.show{opacity:1;}
+
+/* ---- boss fight card ---- */
+.boss-card{
+  --boss-accent-rgb:232,35,42; /* default until renderBossCard() sets this boss's own color */
+  position:relative;
+  background:linear-gradient(155deg,var(--card) 0%,#0d0e14 100%);
+  border:1px solid var(--card-border);border-radius:var(--radius);
+  padding:16px 16px 18px;margin-top:12px;
+  overflow:hidden;
+}
+/* faint accent wash behind the whole card, tinted per-boss */
+.boss-card::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 140% 90% at 50% -10%,rgba(var(--boss-accent-rgb),.16),transparent 60%);
+}
+.boss-name{color:rgb(var(--boss-accent-rgb));text-shadow:0 0 14px rgba(var(--boss-accent-rgb),.5);transition:color .4s ease,text-shadow .4s ease;}
+/* ---- daily quest board ---- */
+.quest-card{
+  background:linear-gradient(155deg,var(--card) 0%,var(--bg-elev) 100%);
+  border:1px solid var(--card-border);border-radius:var(--radius);
+  padding:14px 16px 16px;margin-top:12px;
+}
+.quest-card-title{font-size:11px;font-weight:800;letter-spacing:1.5px;color:var(--text-dim);margin-bottom:8px;}
+.quest-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;}
+.quest-row + .quest-row{border-top:1px solid var(--card-border);}
+.quest-row.done .quest-title, .quest-row.done .quest-desc{color:var(--text-faint);}
+.quest-info{min-width:0;}
+.quest-title{font-size:13px;font-weight:700;}
+.quest-desc{font-size:11px;color:var(--text-dim);margin-top:2px;line-height:1.35;}
+.quest-xp-tag{
+  flex-shrink:0;font-size:11px;font-weight:700;color:var(--text-faint);
+  background:var(--bg-elev);border:1px solid var(--card-border);border-radius:6px;padding:4px 8px;
+}
+.quest-claimed{flex-shrink:0;font-size:11px;font-weight:700;color:var(--success);}
+.quest-claim-btn{
+  flex-shrink:0;font-size:11px;font-weight:800;letter-spacing:.3px;color:#fff;
+  background:linear-gradient(90deg,var(--push),var(--warning));
+  border:none;border-radius:7px;padding:7px 10px;cursor:pointer;
+}
+.quest-claim-btn:active{transform:scale(.95);}
+
+
+.boss-countdown{font-size:10px;color:var(--text-faint);letter-spacing:.3px;margin-top:4px;}
+.boss-view-btn{flex-shrink:0;font-size:10px;font-weight:800;letter-spacing:1px;color:var(--text-dim);background:var(--bg-elev);border:1px solid var(--card-border);border-radius:6px;padding:6px 10px;cursor:pointer;}
+.boss-view-btn:active{transform:scale(.96);}
+.boss-view-modal{position:fixed;inset:0;z-index:1000;display:none;}
+.boss-view-modal.open{display:block;}
+.boss-view-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.68);}
+.boss-view-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(88vw,360px);max-height:78vh;overflow:auto;background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);padding:16px;box-shadow:0 18px 60px rgba(0,0,0,.45);}
+.boss-view-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;}
+.boss-view-eyebrow{font-size:10px;font-weight:800;letter-spacing:1.5px;color:var(--text-faint);}
+.boss-view-title{font-family:var(--font-display);font-size:20px;margin-top:3px;}
+.boss-view-close{width:30px;height:30px;border:1px solid var(--card-border);border-radius:7px;background:var(--bg-elev);color:var(--text);font-size:20px;line-height:1;cursor:pointer;}
+.boss-view-list{display:grid;gap:8px;}
+.boss-view-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 11px;border:1px solid var(--card-border);border-radius:8px;background:var(--bg-elev);}
+.boss-view-item.current{border-color:rgb(var(--boss-accent-rgb));}
+.boss-view-item-name{font-weight:800;font-size:12px;letter-spacing:.5px;}
+.boss-view-item-tag{font-size:9px;color:var(--text-faint);margin-top:2px;}
+.boss-view-item-status{font-size:9px;font-weight:800;letter-spacing:.7px;color:var(--text-faint);text-align:right;}
+.boss-view-item.current .boss-view-item-status{color:var(--success);}
+
+.boss-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+.boss-name{font-family:var(--font-display);font-size:20px;letter-spacing:1px;}
+.boss-tag{font-size:10px;color:rgba(var(--boss-accent-rgb),.75);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;font-weight:700;}
+.boss-stage{
+  position:relative;width:158px;height:158px;margin:6px auto 12px;
+  display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle,rgba(var(--boss-accent-rgb),.14),transparent 70%);
+  border-radius:14px;overflow:visible;
+  transition:background .4s ease;
+}
+  to{background-position:0 -52px, 0 -68px;}
+}
+.boss-art{position:relative;z-index:1;width:150px;height:150px;transition:opacity .4s ease, filter .4s ease;}
+.boss-art svg{width:100%;height:100%;display:block;}
+.boss-hp-track{
+  height:9px;border-radius:5px;overflow:hidden;
+  background:var(--bg-elev);border:1px solid var(--card-border);
+}
+.boss-hp-fill{
+  height:100%;border-radius:5px;width:100%;
+  background:linear-gradient(90deg,rgb(var(--boss-accent-rgb)),#ff6a3d);
+  transition:width .6s ease,background .4s ease;
+}
+
+/* last 25% of HP — a slow red pulse traced around the boss art itself
+   (drop-shadow follows the PNG's alpha silhouette, unlike box-shadow which
+   draws a rectangle around the whole stage box) as urgency to finish the fight */
+.boss-stage.boss-critical .boss-art{animation:bossCriticalPulse 1.6s ease-in-out infinite;}
+@keyframes bossCriticalPulse{
+  0%,100%{filter:drop-shadow(0 0 0 rgba(232,35,42,0)) drop-shadow(0 0 0 rgba(232,35,42,0));}
+  50%{filter:drop-shadow(0 0 6px rgba(232,35,42,.9)) drop-shadow(0 0 16px rgba(232,35,42,.55));}
+}
+.boss-stage.boss-critical.boss-defeated .boss-art{animation:none;filter:none;}
+.boss-hp-label{font-size:10px;color:var(--text-faint);margin-top:6px;text-align:center;letter-spacing:.3px;}
+
+.boss-dmg-breakdown{margin-top:12px;}
+.boss-dmg-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.boss-dmg-row:last-child{margin-bottom:0;}
+.boss-dmg-name{flex-shrink:0;width:52px;font-size:9.5px;font-weight:800;letter-spacing:.5px;color:var(--text-dim);}
+.boss-dmg-track{flex:1;height:6px;border-radius:4px;overflow:hidden;background:var(--bg-elev);border:1px solid var(--card-border);}
+.boss-dmg-fill{height:100%;border-radius:4px;transition:width .5s ease;}
+.boss-dmg-val{flex-shrink:0;font-size:10.5px;font-weight:700;color:var(--text-faint);min-width:34px;text-align:right;}
+
+/* hit flash — small shake + quick red pulse */
+.boss-stage.boss-hit .boss-art{animation:bossHitShake .4s ease;}
+@keyframes bossHitShake{
+  0%{transform:translateX(0);filter:brightness(1);}
+  20%{transform:translateX(-5px);filter:brightness(1.6) drop-shadow(0 0 10px rgba(232,35,42,.8));}
+  40%{transform:translateX(5px);}
+  60%{transform:translateX(-3px);}
+  80%{transform:translateX(2px);}
+  100%{transform:translateX(0);filter:brightness(1);}
+}
+
+/* defeated state — dim + fade the silhouette, show "cleared" tag */
+.boss-stage.boss-defeated .boss-art{opacity:.28;filter:grayscale(1);}
+.boss-stage.boss-defeated::after{
+  content:"CLEARED";position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);
+  font-family:var(--font-display);font-size:13px;letter-spacing:2px;color:var(--success);
+  background:rgba(0,0,0,.55);padding:2px 10px;border-radius:6px;border:1px solid var(--success);
+}
+
+/* explosion burst — plays once when the boss is freshly defeated */
+.boss-boom{
+  position:absolute;inset:0;z-index:2;pointer-events:none;
+  display:flex;align-items:center;justify-content:center;
+}
+.boss-stage.boss-explode .boss-boom{animation:bossBoomFlash .8s ease forwards;}
+.boss-stage.boss-explode .boss-boom::before,
+.boss-stage.boss-explode .boss-boom::after{
+  content:"";position:absolute;left:50%;top:50%;width:8px;height:8px;border-radius:50%;
+  background:var(--warning);opacity:0;
+}
+.boss-stage.boss-explode .boss-boom::before{
+  box-shadow:
+    0 0 0 0 rgba(255,176,32,0),
+    -40px -30px 0 -2px #FFB020, 40px -30px 0 -2px #E8232A,
+    -46px 20px 0 -2px #E8232A, 46px 20px 0 -2px #FFB020,
+    0 -46px 0 -2px #fff, 0 46px 0 -2px #FFB020;
+  animation:bossParticles .8s ease forwards;
+}
+@keyframes bossBoomFlash{
+  0%{background:radial-gradient(circle,rgba(255,255,255,0) 0%,rgba(255,176,32,0) 60%);}
+  15%{background:radial-gradient(circle,rgba(255,255,255,.9) 0%,rgba(255,176,32,.6) 55%,rgba(255,176,32,0) 75%);}
+  100%{background:radial-gradient(circle,rgba(255,255,255,0) 0%,rgba(255,176,32,0) 60%);}
+}
+@keyframes bossParticles{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.2);}
+  25%{opacity:1;}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(2.6);}
+}
+
+.plan-cta{
+  display:block;width:100%;text-align:left;
+  background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);
+  padding:16px 16px;margin-top:12px;cursor:pointer;
+}
+.plan-cta .eyebrow{font-size:10px;font-weight:800;letter-spacing:2px;color:var(--text-faint);text-transform:uppercase;}
+.plan-cta .title-row{display:flex;align-items:center;justify-content:space-between;margin-top:6px;}
+.plan-cta .title{font-family:var(--font-display);font-size:22px;letter-spacing:.5px;}
+.plan-cta .arrow{color:var(--text-dim);}
+.plan-cta .meta{font-size:12px;color:var(--text-dim);margin-top:2px;}
+
+.week-card{
+  background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);
+  padding:16px;margin-top:12px;display:flex;align-items:center;gap:16px;
+}
+.week-ring-wrap{position:relative;flex-shrink:0;width:84px;height:84px;}
+.week-ring-wrap svg{width:84px;height:84px;transform:rotate(-90deg);}
+.week-ring-wrap .track{fill:none;stroke:var(--card-border);stroke-width:8;}
+.week-legend{flex:1;}
+.week-legend-row{display:flex;align-items:center;gap:7px;font-size:12px;margin-top:6px;}
+.week-legend-row:first-child{margin-top:0;}
+.week-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+.type-tag{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.5px;border-radius:5px;padding:2px 6px;vertical-align:1px;margin-left:6px;}
+.type-tag.cindy{color:var(--pull);border:1px solid var(--pull);}
+.type-tag.custom{color:var(--success);border:1px solid var(--success);}
+
+/* ---- program screen ---- */
+.program-card{
+  background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);
+  padding:16px;margin-bottom:14px;
+}
+.program-card-link{
+  display:flex;align-items:center;gap:14px;cursor:pointer;
+  background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);
+  padding:16px;margin-bottom:14px;
+}
+.program-card-icon{
+  flex-shrink:0;width:44px;height:44px;border-radius:11px;background:var(--bg-elev);
+  display:flex;align-items:center;justify-content:center;color:var(--success);
+}
+.program-card-link .title{font-size:15px;font-weight:700;}
+.program-card-link .sub{font-size:12px;color:var(--text-dim);margin-top:2px;}
+.program-card-link .sub2{font-size:11px;font-weight:600;margin-top:3px;}
+.program-card-link .sub3{font-size:11px;font-weight:600;margin-top:4px;color:var(--success);}
+.program-card-link .arrow{margin-left:auto;color:var(--text-faint);flex-shrink:0;}
+.program-card-link.mode-cindy .program-card-icon{color:var(--pull);background:rgba(61,111,224,.14);}
+.program-card-link.mode-cindy .sub2{color:var(--pull);}
+.program-card-link.mode-custom .program-card-icon{color:var(--success);background:rgba(62,213,152,.14);}
+.program-card-link.mode-custom .sub2{color:var(--success);}
+.program-card-link.mode-cardio .program-card-icon{color:var(--danger);background:rgba(232,35,42,.14);}
+.program-card-link.mode-cardio .sub2{color:var(--danger);}
+.program-today-badge{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--warning);border:1px solid var(--warning);border-radius:5px;padding:1px 5px;vertical-align:1px;margin-left:4px;}
+
+/* ---- bottom tabbar ---- */
+.tabbar{
+  flex-shrink:0;
+  display:flex;border-top:1px solid var(--card-border);background:var(--bg-elev);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.tab{flex:1;text-align:center;padding:12px 0 10px;color:var(--text-faint);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+.tab.active{color:var(--text);}
+.tab .dot{width:6px;height:6px;border-radius:50%;background:currentColor;margin:0 auto 5px;opacity:0;}
+.tab.active .dot{opacity:1;background:var(--push);}
+
+/* ---- workout screen ---- */
+.workout-wrap{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;padding:16px 20px 20px;}
+.workout-top{flex-shrink:0;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.status-pill{
+  font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-dim);text-transform:uppercase;
+  background:var(--card);border:1px solid var(--card-border);padding:6px 12px;border-radius:20px;
+}
+.status-pill.paused{color:var(--warning);border-color:var(--warning);}
+.timer-wrap{position:relative;display:flex;align-items:center;justify-content:center;margin:14px auto 6px;width:250px;height:250px;}
+.timer-wrap svg{width:250px;height:250px;transform:rotate(-90deg);}
+.timer-wrap .track{fill:none;stroke:var(--card-border);stroke-width:14;}
+.timer-wrap .ring{fill:none;stroke:var(--text);stroke-width:14;stroke-linecap:round;transition:stroke .3s ease, stroke-dasharray .25s linear;}
+.timer-center{position:absolute;display:flex;flex-direction:column;align-items:center;}
+.timer-digits{font-family:var(--font-display);font-size:64px;line-height:1;letter-spacing:1px;}
+.timer-sub{font-size:11px;color:var(--text-dim);letter-spacing:2px;margin-top:6px;text-transform:uppercase;}
+
+.combo-badge{
+  position:absolute;top:-6px;left:50%;transform:translateX(-50%) scale(0);
+  font-family:var(--font-display);font-size:16px;letter-spacing:.5px;color:#fff;
+  background:linear-gradient(90deg,var(--push),var(--warning));
+  padding:4px 12px 3px;border-radius:20px;white-space:nowrap;
+  box-shadow:0 3px 12px rgba(255,176,32,.5);
+  opacity:0;transition:transform .25s cubic-bezier(.3,1.4,.4,1), opacity .2s ease;
+  pointer-events:none;
+}
+.combo-badge.show{opacity:1;transform:translateX(-50%) scale(1);}
+.combo-badge.pulse{animation:comboPulse .35s ease;}
+@keyframes comboPulse{
+  0%{transform:translateX(-50%) scale(1);}
+  40%{transform:translateX(-50%) scale(1.25);}
+  100%{transform:translateX(-50%) scale(1);}
+}
+
+.rounds-banner{text-align:center;margin:6px 0 18px;}
+.rounds-banner .num{font-family:var(--font-display);font-size:20px;letter-spacing:1px;}
+.rounds-banner .lbl{font-size:10px;color:var(--text-dim);letter-spacing:2px;}
+.pb-hint{font-size:11px;color:var(--text-faint);margin-top:4px;font-weight:600;letter-spacing:.5px;}
+
+.exercise-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px;}
+.ex-box{
+  background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);
+  padding:12px 6px;text-align:center;
+}
+.ex-box svg{width:26px;height:26px;margin-bottom:6px;}
+.ex-box .rep{font-family:var(--font-display);font-size:26px;line-height:1;}
+.ex-box .name{font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;}
+.ex-box.pull{border-color:rgba(61,127,255,.35);}
+.ex-box.push{border-color:rgba(52,211,153,.35);}
+.ex-box.squat{border-color:rgba(245,166,35,.35);}
+.ex-box.pull svg{color:var(--pull)}
+.ex-box.push svg{color:var(--push)}
+.ex-box.squat svg{color:var(--squat)}
+
+.save-round-btn{margin-bottom:12px;}
+.control-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.workout-spacer{flex:1;}
+
+/* ---- modal ---- */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;
+  align-items:center;justify-content:center;z-index:50;padding:24px;
+  backdrop-filter:blur(2px);
+}
+.modal-overlay.active{display:flex;}
+.modal-card{
+  background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);
+  padding:22px;max-width:340px;width:100%;
+}
+.modal-title{font-size:17px;font-weight:800;margin-bottom:6px;}
+.modal-body{font-size:13px;color:var(--text-dim);margin-bottom:18px;line-height:1.5;}
+.modal-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.field-row{display:grid;grid-template-columns:1fr 88px;align-items:center;gap:10px;margin-bottom:12px;}
+.field-row label{font-size:13px;color:var(--text-dim);font-weight:600;}
+.field-row input[type="number"]{
+  width:100%;background:var(--bg-elev);border:1px solid var(--card-border);border-radius:8px;
+  color:var(--text);padding:10px;font-size:15px;font-weight:700;text-align:center;font-family:inherit;
+}
+.field-row input[type="number"]:focus{outline:none;border-color:var(--web);}
+.modal-scroll{max-height:60vh;overflow-y:auto;padding-right:2px;}
+.toast{
+  position:fixed;bottom:26px;left:50%;transform:translateX(-50%);
+  background:var(--card);border:1px solid var(--card-border);color:var(--text);
+  padding:10px 18px;border-radius:20px;font-size:13px;z-index:60;opacity:0;
+  display:flex;align-items:center;gap:7px;
+  transition:opacity .2s ease, transform .2s ease;pointer-events:none;font-weight:600;
+}
+.toast.show{opacity:1;}
+.toast .toast-icon{font-size:15px;color:var(--squat);flex-shrink:0;}
+
+/* ---- complete screen ---- */
+.complete-wrap{flex:1;min-height:0;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.complete-hero{position:relative;text-align:center;padding:22px 0 8px;}
+.complete-hero::before{
+  content:"";position:absolute;left:50%;top:38%;width:280px;height:280px;z-index:0;
+  transform:translate(-50%,-50%) scale(.4);opacity:0;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cg stroke='%23E8232A' stroke-width='2.4' opacity='0.9'%3E%3Cpath d='M100 100L100 5'/%3E%3Cpath d='M100 100L167 33'/%3E%3Cpath d='M100 100L195 100'/%3E%3Cpath d='M100 100L167 167'/%3E%3Cpath d='M100 100L100 195'/%3E%3Cpath d='M100 100L33 167'/%3E%3Cpath d='M100 100L5 100'/%3E%3Cpath d='M100 100L33 33'/%3E%3C/g%3E%3Cg stroke='%233D6FE0' stroke-width='1.6' opacity='0.65'%3E%3Ccircle cx='100' cy='100' r='35'/%3E%3Ccircle cx='100' cy='100' r='65'/%3E%3Ccircle cx='100' cy='100' r='95'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  background-size:contain;background-repeat:no-repeat;
+}
+.complete-hero.pr-burst::before{animation:webBurst .9s cubic-bezier(.2,.7,.3,1) 1;}
+.complete-hero .complete-star,.complete-hero .complete-rounds,.complete-hero .complete-lbl,.complete-hero .pr-badge{position:relative;z-index:1;}
+@keyframes webBurst{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.3);}
+  18%{opacity:.95;}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1.55);}
+}
+.complete-star{font-size:34px;color:var(--warning);margin-bottom:6px;}
+.complete-rounds{font-family:var(--font-display);font-size:72px;line-height:1;}
+.complete-lbl{font-size:12px;color:var(--text-dim);letter-spacing:2px;margin-top:4px;text-transform:uppercase;}
+.pr-badge{
+  display:inline-block;margin-top:10px;padding:5px 14px;border-radius:4px;
+  font-size:11px;font-weight:800;letter-spacing:1px;
+}
+.pr-badge.new{background:rgba(62,213,152,.15);color:var(--success);}
+.pr-badge.no{background:var(--bg-elev);color:var(--text-faint);}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px;}
+.metric-card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:14px 16px;}
+.metric-card .v{font-family:var(--font-display);font-size:28px;line-height:1;}
+.metric-card .l{font-size:11px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;text-transform:uppercase;}
+
+.combo-result-card{
+  text-align:center;margin-top:12px;
+  background:linear-gradient(155deg,rgba(255,176,32,.14),var(--card));
+  border-color:var(--warning);
+}
+.combo-result-title{font-family:var(--font-display);font-size:20px;letter-spacing:.5px;color:var(--warning);}
+.combo-result-xp{font-size:11px;color:var(--text-dim);margin-top:4px;font-weight:700;letter-spacing:.5px;}
+.breakdown-row{display:flex;justify-content:space-between;align-items:center;padding:11px 4px;border-bottom:1px solid var(--card-border);}
+.breakdown-row:last-child{border-bottom:none;}
+.breakdown-row .dot{width:8px;height:8px;border-radius:50%;margin-right:8px;display:inline-block;}
+.breakdown-name{display:flex;align-items:center;font-size:14px;color:var(--text-dim);font-weight:600;}
+.breakdown-val{font-family:var(--font-display);font-size:20px;}
+
+.feedback-block{margin-top:24px;}
+.rpe-row{display:flex;gap:6px;margin-top:8px;}
+.rpe-pill{
+  flex:1;text-align:center;padding:10px 0;border-radius:8px;background:var(--card);
+  border:1px solid var(--card-border);font-size:13px;font-weight:700;color:var(--text-dim);
+}
+.rpe-pill.sel{background:var(--text);border-color:var(--text);color:var(--bg);}
+.feeling-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;}
+.feeling-pill{
+  text-align:center;padding:12px 4px;border-radius:8px;background:var(--card);
+  border:1px solid var(--card-border);font-size:12px;font-weight:700;color:var(--text-dim);letter-spacing:.5px;
+}
+.feeling-pill.sel{background:var(--success);border-color:var(--success);color:#04140c;}
+textarea.note-input{
+  width:100%;background:var(--card);border:1px solid var(--card-border);border-radius:14px;
+  color:var(--text);padding:14px;font-size:14px;margin-top:8px;resize:none;min-height:80px;font-family:inherit;
+}
+textarea.note-input::placeholder{color:var(--text-faint);}
+
+/* ---- history ---- */
+.list-wrap{flex:1;min-height:0;padding:16px 20px 20px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.history-item{
+  position:relative;
+  background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);
+  padding:14px 16px 14px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;
+  overflow:hidden;
+}
+.history-item::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+  background:linear-gradient(180deg,var(--push),var(--web));
+}
+.history-item .date{font-size:13px;color:var(--text-dim);font-weight:600;}
+.history-item .reps{font-size:11px;color:var(--text-faint);margin-top:2px;}
+.history-item .rounds{font-family:var(--font-display);font-size:24px;}
+
+/* ---- detail ---- */
+.detail-table{width:100%;border-collapse:collapse;margin-top:10px;}
+.detail-table th{font-size:10px;color:var(--text-faint);letter-spacing:1px;text-align:center;padding:8px 4px;font-weight:700;text-transform:uppercase;}
+.detail-table td{font-size:13px;text-align:center;padding:9px 4px;border-top:1px solid var(--card-border);font-weight:700;}
+.detail-table td:first-child, .detail-table th:first-child{text-align:left;color:var(--text-dim);font-weight:600;}
+.skip-row td{opacity:.65;}
+
+/* ---- progress ---- */
+.period-row{display:flex;gap:8px;margin:14px 0 18px;}
+.period-pill{flex:1;text-align:center;padding:9px 0;border-radius:8px;background:var(--card);border:1px solid var(--card-border);font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;}
+.period-pill.sel{background:var(--text);border-color:var(--text);color:var(--bg);}
+.chart-card{position:relative;background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);padding:18px 14px 10px;margin-top:6px;}
+.chart-card::before{
+  content:"";position:absolute;top:0;right:0;width:74px;height:74px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%233D6FE0' stroke-width='1.3' opacity='0.3'%3E%3Cpath d='M100 0 L0 100'/%3E%3Cpath d='M100 28 L28 100'/%3E%3Cpath d='M100 56 L56 100'/%3E%3Cpath d='M100 0 Q70 45 100 100'/%3E%3Cpath d='M100 0 Q85 60 88 100'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:contain;background-position:top right;background-repeat:no-repeat;
+  pointer-events:none;border-radius:0 var(--radius) 0 0;
+}
+.chart-bars{position:relative;z-index:1;}
+.chart-bars{display:flex;align-items:flex-end;gap:5px;height:130px;}
+.chart-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
+.chart-bar{width:100%;max-width:22px;background:var(--primary);border-radius:5px 5px 2px 2px;min-height:3px;}
+.chart-bar.pb{background:var(--success);}
+.chart-bar.xp{background:linear-gradient(180deg,#ffd76a,var(--warning));}
+.chart-xlabel{font-size:8px;color:var(--text-faint);margin-top:6px;}
+
+/* ---- reminder ---- */
+.reminder-card{text-align:left;padding:16px;}
+.reminder-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.reminder-lbl{font-size:14px;font-weight:700;color:var(--text);}
+.reminder-sub{font-size:11px;color:var(--text-faint);margin-top:2px;}
+.switch{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0;}
+.switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1;}
+.switch-track{position:absolute;inset:0;background:var(--bg-elev);border:1px solid var(--card-border);border-radius:20px;transition:background .2s ease,border-color .2s ease;}
+.switch-thumb{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--text-faint);transition:transform .2s ease,background .2s ease;}
+.switch input:checked ~ .switch-track{background:rgba(232,35,42,.18);border-color:var(--push);}
+.switch input:checked ~ .switch-track .switch-thumb{transform:translateX(20px);background:var(--push);}
+.protocol-list{max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px;}
+.protocol-item{cursor:pointer;}
+.protocol-item.sel{border-color:var(--push);}
+
+/* ---- custom workout builder ---- */
+.exercise-card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px;}
+.exercise-card-top{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.exercise-num{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--bg-elev);color:var(--text-dim);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+.exercise-name-input{flex:1;min-width:0;background:var(--bg-elev);border:1.5px solid var(--card-border);border-radius:8px;color:var(--text);padding:9px 10px;font-size:13px;font-weight:600;}
+.exercise-card .iconbtn{width:30px;height:30px;flex-shrink:0;}
+.exercise-card .field-row{grid-template-columns:1fr 70px;margin-bottom:8px;}
+.exercise-card .field-row:last-child{margin-bottom:0;}
+.proto-active-tag{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--success);border:1px solid var(--success);border-radius:5px;padding:1px 5px;vertical-align:1px;margin-left:4px;}
+#screen-workout.mode-emom #skipRoundBtn{display:none;}
+#screen-workout.mode-emom #saveRoundBtn{pointer-events:none;opacity:.85;}
+.time-input{
+  background:var(--bg-elev);border:1px solid var(--card-border);border-radius:8px;
+  color:var(--text);padding:8px 10px;font-size:14px;font-weight:700;font-family:inherit;
+}
+.time-input:focus{outline:none;border-color:var(--web);}
+
+/* ---- splash ---- */
+.splash{
+  position:fixed;inset:0;z-index:999;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  transition:opacity .45s ease, visibility .45s ease;
+}
+.splash.hide{opacity:0;visibility:hidden;pointer-events:none;}
+.splash-mark{width:104px;height:104px;}
+.splash-mark svg{width:100%;height:100%;}
+.splash-mark .spokes path{
+  stroke-dasharray:140;stroke-dashoffset:140;
+  animation:splashDraw .55s ease-out forwards;
+}
+.splash-mark .spokes path:nth-child(2){animation-delay:.04s;}
+.splash-mark .spokes path:nth-child(3){animation-delay:.08s;}
+.splash-mark .spokes path:nth-child(4){animation-delay:.12s;}
+.splash-mark .spokes path:nth-child(5){animation-delay:.16s;}
+.splash-mark .spokes path:nth-child(6){animation-delay:.2s;}
+.splash-mark .spokes path:nth-child(7){animation-delay:.24s;}
+.splash-mark .spokes path:nth-child(8){animation-delay:.28s;}
+.splash-mark .rings circle{
+  stroke-dasharray:400;stroke-dashoffset:400;
+  animation:splashDraw .6s ease-out forwards;animation-delay:.3s;
+}
+@keyframes splashDraw{to{stroke-dashoffset:0;}}
+.splash-word{
+  font-family:var(--font-display);font-size:34px;letter-spacing:4px;
+  background:linear-gradient(90deg,var(--push),var(--web));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  opacity:0;animation:splashWordIn .5s ease-out forwards;animation-delay:.45s;
+}
+@keyframes splashWordIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+<div id="splash" class="splash">
+  <div class="splash-mark">
+    <svg viewBox="0 0 200 200" fill="none">
+      <g class="spokes" stroke="#E8232A" stroke-width="3" stroke-linecap="round">
+        <path d="M100 100L100 8"/>
+        <path d="M100 100L163 37"/>
+        <path d="M100 100L192 100"/>
+        <path d="M100 100L163 163"/>
+        <path d="M100 100L100 192"/>
+        <path d="M100 100L37 163"/>
+        <path d="M100 100L8 100"/>
+        <path d="M100 100L37 37"/>
+      </g>
+      <g class="rings" stroke="#3D6FE0" stroke-width="2">
+        <circle cx="100" cy="100" r="38"/>
+        <circle cx="100" cy="100" r="68"/>
+      </g>
+    </svg>
+  </div>
+  <div class="splash-word">CINDY</div>
+</div>
+<div id="app">
+
+  <!-- HOME -->
+  <section id="screen-home" class="screen active">
+    <div class="topbar">
+      <div class="brand">CINDY</div>
+      <div style="display:flex;gap:8px;">
+        <button id="installBtn" class="iconbtn install-btn" onclick="handleInstallClick()" aria-label="Install app">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v13M7 11l5 5 5-5"/><path d="M4 19h16"/></svg>
+        </button>
+        <button class="iconbtn" onclick="go('collection')" aria-label="Collection">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4z"/><path d="M7 6H4a2 2 0 002 4M17 6h3a2 2 0 01-2 4"/></svg>
+        </button>
+        <button class="iconbtn" onclick="openRestTimer()" aria-label="Rest Timer">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>
+        </button>
+        <button class="iconbtn" onclick="toggleTheme()" aria-label="Theme">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="home-content">
+
+      <div class="mascot-card">
+        <div id="treasureChestBtn" class="treasure-chest-btn" onclick="openTreasureChestModal()" aria-label="เปิดหีบรางวัล"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><rect x="4" y="12" width="16" height="9" rx="1"/><path d="M12 8v13"/><path d="M12 8C10.5 4.5 6.5 4.5 6.5 6.9c0 1.5 2 1.1 5.5 1.1z"/><path d="M12 8c1.5-3.5 5.5-3.9 5.5-1.1 0 1.5-2 1.1-5.5 1.1z"/></svg></span></div>
+        <div class="mascot-avatar" id="mascotAvatar" onclick="openSkinPicker()">
+          <img id="mascotImgGlow" src="assets/mascot/mascot.png" alt="" aria-hidden="true" />
+          <img id="mascotImg" src="assets/mascot/mascot.png" alt="" />
+          <div id="mascotLevelBadge" class="mascot-level-badge">LV.1</div>
+          <div id="mascotGearBadge" class="mascot-gear-badge"></div>
+          <div id="mascotSkinAccessory" class="mascot-skin-accessory"></div>
+          <div id="mascotLootBadge" class="mascot-loot-badge"></div>
+          <div class="mascot-skin-hint"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 100 18c1.4 0 2-1.1 1.2-2.2-.5-.7-.1-1.8 1-1.8H16a5 5 0 005-5c0-5-4.5-9-9-9z"/><circle cx="7.7" cy="10.5" r="1.15" fill="currentColor" stroke="none"/><circle cx="12" cy="7.3" r="1.15" fill="currentColor" stroke="none"/><circle cx="16.1" cy="10" r="1.15" fill="currentColor" stroke="none"/><circle cx="9.3" cy="15" r="1.15" fill="currentColor" stroke="none"/></svg></span></div>
+        </div>
+        <div class="mascot-text">
+          <div id="mascotRank" class="mascot-rank rank-recruit"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 7.6-7 9-4-1.4-7-4.4-7-9V6z"/></svg></span> RECRUIT</div>
+          <div id="mascotSkinTitle" class="mascot-skin-title"></div>
+          <div id="mascotHeadline" class="mascot-headline">ยังไม่มีประวัติการเล่น</div>
+          <div id="mascotSub" class="mascot-sub">เริ่มวันนี้เลย แล้วมาสร้าง streak กัน</div>
+          <div class="xp-bar-wrap">
+            <div class="xp-bar-track"><div id="xpBarFill" class="xp-bar-fill" style="width:0%;"></div></div>
+            <div id="xpBarLabel" class="xp-bar-label">0 / 100 XP</div>
+          </div>
+          <button class="character-sheet-link" onclick="go('character')">ดูตัวละคร <span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></button>
+        </div>
+      </div>
+
+      <div class="quest-card">
+        <div class="quest-card-title">DAILY QUEST</div>
+        <div id="dailyQuestList" class="quest-list"></div>
+      </div>
+
+      <div class="boss-card">
+        <div class="boss-header">
+          <div>
+            <div id="bossName" class="boss-name">GRINDER-1</div>
+            <div id="bossTag" class="boss-tag">SCRAP BRAWLER</div>
+            <div id="bossCountdown" class="boss-countdown">เหลือเวลา —</div>
+          </div>
+          <button id="bossViewBtn" class="boss-view-btn" type="button">VIEW</button>
+        </div>
+        <div id="bossStage" class="boss-stage">
+          <div class="boss-art"></div>
+          <div class="boss-boom"></div>
+        </div>
+        <div class="boss-hp-track"><div id="bossHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
+        <div id="bossHpLabel" class="boss-hp-label">0 / 0 HP</div>
+        <div id="bossDmgBreakdown" class="boss-dmg-breakdown"></div>
+      </div>
+
+      <div id="bossViewModal" class="boss-view-modal" aria-hidden="true">
+        <div class="boss-view-backdrop" data-boss-close></div>
+        <div class="boss-view-panel" role="dialog" aria-modal="true" aria-label="Boss Archive">
+          <div class="boss-view-panel-head">
+            <div>
+              <div class="boss-view-eyebrow">BOSS ARCHIVE</div>
+              <div id="bossViewTitle" class="boss-view-title">บอสประจำสัปดาห์</div>
+            </div>
+            <button class="boss-view-close" type="button" data-boss-close>×</button>
+          </div>
+          <div id="bossViewList" class="boss-view-list"></div>
+        </div>
+      </div>
+
+      <div id="homeWeeklyPlanWrap"></div>
+
+      <div class="week-card">
+        <div class="week-ring-wrap">
+          <svg viewBox="0 0 84 84">
+            <circle class="track" cx="42" cy="42" r="34"></circle>
+            <circle id="weekRingCindy" cx="42" cy="42" r="34" fill="none" style="stroke:var(--pull);" stroke-width="8" stroke-linecap="round" stroke-dasharray="213.6" stroke-dashoffset="213.6"></circle>
+            <circle class="track" cx="42" cy="42" r="24"></circle>
+            <circle id="weekRingCustom" cx="42" cy="42" r="24" fill="none" style="stroke:var(--push);" stroke-width="8" stroke-linecap="round" stroke-dasharray="150.8" stroke-dashoffset="150.8"></circle>
+          </svg>
+        </div>
+        <div class="week-legend">
+          <div style="font-size:11px;color:var(--text-faint);letter-spacing:1px;font-weight:700;margin-bottom:8px;">สัปดาห์นี้</div>
+          <div class="week-legend-row"><span class="week-legend-dot" style="background:var(--pull);"></span>Cindy — <span id="weekCindyCount" class="tabular">0</span> ครั้ง</div>
+          <div class="week-legend-row"><span class="week-legend-dot" style="background:var(--push);"></span>Custom — <span id="weekCustomCount" class="tabular">0</span> ครั้ง</div>
+        </div>
+      </div>
+
+      <div class="section-label">เวิร์คเอาท์ล่าสุด</div>
+      <div id="lastWorkoutWrap"><div class="empty-hint">ยังไม่มีประวัติการเล่น</div></div>
+    </div>
+    <div class="tabbar">
+      <div class="tab active" onclick="go('home')"><div class="dot"></div>HOME</div>
+      <div class="tab" onclick="go('program')"><div class="dot"></div>PROGRAM</div>
+      <div class="tab" onclick="go('history')"><div class="dot"></div>HISTORY</div>
+      <div class="tab" onclick="go('progress')"><div class="dot"></div>PROGRESS</div>
+    </div>
+  </section>
+
+  <!-- PROGRAM -->
+  <section id="screen-program" class="screen">
+    <div class="topbar">
+      <div class="brand">PROGRAM</div>
+      <div style="display:flex;gap:8px;">
+        <button class="iconbtn" onclick="go('customschedule')" aria-label="Weekly schedule">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="home-content">
+      <div class="section-label" style="margin-top:14px;">เลือกโหมด</div>
+
+      <div class="program-card-link mode-custom" onclick="go('customlist')">
+        <div class="program-card-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11M4 4l3 3M20 20l-3-3M2.5 9.5l3-3 3 3-3 3zM15.5 22.5l3-3 3 3-3 3zM18.5 2.5l3 3-3 3-3-3zM5.5 15.5l3 3-3 3-3-3z"/></svg>
+        </div>
+        <div>
+          <div class="title">Custom Workouts<span id="programCustomTodayBadge" class="program-today-badge" style="display:none;">วันนี้ตามแผน</span></div>
+          <div class="sub">สร้างสูตรของคุณเอง ตั้งตารางประจำสัปดาห์ — เล่นได้บ่อยเท่าที่ต้องการ</div>
+          <div class="sub2" id="programCustomStat"></div>
+          <div class="sub3" id="programCustomNudge" style="display:none;">อยากได้ระบบเล่นประจำ? ไปสร้าง Custom Workout →</div>
+        </div>
+        <div class="arrow">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+      </div>
+
+      <div class="program-card-link mode-cardio" onclick="go('cardiolist')">
+        <div class="program-card-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-2.5 4.2-2.5 7.3 0 1.2.8 2 1.8 2.1-.6-1.4.2-2.6 1.1-3.3.2 1.4 1 2 1.9 2.9 1.1 1.1 1.7 2.3 1.7 3.8 0 3.4-2.9 6.2-6.5 6.2S2 17.9 2 14.5c0-3.6 2.6-5.6 4.6-8 1.6-1.9 2.8-2.9 5.4-4.5z" fill="currentColor" stroke="none"/></svg>
+        </div>
+        <div>
+          <div class="title">Cardio<span id="programCardioTodayBadge" class="program-today-badge" style="display:none;">วันนี้ตามแผน</span></div>
+          <div class="sub">HIIT, Circuit, Tabata พร้อมเล่นทันที — เสริมวันไหนแรงเหลือ</div>
+          <div class="sub2" id="programCardioStat"></div>
+        </div>
+        <div class="arrow">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+      </div>
+
+      <div class="program-card-link mode-cindy" onclick="go('cindy')">
+        <div class="program-card-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+        </div>
+        <div>
+          <div class="title">Cindy (Classic)<span id="programCindyStartBadge" class="proto-active-tag" style="display:none;">ลองเล่นเลย (ไม่ต้องตั้งค่า)</span><span id="programCindyTodayBadge" class="program-today-badge" style="display:none;">วันนี้ตามแผน</span></div>
+          <div class="sub">โหมดพิเศษ — หนักกว่า ท้าทายกว่า (AMRAP 20 นาที Pull-up · Push-up · Squat)</div>
+          <div class="sub2" id="programCindyStat"></div>
+        </div>
+        <div class="arrow">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+      </div>
+
+      <div id="homeCustomWrap" style="display:none;margin-top:14px;">
+        <div class="section-label" style="margin-top:0;">CUSTOM WORKOUT ล่าสุด</div>
+        <div id="homeCustomCard"></div>
+      </div>
+    </div>
+    <div class="tabbar">
+      <div class="tab" onclick="go('home')"><div class="dot"></div>HOME</div>
+      <div class="tab active" onclick="go('program')"><div class="dot"></div>PROGRAM</div>
+      <div class="tab" onclick="go('history')"><div class="dot"></div>HISTORY</div>
+      <div class="tab" onclick="go('progress')"><div class="dot"></div>PROGRESS</div>
+    </div>
+  </section>
+
+  <!-- CINDY (CLASSIC) -->
+  <section id="screen-cindy" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('program')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">CINDY</div>
+      <button class="iconbtn" onclick="openSettingsModal()" aria-label="Protocol library">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </button>
+    </div>
+    <div class="home-content">
+      <div class="hero-card" style="margin-top:22px;">
+        <div id="activeProtocolName" style="font-size:11px;letter-spacing:2px;color:var(--text-faint);text-transform:uppercase;margin-bottom:2px;">Cindy (Classic)</div>
+        <div id="heroEyebrow" class="hero-eyebrow">20 MIN AMRAP</div>
+        <div id="heroTitle" class="hero-title">5 PULL-UP · 10 PUSH-UP · 15 SQUAT</div>
+        <div class="hero-protocol">
+          <div class="proto-chip pull"><div id="protoPullN" class="n">5</div><div class="l">PULL-UP</div></div>
+          <div class="proto-chip push"><div id="protoPushN" class="n">10</div><div class="l">PUSH-UP</div></div>
+          <div class="proto-chip squat"><div id="protoSquatN" class="n">15</div><div class="l">SQUAT</div></div>
+        </div>
+        <button id="homeMainBtn" class="btn btn-primary" onclick="handleHomeMainBtn()">START WORKOUT</button>
+        <div id="homeSecondaryWrap" style="margin-top:10px;display:none;">
+          <button class="btn btn-ghost btn-sm" onclick="confirmDiscardAndStartNew()">เริ่มใหม่ (ไม่เอา Workout ค้างอยู่)</button>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card"><div class="v" id="statBest">0</div><div class="l">PERSONAL BEST</div></div>
+        <div class="stat-card"><div class="v" id="statSessions">0</div><div class="l">SESSIONS</div></div>
+        <div class="stat-card"><div class="v" id="statTotalRounds">0</div><div class="l">TOTAL ROUNDS</div></div>
+        <div class="stat-card"><div class="v" id="statStreak">0</div><div class="l">STREAK</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CARDIO PRESETS (built-in, read-only Custom Workout recipes) -->
+  <section id="screen-cardiolist" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('program')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">CARDIO</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div class="empty-hint" style="text-align:left;padding:0 0 10px;">โปรแกรมคาร์ดิโอสำเร็จรูป กดเล่นได้ทันที</div>
+      <div id="cardioPresetList"></div>
+    </div>
+  </section>
+
+  <!-- WORKOUT -->
+  <section id="screen-workout" class="screen">
+    <div class="workout-wrap">
+      <div class="workout-top">
+        <button class="iconbtn" onclick="openEndModal()" aria-label="Back">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+        <div id="statusPill" class="status-pill">กำลังเล่น</div>
+        <div style="width:38px;"></div>
+      </div>
+
+      <div class="timer-wrap">
+        <svg viewBox="0 0 250 250">
+          <defs>
+            <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#E8232A"/>
+              <stop offset="100%" stop-color="#3D6FE0"/>
+            </linearGradient>
+          </defs>
+          <circle class="track" cx="125" cy="125" r="108"/>
+          <circle id="ringProgress" class="ring" cx="125" cy="125" r="108" stroke="url(#ringGrad)" stroke-dasharray="678 678" stroke-dashoffset="0"/>
+        </svg>
+        <div class="timer-center">
+          <div id="timerDigits" class="timer-digits tabular">20:00</div>
+          <div class="timer-sub">เวลาที่เหลือ</div>
+        </div>
+        <div id="comboBadge" class="combo-badge"></div>
+      </div>
+
+      <div class="rounds-banner">
+        <div class="lbl">ROUNDS SAVED</div>
+        <div id="roundsBig" class="num tabular" style="font-size:28px;">0</div>
+        <div id="pbHint" class="pb-hint">PB —</div>
+      </div>
+
+      <div class="exercise-row">
+        <div class="ex-box pull">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 3l3 1.4L9 3l3 1.4L15 3l3 1.4L21 3" stroke-dasharray="1.2 2.4"/>
+            <circle cx="12" cy="8.4" r="1.7" fill="currentColor" stroke="none"/>
+            <path d="M12 10.2v4.3"/>
+            <path d="M7.2 4.7L12 10.2l4.8-5.5"/>
+            <path d="M6.4 4.2l1.6 1M15.4 4.2l-1.6 1"/>
+            <path d="M12 14.5l-2.3 3.6M12 14.5l2.3 3.6"/>
+          </svg>
+          <div id="repPull" class="rep">5</div><div class="name">PULL-UP</div>
+        </div>
+        <div class="ex-box push">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="5" cy="10.5" r="1.7" fill="currentColor" stroke="none"/>
+            <path d="M6.4 11.3l4.6 2.4 4-2 4.6 2"/>
+            <path d="M9.4 12.9l-2 4.6"/>
+            <path d="M6.6 16.2l1.4-.9"/>
+            <path d="M3 18.4h18"/>
+          </svg>
+          <div id="repPush" class="rep">10</div><div class="name">PUSH-UP</div>
+        </div>
+        <div class="ex-box squat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="5.2" r="1.7" fill="currentColor" stroke="none"/>
+            <path d="M12 7v3.6"/>
+            <path d="M8 7.6l4 3 4-3"/>
+            <path d="M8.6 7.9l-1.1 1M15.4 7.9l1.1 1"/>
+            <path d="M12 10.6l-3 3.6v4M12 10.6l3 3.6v4"/>
+            <path d="M6 18.4h12"/>
+          </svg>
+          <div id="repSquat" class="rep">15</div><div class="name">SQUAT</div>
+        </div>
+      </div>
+
+      <button id="saveRoundBtn" class="btn btn-success save-round-btn" onclick="saveRound()"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg></span> บันทึกรอบที่ 1</button>
+
+      <div class="control-row">
+        <button id="pauseBtn" class="btn btn-outline btn-sm" onclick="togglePause()">PAUSE</button>
+        <button id="skipRoundBtn" class="btn btn-outline btn-sm" onclick="skipRound()">SKIP</button>
+      </div>
+      <div class="control-row">
+        <button class="btn btn-ghost btn-sm" onclick="openEndModal()">END WORKOUT</button>
+        <button class="btn btn-ghost btn-sm" onclick="openFinishModal()">FINISH NOW</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPLETE -->
+  <section id="screen-complete" class="screen">
+    <div class="complete-wrap">
+      <div class="complete-hero">
+        <div class="complete-star">★</div>
+        <div id="completeRounds" class="complete-rounds tabular">0</div>
+        <div class="complete-lbl">ROUNDS</div>
+        <div id="prBadge" class="pr-badge no">PR —</div>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-card"><div id="cTotalReps" class="v">0</div><div class="l">TOTAL REPS</div></div>
+        <div class="metric-card"><div id="cAvgRound" class="v tabular">00:00</div><div class="l">AVERAGE ROUND</div></div>
+      </div>
+
+      <div id="comboResultCard" class="metric-card combo-result-card" style="display:none;">
+        <div class="combo-result-title">🔥 COMBO MAX <span id="comboResultMax">x0</span></div>
+        <div id="comboResultXp" class="combo-result-xp">+0 XP BONUS</div>
+      </div>
+
+      <div class="section-label">EXERCISE BREAKDOWN</div>
+      <div class="metric-card">
+        <div class="breakdown-row"><span class="breakdown-name"><span class="dot" style="background:var(--pull)"></span>PULL-UP</span><span id="bdPull" class="breakdown-val">0</span></div>
+        <div class="breakdown-row"><span class="breakdown-name"><span class="dot" style="background:var(--push)"></span>PUSH-UP</span><span id="bdPush" class="breakdown-val">0</span></div>
+        <div class="breakdown-row"><span class="breakdown-name"><span class="dot" style="background:var(--squat)"></span>SQUAT</span><span id="bdSquat" class="breakdown-val">0</span></div>
+      </div>
+
+      <div class="feedback-block">
+        <div class="section-label" style="margin-top:0;">RPE (1–10)</div>
+        <div id="rpeRow" class="rpe-row"></div>
+
+        <div class="section-label">FEELING</div>
+        <div class="feeling-row">
+          <div class="feeling-pill" data-f="Great" onclick="selectFeeling('Great')">GREAT</div>
+          <div class="feeling-pill" data-f="Good" onclick="selectFeeling('Good')">GOOD</div>
+          <div class="feeling-pill" data-f="Hard" onclick="selectFeeling('Hard')">HARD</div>
+          <div class="feeling-pill" data-f="Max" onclick="selectFeeling('Max')">MAX</div>
+        </div>
+
+        <div class="section-label">NOTE</div>
+        <textarea id="noteInput" class="note-input" placeholder="เช่น วันนี้ Pull-Up ช่วงท้ายเหนื่อยมาก..."></textarea>
+      </div>
+
+      <button class="btn btn-primary" style="margin-top:22px;" onclick="finishCompleteFlow()">บันทึกและกลับหน้าหลัก</button>
+      <button class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="shareResult(lastCompletedSessionId)">แชร์ผลลัพธ์</button>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="screen-history" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('home')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">HISTORY</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div id="historyList" class="list-wrap"></div>
+    <div class="tabbar">
+      <div class="tab" onclick="go('home')"><div class="dot"></div>HOME</div>
+      <div class="tab" onclick="go('program')"><div class="dot"></div>PROGRAM</div>
+      <div class="tab active" onclick="go('history')"><div class="dot"></div>HISTORY</div>
+      <div class="tab" onclick="go('progress')"><div class="dot"></div>PROGRESS</div>
+    </div>
+  </section>
+
+  <!-- DETAIL -->
+  <section id="screen-detail" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('history')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">WORKOUT REPORT</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap" id="detailWrap"></div>
+    <div style="padding:0 20px 20px;">
+      <button class="btn btn-outline btn-sm" onclick="shareResult(currentDetailId)">แชร์ผลลัพธ์</button>
+      <div class="control-row" style="margin-top:10px;">
+        <button class="btn btn-ghost btn-sm" onclick="openEditSessionModal(currentDetailId)">แก้ไข</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDeleteSession()">ลบ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROGRESS -->
+  <section id="screen-progress" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('home')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">PROGRESS</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div class="stats-grid">
+        <div class="stat-card"><div id="pBest" class="v">0 R</div><div class="l">BEST</div></div>
+        <div class="stat-card"><div id="pAvg" class="v">0 R</div><div class="l">AVERAGE</div></div>
+        <div class="stat-card"><div id="pSessions" class="v">0</div><div class="l">SESSIONS</div></div>
+        <div class="stat-card"><div id="pTotalReps" class="v">0</div><div class="l">TOTAL REPS</div></div>
+      </div>
+      <div class="period-row">
+        <div class="period-pill" data-p="7" onclick="setPeriod('7')">7 DAYS</div>
+        <div class="period-pill" data-p="30" onclick="setPeriod('30')">30 DAYS</div>
+        <div class="period-pill" data-p="90" onclick="setPeriod('90')">3 MONTHS</div>
+        <div class="period-pill sel" data-p="all" onclick="setPeriod('all')">ALL</div>
+      </div>
+      <div class="period-row" style="margin-top:-8px;">
+        <div class="period-pill sel" data-m="rounds" onclick="setMetric('rounds')">ROUNDS</div>
+        <div class="period-pill" data-m="pull" onclick="setMetric('pull')">PULL-UP</div>
+        <div class="period-pill" data-m="push" onclick="setMetric('push')">PUSH-UP</div>
+        <div class="period-pill" data-m="squat" onclick="setMetric('squat')">SQUAT</div>
+        <div class="period-pill" data-m="xp" onclick="setMetric('xp')">⚡ XP (ALL)</div>
+      </div>
+      <div class="chart-card">
+        <div id="chartBars" class="chart-bars"></div>
+      </div>
+
+      <div class="section-label">🏆 RECENT RECORDS</div>
+      <div id="progressRecordsList"></div>
+
+      <div class="section-label">STATS</div>
+      <div class="metric-card" style="padding:16px;">
+        <div id="statBarList"></div>
+      </div>
+
+      <div class="section-label">STREAK</div>
+      <div class="metric-card" style="text-align:center;padding:20px;">
+        <div id="progStreak" class="v" style="font-size:28px;">0 DAYS</div>
+      </div>
+
+      <div class="section-label">เป้าหมายรายสัปดาห์</div>
+      <div class="metric-card" style="padding:16px;">
+        <div class="field-row" style="margin-bottom:12px;">
+          <label>Cindy (ครั้ง/สัปดาห์)</label>
+          <input type="number" id="goalCindyInput" min="1" max="14" class="time-input" style="width:100%;" onchange="setRingGoal('cindy', this.value)">
+        </div>
+        <div class="field-row" style="margin-bottom:0;">
+          <label>Custom Workout (ครั้ง/สัปดาห์)</label>
+          <input type="number" id="goalCustomInput" min="1" max="14" class="time-input" style="width:100%;" onchange="setRingGoal('custom', this.value)">
+        </div>
+      </div>
+
+      <div class="section-label">เตือนเล่นทุกวัน</div>
+      <div class="metric-card reminder-card">
+        <div class="reminder-row">
+          <div>
+            <div class="reminder-lbl">เปิดการแจ้งเตือน</div>
+            <div class="reminder-sub">แจ้งเตือนตอนเปิดแอปถ้ายังไม่ได้เล่นวันนี้</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="reminderToggle" onchange="toggleReminder(this.checked)">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </label>
+        </div>
+        <div class="reminder-row" style="margin-top:12px;">
+          <div class="reminder-lbl">เวลาที่อยากให้เตือน</div>
+          <input type="time" id="reminderTime" class="time-input" onchange="setReminderTime(this.value)">
+        </div>
+        <div class="reminder-row" style="margin-top:12px;">
+          <div class="reminder-lbl">เสียงแจ้งเตือน</div>
+          <select id="reminderSound" class="time-input" onchange="setReminderSound(this.value)">
+            <option value="default">มีเสียง (ค่าเริ่มต้นเครื่อง)</option>
+            <option value="silent">สั่นอย่างเดียว (ไม่มีเสียง)</option>
+          </select>
+        </div>
+        <div id="reminderNativeHint" style="display:none;font-size:11px;color:var(--text-faint);margin-top:10px;line-height:1.5;">
+          แอปเวอร์ชันนี้แจ้งเตือนได้จริงแม้ปิดแอปอยู่ — เสียงจะใช้ค่าเริ่มต้นของเครื่อง (Android ไม่รองรับการเลือกเสียงแจ้งเตือนเองต่อแอปแบบเสียงเรียกเข้า จึงเลือกได้ระหว่าง "มีเสียง" หรือ "สั่นอย่างเดียว")
+        </div>
+        <div id="reminderWebHint" style="display:block;font-size:11px;color:var(--text-faint);margin-top:10px;line-height:1.5;">
+          บนเว็บ การแจ้งเตือนจะทำงานเฉพาะตอนเปิดแอปอยู่เท่านั้น — ติดตั้งเป็น APK เพื่อให้เตือนได้จริงแม้ปิดแอป
+        </div>
+        <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="testReminderNow()">ทดสอบการแจ้งเตือน</button>
+      </div>
+
+      <div class="section-label">BACKUP</div>
+      <div class="control-row">
+        <button class="btn btn-outline btn-sm" onclick="exportData()">EXPORT ข้อมูล</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()">IMPORT ข้อมูล</button>
+      </div>
+      <input type="file" id="importFile" accept="application/json" style="display:none;" onchange="importData(event)" />
+    </div>
+    <div class="tabbar">
+      <div class="tab" onclick="go('home')"><div class="dot"></div>HOME</div>
+      <div class="tab" onclick="go('program')"><div class="dot"></div>PROGRAM</div>
+      <div class="tab" onclick="go('history')"><div class="dot"></div>HISTORY</div>
+      <div class="tab active" onclick="go('progress')"><div class="dot"></div>PROGRESS</div>
+    </div>
+  </section>
+
+  <!-- COLLECTION / TROPHY ROOM -->
+  <section id="screen-collection" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('home')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">COLLECTION</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div id="collectionSummary" class="collection-summary">สะสมแล้ว 0 / 0</div>
+
+      <div class="section-label" style="margin-top:8px;">BADGES</div>
+      <div id="collectionBadgeGrid" class="skin-grid" style="max-height:none;overflow:visible;"></div>
+
+      <div class="section-label">MASCOT SKINS</div>
+      <div id="collectionSkinGrid" class="skin-grid" style="max-height:none;overflow:visible;"></div>
+
+      <div class="section-label">TITLES</div>
+      <div id="collectionTitleGrid" class="skin-grid" style="max-height:none;overflow:visible;"></div>
+
+      <div class="section-label" style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span>LOOT (จากการปราบบอส)</span>
+        <span id="collectionLootSummary" style="font-size:10px;color:var(--text-faint);font-weight:600;letter-spacing:.3px;">เก็บได้ 0 / 0 ชิ้น</span>
+      </div>
+      <div class="empty-hint" style="text-align:left;padding:0 0 8px;">แตะไอเทมที่มีเพื่อสวมใส่เป็นแบดจ์ข้าง mascot (แตะซ้ำเพื่อถอด)</div>
+      <div id="collectionLootGrid" class="skin-grid" style="max-height:none;overflow:visible;"></div>
+    </div>
+  </section>
+
+  <!-- CHARACTER SHEET -->
+  <section id="screen-character" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('home')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">CHARACTER</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div class="character-sheet-card">
+        <div class="character-avatar-wrap">
+          <div class="mascot-avatar" id="characterAvatar">
+            <img id="characterMascotImg" src="assets/mascot/mascot.png" alt="" />
+            <div id="characterLevelBadge" class="mascot-level-badge">LV.1</div>
+            <div id="characterGearBadge" class="mascot-gear-badge"></div>
+            <div id="characterSkinAccessory" class="mascot-skin-accessory"></div>
+            <div id="characterLootBadge" class="mascot-loot-badge"></div>
+          </div>
+        </div>
+        <div id="characterCP" class="character-cp"></div>
+        <div id="characterRank" class="mascot-rank rank-recruit" style="display:inline-block;"></div>
+        <div id="characterSkinTitle" class="mascot-skin-title"></div>
+        <div id="characterClassTitle" class="character-class-title"></div>
+      </div>
+
+      <div class="section-label">STATS</div>
+      <div class="metric-card" style="padding:16px;">
+        <div id="characterStatBarList"></div>
+      </div>
+
+      <div class="section-label">EQUIPMENT</div>
+      <div class="character-equip-row">
+        <button class="character-equip-slot" onclick="goToCollectionSection('skin')">
+          <div class="character-equip-icon" id="characterEquipSkinIcon"></div>
+          <div class="character-equip-info">
+            <div class="character-equip-label">SKIN</div>
+            <div class="character-equip-name" id="characterEquipSkinName">Classic</div>
+          </div>
+        </button>
+        <button class="character-equip-slot" onclick="goToCollectionSection('loot')">
+          <div class="character-equip-icon" id="characterEquipLootIcon"></div>
+          <div class="character-equip-info">
+            <div class="character-equip-label">LOOT BADGE</div>
+            <div class="character-equip-name" id="characterEquipLootName">ยังไม่ได้สวม</div>
+          </div>
+        </button>
+      </div>
+
+      <div class="section-label" style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span>TROPHY WALL</span>
+        <span id="characterBossSummary" style="font-size:10px;color:var(--text-faint);font-weight:600;letter-spacing:.3px;">ผู้พิชิต 0/5</span>
+      </div>
+      <div class="metric-card" style="padding:14px 16px;">
+        <div id="characterBossTrophyRow" class="character-trophy-row"></div>
+      </div>
+
+      <div class="section-label">RECENT BATTLE LOG</div>
+      <div id="characterRecentLog" class="character-recent-log"></div>
+
+      <div class="empty-hint" style="padding-top:4px;">แตะไอเทมในหน้า COLLECTION เพื่อสวมใส่เป็นแบดจ์ข้าง mascot</div>
+    </div>
+  </section>
+
+  <!-- CUSTOM WORKOUT LIST -->
+  <section id="screen-customlist" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('program')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">CUSTOM WORKOUTS</div>
+      <div style="display:flex;gap:6px;">
+        <button class="iconbtn" onclick="go('customhistory')" aria-label="History">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="list-wrap">
+      <div id="customWorkoutList"></div>
+      <button class="btn btn-primary" style="margin-top:6px;" onclick="openCustomEditor(null)">+ สร้าง WORKOUT ใหม่</button>
+    </div>
+  </section>
+
+  <!-- WEEKLY SCHEDULE (Cindy / Custom Workout / Cardio) -->
+  <section id="screen-customschedule" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('program')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">แผนประจำสัปดาห์</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div class="empty-hint" style="text-align:left;padding:0 0 10px;">กำหนดว่าแต่ละวันจะเล่น Workout ไหน หรือเลือกเป็นวันพัก — หน้า HOME จะโชว์แผนของวันนี้ให้อัตโนมัติ</div>
+      <div id="customScheduleList" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+  </section>
+
+  <!-- CUSTOM WORKOUT EDITOR (BUILDER) -->
+  <section id="screen-customeditor" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="cancelCustomEditor()" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div id="customEditorTitle" class="brand" style="font-size:16px;">สร้าง WORKOUT</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div class="field-row" style="grid-template-columns:1fr;">
+        <input type="text" id="customNameInput" placeholder="ชื่อ Workout เช่น Full Body 20 นาที"
+          style="width:100%;box-sizing:border-box;background:var(--bg-elev);border:1.5px solid var(--card-border);border-radius:8px;color:var(--text);padding:12px 14px;font-size:15px;font-weight:600;"
+          oninput="updateCustomHeaderField('name', this.value)">
+      </div>
+
+      <div class="empty-hint" style="text-align:left;padding:2px 0 0;">กำหนดจำนวนเซ็ต พักระหว่างเซ็ต และพักก่อนไปท่าถัดไปแยกของแต่ละท่าด้านล่าง</div>
+
+      <div class="metric-card reminder-card" style="margin-top:14px;">
+        <div class="reminder-row">
+          <div>
+            <div class="reminder-lbl">อบอุ่นร่างกายก่อนเริ่ม (Warm-up)</div>
+            <div class="reminder-sub">โชว์เช็คลิสต์ท่าวอร์มก่อนเข้า Workout จริง</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="customWarmupToggle" onchange="updateCustomHeaderField('warmupEnabled', this.checked)">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="section-label" style="margin-top:16px;">ท่าออกกำลังกาย</div>
+      <div id="customExerciseList"></div>
+      <button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="openExerciseLibrary()">+ เพิ่มท่า</button>
+
+      <div class="control-row" style="margin-top:26px;">
+        <button class="btn btn-ghost btn-sm" onclick="cancelCustomEditor()">ยกเลิก</button>
+        <button class="btn btn-primary btn-sm" onclick="saveCustomEditorForm()">บันทึก</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CUSTOM WORKOUT WARM-UP CHECKLIST -->
+  <section id="screen-customwarmup" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="warmupPendingWorkoutId=null;go('customlist')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">WARM-UP</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div class="empty-hint" style="text-align:left;padding:0 0 10px;">ติ๊กท่าที่ทำแล้ว หรือข้ามได้เลยถ้าอบอุ่นร่างกายมาแล้ว</div>
+      <div id="customWarmupList"></div>
+      <button class="btn btn-primary" style="margin-top:16px;" onclick="proceedFromCustomWarmup()">เริ่มออกกำลังกาย</button>
+    </div>
+  </section>
+
+  <!-- CUSTOM WORKOUT PLAYER -->
+  <section id="screen-customplayer" class="screen">
+    <div class="workout-wrap">
+      <div class="workout-top">
+        <button class="iconbtn" onclick="openCustomPlayerEndModal()" aria-label="End">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+        <div id="playerStatusPill" class="status-pill">SET 1/1</div>
+        <button id="playerVoiceBtn" class="iconbtn" onclick="toggleVoiceCues()" aria-label="Voice cues">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19 12a7 7 0 00-2-5"/></svg>
+        </button>
+      </div>
+
+      <div id="playerWorkoutName" style="text-align:center;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;font-weight:700;text-transform:uppercase;"></div>
+      <div id="playerProgress" style="text-align:center;font-size:11px;color:var(--text-faint);letter-spacing:1px;margin-top:2px;"></div>
+
+      <div class="timer-wrap">
+        <svg viewBox="0 0 250 250">
+          <defs>
+            <linearGradient id="playerRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#E8232A"/>
+              <stop offset="100%" stop-color="#3D6FE0"/>
+            </linearGradient>
+          </defs>
+          <circle class="track" cx="125" cy="125" r="108"/>
+          <circle id="playerRing" class="ring" cx="125" cy="125" r="108" stroke="url(#playerRingGrad)" stroke-dasharray="678 678" stroke-dashoffset="0"/>
+        </svg>
+        <div class="timer-center">
+          <div id="playerDigits" class="timer-digits tabular">10</div>
+          <div id="playerPhaseLabel" class="timer-sub">ทำท่านี้</div>
+        </div>
+        <div id="restBonusBadge" class="rest-bonus-badge"></div>
+      </div>
+
+      <div id="playerExerciseName" style="text-align:center;font-family:var(--font-display);font-size:26px;letter-spacing:.5px;margin:4px 0 20px;"></div>
+
+      <div id="playerRepsAdjustRow" class="control-row" style="display:none;">
+        <button class="btn btn-outline btn-sm" onclick="adjustPlayerReps(-1)">−1</button>
+        <button class="btn btn-outline btn-sm" onclick="adjustPlayerReps(1)">+1</button>
+      </div>
+
+      <button id="playerDoneBtn" class="btn btn-success save-round-btn" style="display:none;" onclick="confirmPlayerExerciseDone()"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg></span> เสร็จแล้ว</button>
+      <button id="playerPauseBtn" class="btn btn-outline" style="display:none;" onclick="togglePlayerPause()">⏸ หยุดชั่วคราว</button>
+      <button id="playerSkipBtn" class="btn btn-outline" style="display:none;" onclick="skipPlayerStep()">ข้าม</button>
+    </div>
+    <div id="playerCompanionHud" class="player-companion-hud">
+      <img id="playerCompanionImg" src="assets/mascot/mascot.png" alt="" />
+      <div id="playerCompanionLootBadge" class="mascot-loot-badge"></div>
+    </div>
+  </section>
+
+  <!-- CUSTOM WORKOUT COMPLETE (post-workout summary, mirrors screen-complete) -->
+  <section id="screen-customcomplete" class="screen">
+    <div class="complete-wrap">
+      <div class="complete-hero">
+        <div class="complete-star">★</div>
+        <div id="customCompleteSets" class="complete-rounds tabular">0</div>
+        <div class="complete-lbl">SETS COMPLETED</div>
+        <div id="customCompleteName" style="font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:2px;font-weight:700;text-transform:uppercase;"></div>
+        <div id="customPrBadge" class="pr-badge no">PR —</div>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-card"><div id="cCustomTotalTime" class="v tabular">00:00</div><div class="l">TOTAL TIME</div></div>
+        <div class="metric-card"><div id="cCustomSets" class="v">0</div><div class="l">SETS COMPLETED</div></div>
+      </div>
+
+      <div id="customRestBonusRow" class="metric-card" style="display:none;padding:12px 16px;margin-top:10px;align-items:center;justify-content:space-between;border-color:var(--push);">
+        <div>
+          <div style="font-size:12px;font-weight:800;letter-spacing:.5px;">⚡ REST-SKIP BONUS</div>
+          <div style="font-size:10.5px;color:var(--text-faint);margin-top:2px;">พักน้อยลง ร่างกายแบกรับมากขึ้น</div>
+        </div>
+        <div id="cCustomRestBonus" class="v tabular" style="color:var(--push);font-size:20px;">+0 XP</div>
+      </div>
+
+      <div class="section-label">EXERCISE BREAKDOWN</div>
+      <div class="metric-card" id="customBreakdown"></div>
+
+      <div class="feedback-block">
+        <div class="section-label" style="margin-top:0;">RPE (1–10)</div>
+        <div id="customRpeRow" class="rpe-row"></div>
+
+        <div class="section-label">FEELING</div>
+        <div id="customFeelingRow" class="feeling-row">
+          <div class="feeling-pill" data-f="Great" onclick="selectCustomFeeling('Great')">GREAT</div>
+          <div class="feeling-pill" data-f="Good" onclick="selectCustomFeeling('Good')">GOOD</div>
+          <div class="feeling-pill" data-f="Hard" onclick="selectCustomFeeling('Hard')">HARD</div>
+          <div class="feeling-pill" data-f="Max" onclick="selectCustomFeeling('Max')">MAX</div>
+        </div>
+
+        <div class="section-label">NOTE</div>
+        <textarea id="customNoteInput" class="note-input" placeholder="เช่น วันนี้ Push-up ช่วงท้ายเหนื่อยมาก..."></textarea>
+      </div>
+
+      <button class="btn btn-primary" style="margin-top:22px;" onclick="finishCustomCompleteFlow()">บันทึกและกลับหน้าหลัก</button>
+      <button class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="shareCustomResult(lastCompletedCustomSessionId)">แชร์ผลลัพธ์</button>
+    </div>
+  </section>
+
+  <!-- CUSTOM WORKOUT HISTORY -->
+  <section id="screen-customhistory" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('customlist')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">WORKOUT HISTORY</div>
+      <button class="iconbtn" onclick="go('customprogress')" aria-label="Progress">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+      </button>
+    </div>
+    <div id="customHistoryList" class="list-wrap"></div>
+  </section>
+
+  <!-- CUSTOM WORKOUT PROGRESS CHART -->
+  <section id="screen-customprogress" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('customhistory')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">PROGRESS</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <select id="customProgressWorkoutSelect" class="time-input" style="width:100%;box-sizing:border-box;margin-bottom:14px;" onchange="renderCustomProgress(this.value)"></select>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="v" id="cProgBest">0</div><div class="l">BEST VOLUME</div></div>
+        <div class="stat-card"><div class="v" id="cProgSessions">0</div><div class="l">SESSIONS</div></div>
+      </div>
+      <div class="chart-card">
+        <div id="customChartBars" class="chart-bars"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CUSTOM WORKOUT HISTORY DETAIL -->
+  <section id="screen-customhistorydetail" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('customhistory')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">WORKOUT REPORT</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap" id="customHistoryDetailWrap"></div>
+    <div style="padding:0 20px 20px;">
+      <button class="btn btn-outline btn-sm" onclick="shareCustomResult(currentCustomHistoryDetailId)">แชร์ผลลัพธ์</button>
+      <div class="control-row" style="margin-top:10px;">
+        <button class="btn btn-ghost btn-sm" onclick="openEditCustomHistorySessionModal(currentCustomHistoryDetailId)">แก้ไข</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDeleteCustomHistorySession()">ลบ</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- End Workout Modal -->
+<div id="endModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">End Workout?</div>
+    <div class="modal-body">ข้อมูลของ Workout นี้จะไม่ถูกบันทึก</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('endModal')">CANCEL</button>
+      <button class="btn btn-danger btn-sm" onclick="confirmEndWorkout()">END</button>
+    </div>
+  </div>
+</div>
+
+<!-- iOS Install Instructions Modal -->
+<div id="iosInstallModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">ติดตั้ง CINDY ลงหน้าจอหลัก</div>
+    <div class="modal-body">
+      แตะปุ่ม
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin:0 2px;"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/></svg>
+      แชร์ ที่แถบด้านล่างของ Safari แล้วเลือก <b>"เพิ่มไปยังหน้าจอโฮม"</b> (Add to Home Screen) เพื่อเปิดแอปแบบเต็มจอได้ทันทีจากมือถือของคุณ
+    </div>
+    <div class="modal-row" style="grid-template-columns:1fr;">
+      <button class="btn btn-primary btn-sm" onclick="closeModal('iosInstallModal')">เข้าใจแล้ว</button>
+    </div>
+  </div>
+</div>
+
+<!-- Finish Now Modal -->
+<div id="finishModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">Finish Now?</div>
+    <div class="modal-body">ระบบจะบันทึก Workout ด้วยเวลาปัจจุบันและจำนวนรอบที่ทำได้</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('finishModal')">CANCEL</button>
+      <button class="btn btn-success btn-sm" onclick="confirmFinishNow()">FINISH</button>
+    </div>
+  </div>
+</div>
+
+<!-- Protocol Library Modal -->
+<div id="settingsModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>โปรโตคอล / WOD</span>
+      <span onclick="closeModal('settingsModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
+    </div>
+    <div class="modal-body">เลือกโปรโตคอลที่จะใช้เล่น หรือสร้างสูตรของคุณเอง (AMRAP หรือ EMOM)</div>
+    <div id="protocolList" class="protocol-list"></div>
+    <div class="modal-row" style="grid-template-columns:1fr;margin-top:14px;">
+      <button class="btn btn-primary btn-sm" onclick="openProtocolEditor(null)">+ สร้างโปรโตคอลใหม่</button>
+    </div>
+  </div>
+</div>
+
+<!-- Protocol Editor Modal (create / edit) -->
+<div id="protocolEditorModal" class="modal-overlay">
+  <div class="modal-card">
+    <div id="protoEditorTitle" class="modal-title">สร้างโปรโตคอลใหม่</div>
+    <div class="field-row" style="grid-template-columns:1fr 160px;"><label>ชื่อโปรโตคอล</label><input type="text" id="cfgName" placeholder="เช่น My AMRAP" style="width:100%;box-sizing:border-box;text-align:right;background:var(--bg-elev);border:1.5px solid var(--card-border);border-radius:8px;color:var(--text);padding:8px 10px;font-size:14px;"></div>
+    <div id="protoModeRow" class="period-row" style="margin:4px 0 14px;">
+      <div class="period-pill sel" data-mode="amrap" onclick="setProtoEditorMode('amrap')">AMRAP</div>
+      <div class="period-pill" data-mode="emom" onclick="setProtoEditorMode('emom')">EMOM</div>
+    </div>
+    <div class="field-row"><label>PULL-UP ต่อรอบ</label><input type="number" id="cfgPull" min="0" max="99"></div>
+    <div class="field-row"><label>PUSH-UP ต่อรอบ</label><input type="number" id="cfgPush" min="0" max="99"></div>
+    <div class="field-row"><label>SQUAT ต่อรอบ</label><input type="number" id="cfgSquat" min="0" max="99"></div>
+    <div id="amrapFields">
+      <div class="field-row"><label>เวลาทั้งหมด (นาที)</label><input type="number" id="cfgDuration" min="1" max="120"></div>
+    </div>
+    <div id="emomFields" style="display:none;">
+      <div class="field-row"><label>ทุกๆ (วินาที)</label><input type="number" id="cfgEmomInterval" min="10" max="600"></div>
+      <div class="field-row"><label>จำนวนรอบ</label><input type="number" id="cfgEmomRounds" min="1" max="200"></div>
+    </div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('protocolEditorModal');openSettingsModal()">ยกเลิก</button>
+      <button class="btn btn-primary btn-sm" onclick="saveProtocolEditor()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rest Timer Modal -->
+<div id="restTimerModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Rest Timer</span>
+      <span onclick="closeModal('restTimerModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
+    </div>
+    <div class="modal-body">ตัวจับเวลาพักแบบอิสระ ไม่ผูกกับ Workout — ใช้พักระหว่างเซ็ตได้เลย</div>
+    <div id="restTimerDigits" class="timer-digits tabular" style="text-align:center;font-size:48px;margin:10px 0 16px;">01:00</div>
+    <div id="restQuickRow" class="period-row">
+      <div class="period-pill sel" data-sec="30" onclick="setRestDuration(30)">30s</div>
+      <div class="period-pill" data-sec="60" onclick="setRestDuration(60)">60s</div>
+      <div class="period-pill" data-sec="90" onclick="setRestDuration(90)">90s</div>
+      <div class="period-pill" data-sec="120" onclick="setRestDuration(120)">120s</div>
+    </div>
+    <div class="control-row" style="margin-top:14px;">
+      <button class="btn btn-outline btn-sm" onclick="adjustRestDuration(-15)">−15s</button>
+      <button class="btn btn-outline btn-sm" onclick="adjustRestDuration(15)">+15s</button>
+    </div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="resetRestTimer()">RESET</button>
+      <button id="restTimerToggleBtn" class="btn btn-success btn-sm" onclick="toggleRestTimer()">START</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mascot Skin Picker Modal -->
+<div id="skinPickerModal" class="modal-overlay">
+  <div class="modal-card" style="max-width:380px;">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>เลือกสกิน Mascot</span>
+      <span onclick="closeModal('skinPickerModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
+    </div>
+    <div class="modal-body" style="margin-bottom:12px;">ปลดล็อคสกินใหม่ได้จาก Streak, เลเวล, และการปราบ Boss</div>
+    <div id="skinGrid" class="skin-grid"></div>
+  </div>
+</div>
+
+<!-- Streak Milestone Treasure Chest Modal -->
+<div id="treasureChestModal" class="modal-overlay">
+  <div class="modal-card" style="text-align:center;">
+    <div class="modal-title">หีบรางวัล Streak!</div>
+    <div id="chestMilestoneLabel" class="modal-body" style="margin-bottom:4px;">STREAK 7 วัน</div>
+    <div class="chest-stage">
+      <div id="chestIcon" class="chest-icon">
+        <svg viewBox="0 0 64 64" width="1em" height="1em" style="display:block;">
+          <defs>
+            <linearGradient id="chestLidGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#6b4426"/><stop offset="1" stop-color="#3d2513"/>
+            </linearGradient>
+            <linearGradient id="chestWoodGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#5a3820"/><stop offset="1" stop-color="#2f1c0d"/>
+            </linearGradient>
+            <linearGradient id="chestGoldGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#ffe08a"/><stop offset=".55" stop-color="#e0a52c"/><stop offset="1" stop-color="#9c6a12"/>
+            </linearGradient>
+          </defs>
+          <path d="M6 28C6 15 17.6 7 32 7s26 8 26 21H6z" fill="url(#chestLidGrad)" stroke="#1c1006" stroke-width="1.4"/>
+          <rect x="6" y="27" width="52" height="26" rx="4" fill="url(#chestWoodGrad)" stroke="#1c1006" stroke-width="1.4"/>
+          <rect x="6" y="25" width="52" height="6" fill="url(#chestGoldGrad)"/>
+          <rect x="27" y="9" width="10" height="44" fill="url(#chestGoldGrad)" opacity=".95"/>
+          <rect x="3.4" y="25" width="3.4" height="28" rx="1.4" fill="url(#chestGoldGrad)"/>
+          <rect x="57.2" y="25" width="3.4" height="28" rx="1.4" fill="url(#chestGoldGrad)"/>
+          <circle cx="32" cy="30" r="7" fill="url(#chestGoldGrad)" stroke="#4a2f08" stroke-width="1.2"/>
+          <circle cx="32" cy="30" r="3" fill="#8a1f22"/>
+        </svg>
+      </div>
+      <div id="chestBadgeReveal" class="chest-badge-reveal">
+        <div id="chestBadgeEmoji" class="emoji"></div>
+      </div>
+    </div>
+    <div id="chestRewardText" class="chest-reward-text">
+      <div id="chestBadgeTitle" style="font-family:var(--font-display);font-size:22px;letter-spacing:1px;">นักสู้ 7 วัน</div>
+      <div id="chestBadgeDesc" class="modal-body" style="margin-top:4px;margin-bottom:16px;">สร้าง Streak ครบ 7 วันติดต่อกัน</div>
+    </div>
+    <div class="modal-row" style="grid-template-columns:1fr;">
+      <button id="chestOpenBtn" class="btn btn-primary btn-sm" onclick="revealTreasureChest()">เปิดหีบ</button>
+      <button id="chestCloseBtn" class="btn btn-outline btn-sm" style="display:none;" onclick="closeModal('treasureChestModal')">รับไว้แล้ว!</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Session Modal -->
+<div id="editSessionModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">แก้ไข Workout</div>
+    <div class="section-label" style="margin-top:0;">RPE (1–10)</div>
+    <div id="editRpeRow" class="rpe-row"></div>
+    <div class="section-label">FEELING</div>
+    <div id="editFeelingRow" class="feeling-row">
+      <div class="feeling-pill" data-f="Great" onclick="selectEditFeeling('Great')">GREAT</div>
+      <div class="feeling-pill" data-f="Good" onclick="selectEditFeeling('Good')">GOOD</div>
+      <div class="feeling-pill" data-f="Hard" onclick="selectEditFeeling('Hard')">HARD</div>
+      <div class="feeling-pill" data-f="Max" onclick="selectEditFeeling('Max')">MAX</div>
+    </div>
+    <div class="section-label">NOTE</div>
+    <textarea id="editNoteInput" class="note-input" placeholder="เช่น วันนี้ Pull-Up ช่วงท้ายเหนื่อยมาก..."></textarea>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('editSessionModal')">ยกเลิก</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEditSession()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Session Modal -->
+<div id="deleteSessionModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">ลบ Workout นี้?</div>
+    <div class="modal-body">ข้อมูล Workout นี้จะถูกลบถาวรและกู้คืนไม่ได้</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('deleteSessionModal')">ยกเลิก</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteSessionExecute()">ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Custom Workout History Session Modal -->
+<div id="editCustomHistoryModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">แก้ไข Workout</div>
+    <div class="section-label" style="margin-top:0;">RPE (1–10)</div>
+    <div id="editCustomRpeRow" class="rpe-row"></div>
+    <div class="section-label">FEELING</div>
+    <div id="editCustomFeelingRow" class="feeling-row">
+      <div class="feeling-pill" data-f="Great" onclick="selectEditCustomFeeling('Great')">GREAT</div>
+      <div class="feeling-pill" data-f="Good" onclick="selectEditCustomFeeling('Good')">GOOD</div>
+      <div class="feeling-pill" data-f="Hard" onclick="selectEditCustomFeeling('Hard')">HARD</div>
+      <div class="feeling-pill" data-f="Max" onclick="selectEditCustomFeeling('Max')">MAX</div>
+    </div>
+    <div class="section-label">NOTE</div>
+    <textarea id="editCustomNoteInput" class="note-input" placeholder="เช่น วันนี้ Push-up ช่วงท้ายเหนื่อยมาก..."></textarea>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('editCustomHistoryModal')">ยกเลิก</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEditCustomHistorySession()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Custom Workout Modal -->
+<div id="customDeleteModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">ลบ Workout นี้?</div>
+    <div class="modal-body">สูตร Workout นี้จะถูกลบถาวรและกู้คืนไม่ได้ (ไม่กระทบ Cindy หรือ Workout อื่น)</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('customDeleteModal')">ยกเลิก</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteCustomWorkoutExecute()">ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- End Custom Player Modal -->
+<div id="customPlayerEndModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">End Workout?</div>
+    <div class="modal-body">ยังเล่นไม่ครบทุกเซ็ต — ถ้าออกตอนนี้ ผลลัพธ์จะไม่ถูกบันทึก</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('customPlayerEndModal')">CANCEL</button>
+      <button class="btn btn-danger btn-sm" onclick="discardCustomPlayerWorkout()">END</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Custom History Session Modal -->
+<div id="customHistoryDeleteModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">ลบ Workout นี้?</div>
+    <div class="modal-body">ผลของ Workout นี้จะถูกลบถาวรและกู้คืนไม่ได้</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('customHistoryDeleteModal')">ยกเลิก</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteCustomHistorySessionExecute()">ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- Exercise Library Modal -->
+<div id="exerciseLibraryModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>เลือกท่าออกกำลังกาย</span>
+      <span onclick="closeModal('exerciseLibraryModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
+    </div>
+    <input type="text" id="librarySearchInput" placeholder="ค้นหาท่า..."
+      style="width:100%;box-sizing:border-box;background:var(--bg-elev);border:1.5px solid var(--card-border);border-radius:8px;color:var(--text);padding:10px 12px;font-size:14px;margin-bottom:10px;"
+      oninput="onLibrarySearchInput(this.value)">
+    <div id="libraryCategoryRow" class="period-row" style="flex-wrap:wrap;"></div>
+    <div id="libraryList" class="protocol-list"></div>
+    <div class="modal-row" style="grid-template-columns:1fr;margin-top:14px;">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('exerciseLibraryModal');addCustomExercise();">พิมพ์ท่าเอง</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
