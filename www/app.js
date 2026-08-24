@@ -693,51 +693,57 @@ function bossSilhouetteMarkup(bossId) {
       return '';
   }
 }
-function bossForWeekIndex(weekIndex) {
-  const rosterIndex = ((weekIndex % BOSS_ROSTER.length) + BOSS_ROSTER.length) % BOSS_ROSTER.length;
-  return BOSS_ROSTER[rosterIndex];
-}
-function bossCountdownText(nowTs) {
-  const endTs = weekStart(nowTs).getTime() + 7 * 24 * 60 * 60 * 1000;
-  const ms = Math.max(0, endTs - nowTs);
-  const totalHours = Math.floor(ms / 3600000);
-  const days = Math.floor(totalHours / 24);
-  const hours = totalHours % 24;
-  if (ms <= 0) return 'กำลังเปลี่ยนบอส';
-  if (days > 0) return 'เหลือ ' + days + ' วัน' + (hours ? ' ' + hours + ' ชม.' : '');
-  const mins = Math.max(1, Math.floor((ms % 3600000) / 60000));
-  return 'เหลือ ' + hours + ' ชม. ' + mins + ' นาที';
-}
+
 function renderBossCountdown() {
   const el = document.getElementById('bossCountdown');
   if (!el) return;
-  const text = bossCountdownText(Date.now());
-  el.innerHTML = '<span>หมดเขตใน</span><strong>' + escapeHtml(text) + '</strong>';
+  const now = new Date();
+  const end = weekStart(now.getTime());
+  end.setDate(end.getDate() + 7);
+  const ms = Math.max(0, end.getTime() - now.getTime());
+  const days = Math.floor(ms / 86400000);
+  const hours = Math.floor((ms % 86400000) / 3600000);
+  const minutes = Math.floor((ms % 3600000) / 60000);
+  el.textContent = `เหลือเวลา ${days} วัน ${hours} ชม. ${minutes} นาที`;
 }
-function openBossViewer() {
-  const modal = document.getElementById('bossViewModal');
-  const list = document.getElementById('bossPreviewList');
-  if (!modal || !list) return;
+
+function renderBossViewList() {
+  const list = document.getElementById('bossViewList');
+  if (!list) return;
   const state = currentBossState();
-  const nextWeekIndex = state.weekIndex + 1;
-  const nextBoss = bossForWeekIndex(nextWeekIndex);
-  list.innerHTML = BOSS_ROSTER.map((boss) => {
-    const isCurrent = boss.id === state.boss.id;
-    const isNext = boss.id === nextBoss.id;
-    const tag = isCurrent ? 'CURRENT' : (isNext ? 'NEXT WEEK' : '');
-    const hp = isCurrent ? state.targetHp : (boss.baseHp + Math.floor((state.weekIndex + (isNext ? 1 : 0)) / BOSS_ROSTER.length) * 150);
-    return '<div class="boss-preview-item' + (isCurrent ? ' current' : '') + '" style="--boss-accent-rgb:' + hexToRgbTriplet(boss.accent) + '">' +
-      '<div class="boss-preview-art">' + bossSilhouetteMarkup(boss.id) + '</div>' +
-      '<div class="boss-preview-copy"><div class="boss-preview-name" style="color:rgb(' + hexToRgbTriplet(boss.accent) + ')">' + escapeHtml(boss.name) + '</div>' +
-      '<div class="boss-preview-tag">' + escapeHtml(boss.tag) + '</div><div class="boss-preview-meta">' + hp + ' HP</div></div>' +
-      (tag ? '<div class="boss-preview-badge' + (isNext ? ' next' : '') + '">' + tag + '</div>' : '') +
-      '</div>';
+  const idx = BOSS_ROSTER.findIndex(b => b.id === state.boss.id);
+  list.innerHTML = BOSS_ROSTER.map((boss, i) => {
+    const current = boss.id === state.boss.id;
+    const next = i === (idx + 1) % BOSS_ROSTER.length;
+    return `<div class="boss-view-item${current ? ' current' : ''}">
+      <div>
+        <div class="boss-view-item-name">${boss.name}</div>
+        <div class="boss-view-item-tag">${boss.tag}</div>
+      </div>
+      <div class="boss-view-item-status">${current ? 'CURRENT' : (next ? 'NEXT WEEK' : 'UPCOMING')}</div>
+    </div>`;
   }).join('');
-  modal.classList.add('active');
 }
-function closeBossViewer() {
+
+function openBossView() {
   const modal = document.getElementById('bossViewModal');
-  if (modal) modal.classList.remove('active');
+  if (!modal) return;
+  renderBossViewList();
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeBossView() {
+  const modal = document.getElementById('bossViewModal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function initBossView() {
+  const btn = document.getElementById('bossViewBtn');
+  if (btn) btn.addEventListener('click', openBossView);
+  document.querySelectorAll('[data-boss-close]').forEach(el => el.addEventListener('click', closeBossView));
 }
 
 function renderBossCard() {
@@ -749,6 +755,7 @@ function renderBossCard() {
   if (!nameEl || !hpFill || !stage) return;
 
   const state = currentBossState();
+  renderBossCountdown();
   nameEl.textContent = state.boss.name;
   if (tagEl) tagEl.textContent = state.boss.tag;
   if (stage.dataset.bossId !== state.boss.id) {
@@ -803,7 +810,6 @@ function renderBossCard() {
     showToast(msg, firstTimeEver ? 'palette' : 'gift');
   }
   renderBossDmgBreakdown();
-  renderBossCountdown();
 }
 
 /* ---- elemental damage breakdown ----
@@ -912,13 +918,6 @@ function renderHome() {
   renderTreasureChest();
   renderDailyQuests();
 }
-
-let bossCountdownHandle = null;
-function startBossCountdownLoop() {
-  if (bossCountdownHandle) clearInterval(bossCountdownHandle);
-  bossCountdownHandle = setInterval(renderBossCountdown, 1000);
-}
-startBossCountdownLoop();
 
 /** Combined streak across Cindy sessions + Custom Workout sessions. */
 function computeCombinedStreak() {
@@ -5217,3 +5216,6 @@ function deleteCustomHistorySessionExecute() {
   go('customhistory');
   showToast('ลบ Workout จากประวัติแล้ว');
 }
+
+
+document.addEventListener('DOMContentLoaded', initBossView);
