@@ -249,16 +249,17 @@ body{
 }
 .mascot-avatar{
   position:relative;
-  flex-shrink:0;width:76px;height:76px;border-radius:50%;
-  background:var(--bg-elev);border:1px solid var(--card-border);
+  flex-shrink:0;width:118px;height:128px;
+  background:transparent;border:none;border-radius:0;
   display:flex;align-items:center;justify-content:center;color:var(--text-faint);
   overflow:visible;cursor:pointer;
+  margin:-12px 0 -12px -8px;
 }
 .mascot-avatar img{
-  position:absolute;left:50%;bottom:-2px;
-  width:128%;height:164%;max-width:none;
+  position:absolute;left:50%;bottom:0;
+  width:148%;height:116%;max-width:none;
   transform:translateX(-50%);
-  object-fit:contain;object-position:bottom;
+  object-fit:contain;object-position:center bottom;
   z-index:1;pointer-events:none;
 }
 /* glow clone — sits directly behind #mascotImg, same src, brightness(0) turns its
@@ -268,7 +269,7 @@ body{
    This keeps the rank aura pulse off #mascotImg's own filter entirely, so it
    never fights with the skin recolor filter set inline by applyActiveMascotSkinFilter(). */
 #mascotImgGlow{z-index:0;filter:brightness(0);}
-.mascot-text{flex:1;min-width:0;}
+.mascot-text{flex:1;min-width:0;transform:translateY(12px);}
 .mascot-headline{font-size:16px;font-weight:700;letter-spacing:.2px;}
 .mascot-sub{font-size:13px;color:var(--text-dim);margin-top:4px;line-height:1.4;}
 .mascot-rank{
@@ -323,9 +324,9 @@ body{
 }
 .xp-bar-label{font-size:10px;color:var(--text-faint);margin-top:4px;letter-spacing:.3px;}
 
-.mascot-avatar.level-up-glow{animation:levelUpGlow 1.1s ease;border-radius:50%;}
+.mascot-avatar.level-up-glow{animation:levelUpGlow 1.1s ease;}
 .mascot-avatar.level-up-glow::after{
-  content:'';position:absolute;inset:-14px;border-radius:50%;z-index:0;pointer-events:none;
+  content:'';position:absolute;inset:-14px;border-radius:0;z-index:0;pointer-events:none;
   background:radial-gradient(circle, rgba(255,176,32,.55) 0%, rgba(255,176,32,.22) 40%, transparent 72%);
   animation:levelUpBurstRing 1.1s ease forwards;
 }
@@ -714,11 +715,17 @@ body{
 }
 .quest-claim-btn:active{transform:scale(.95);}
 
-.boss-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+.boss-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:10px;}
+.boss-header-actions{display:flex;align-items:center;gap:7px;flex-shrink:0;}
+.boss-view-btn{
+  background:transparent;border:1px solid rgba(var(--boss-accent-rgb),.55);color:rgb(var(--boss-accent-rgb));
+  border-radius:7px;padding:6px 9px;font-size:9px;font-weight:800;letter-spacing:1px;cursor:pointer;
+}
+.boss-view-btn:active{transform:scale(.95);}
 .boss-name{font-family:var(--font-display);font-size:20px;letter-spacing:1px;}
 .boss-tag{font-size:10px;color:rgba(var(--boss-accent-rgb),.75);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;font-weight:700;}
 .boss-stage{
-  position:relative;width:132px;height:132px;margin:6px auto 12px;
+  position:relative;width:100%;height:170px;margin:4px auto 12px;
   display:flex;align-items:center;justify-content:center;
   background:radial-gradient(circle,rgba(var(--boss-accent-rgb),.14),transparent 70%);
   border-radius:14px;overflow:visible;
@@ -731,23 +738,12 @@ body{
    via mask so it looks like it's rising out of the stage rather than being
    hard-cropped. Sits at z-index:0, strictly behind .boss-art (z-index:1) and
    .boss-boom (z-index:2), so it never covers the boss or the hit/explode fx. */
-.boss-stage::before{
-  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
-  border-radius:14px;overflow:hidden;
-  background-image:
-    repeating-radial-gradient(circle at 28% 130%, rgba(var(--boss-accent-rgb),.9) 0 1.5px, transparent 1.5px 26px),
-    repeating-radial-gradient(circle at 74% 130%, rgba(var(--boss-accent-rgb),.55) 0 1.1px, transparent 1.1px 34px);
-  animation:bossDustFloat 6s linear infinite;
-  -webkit-mask-image:linear-gradient(to top, transparent 0%, black 20%, black 78%, transparent 100%);
-  mask-image:linear-gradient(to top, transparent 0%, black 20%, black 78%, transparent 100%);
-  transition:opacity .4s ease;
-}
-.boss-stage.boss-defeated::before{opacity:.15;animation-play-state:paused;}
+.boss-stage::before{display:none;}
 @keyframes bossDustFloat{
   from{background-position:0 0, 0 0;}
   to{background-position:0 -52px, 0 -68px;}
 }
-.boss-art{position:relative;z-index:1;width:114px;height:114px;transition:opacity .4s ease, filter .4s ease;}
+.boss-art{position:relative;z-index:1;width:190px;height:170px;transition:opacity .4s ease, filter .4s ease;}
 .boss-art svg{width:100%;height:100%;display:block;}
 .boss-hp-track{
   height:9px;border-radius:5px;overflow:hidden;
@@ -769,6 +765,39 @@ body{
 }
 .boss-stage.boss-critical.boss-defeated .boss-art{animation:none;filter:none;}
 .boss-hp-label{font-size:10px;color:var(--text-faint);margin-top:6px;text-align:center;letter-spacing:.3px;}
+.boss-countdown{
+  display:flex;align-items:center;justify-content:center;gap:6px;margin-top:5px;
+  font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--text-dim);
+}
+.boss-countdown strong{color:rgb(var(--boss-accent-rgb));font-family:var(--font-display);font-size:13px;letter-spacing:.7px;}
+.boss-view-modal{
+  position:fixed;inset:0;z-index:1000;display:none;align-items:flex-end;justify-content:center;
+  background:rgba(0,0,0,.68);backdrop-filter:blur(5px);
+}
+.boss-view-modal.active{display:flex;}
+.boss-view-sheet{
+  width:min(480px,100%);max-height:78vh;overflow-y:auto;
+  background:linear-gradient(155deg,var(--card) 0%,var(--bg-elev) 100%);
+  border:1px solid var(--card-border);border-radius:18px 18px 0 0;padding:18px 18px 28px;
+}
+.boss-view-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.boss-view-title h3{margin:0;font-family:var(--font-display);font-size:24px;letter-spacing:1px;}
+.boss-view-close{background:none;border:0;color:var(--text-dim);font-size:22px;padding:2px 6px;cursor:pointer;}
+.boss-preview-list{display:grid;gap:8px;}
+.boss-preview-item{
+  display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;
+  background:var(--bg-elev);border:1px solid var(--card-border);border-radius:10px;text-align:left;
+}
+.boss-preview-item.current{border-color:rgba(var(--boss-accent-rgb),.7);}
+.boss-preview-art{width:54px;height:54px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.boss-preview-art img{width:100%;height:100%;object-fit:contain;}
+.boss-preview-copy{min-width:0;flex:1;}
+.boss-preview-name{font-family:var(--font-display);font-size:17px;letter-spacing:.7px;}
+.boss-preview-tag{font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-top:1px;}
+.boss-preview-meta{font-size:9px;color:var(--text-faint);margin-top:4px;}
+.boss-preview-badge{font-size:8px;font-weight:800;letter-spacing:1px;padding:4px 6px;border-radius:5px;border:1px solid var(--card-border);color:var(--text-dim);}
+.boss-preview-badge.next{color:var(--warning);border-color:var(--warning);}
+
 
 .boss-dmg-breakdown{margin-top:12px;}
 .boss-dmg-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
@@ -1231,6 +1260,9 @@ textarea.note-input::placeholder{color:var(--text-faint);}
             <div id="bossName" class="boss-name">GRINDER-1</div>
             <div id="bossTag" class="boss-tag">SCRAP BRAWLER</div>
           </div>
+          <div class="boss-header-actions">
+            <button class="boss-view-btn" onclick="openBossViewer()" aria-label="ดูบอสตัวอื่น">VIEW</button>
+          </div>
         </div>
         <div id="bossStage" class="boss-stage">
           <div class="boss-art"></div>
@@ -1238,7 +1270,18 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         </div>
         <div class="boss-hp-track"><div id="bossHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
         <div id="bossHpLabel" class="boss-hp-label">0 / 0 HP</div>
+        <div id="bossCountdown" class="boss-countdown"><span>หมดเขตใน</span><strong>—</strong></div>
         <div id="bossDmgBreakdown" class="boss-dmg-breakdown"></div>
+      </div>
+
+      <div id="bossViewModal" class="boss-view-modal" onclick="if(event.target===this) closeBossViewer()">
+        <div class="boss-view-sheet">
+          <div class="boss-view-title">
+            <h3>BOSS ARCHIVE</h3>
+            <button class="boss-view-close" onclick="closeBossViewer()" aria-label="ปิด">×</button>
+          </div>
+          <div id="bossPreviewList" class="boss-preview-list"></div>
+        </div>
       </div>
 
       <div id="homeWeeklyPlanWrap"></div>

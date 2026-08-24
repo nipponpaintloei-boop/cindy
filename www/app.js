@@ -693,6 +693,53 @@ function bossSilhouetteMarkup(bossId) {
       return '';
   }
 }
+function bossForWeekIndex(weekIndex) {
+  const rosterIndex = ((weekIndex % BOSS_ROSTER.length) + BOSS_ROSTER.length) % BOSS_ROSTER.length;
+  return BOSS_ROSTER[rosterIndex];
+}
+function bossCountdownText(nowTs) {
+  const endTs = weekStart(nowTs).getTime() + 7 * 24 * 60 * 60 * 1000;
+  const ms = Math.max(0, endTs - nowTs);
+  const totalHours = Math.floor(ms / 3600000);
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  if (ms <= 0) return 'กำลังเปลี่ยนบอส';
+  if (days > 0) return 'เหลือ ' + days + ' วัน' + (hours ? ' ' + hours + ' ชม.' : '');
+  const mins = Math.max(1, Math.floor((ms % 3600000) / 60000));
+  return 'เหลือ ' + hours + ' ชม. ' + mins + ' นาที';
+}
+function renderBossCountdown() {
+  const el = document.getElementById('bossCountdown');
+  if (!el) return;
+  const text = bossCountdownText(Date.now());
+  el.innerHTML = '<span>หมดเขตใน</span><strong>' + escapeHtml(text) + '</strong>';
+}
+function openBossViewer() {
+  const modal = document.getElementById('bossViewModal');
+  const list = document.getElementById('bossPreviewList');
+  if (!modal || !list) return;
+  const state = currentBossState();
+  const nextWeekIndex = state.weekIndex + 1;
+  const nextBoss = bossForWeekIndex(nextWeekIndex);
+  list.innerHTML = BOSS_ROSTER.map((boss) => {
+    const isCurrent = boss.id === state.boss.id;
+    const isNext = boss.id === nextBoss.id;
+    const tag = isCurrent ? 'CURRENT' : (isNext ? 'NEXT WEEK' : '');
+    const hp = isCurrent ? state.targetHp : (boss.baseHp + Math.floor((state.weekIndex + (isNext ? 1 : 0)) / BOSS_ROSTER.length) * 150);
+    return '<div class="boss-preview-item' + (isCurrent ? ' current' : '') + '" style="--boss-accent-rgb:' + hexToRgbTriplet(boss.accent) + '">' +
+      '<div class="boss-preview-art">' + bossSilhouetteMarkup(boss.id) + '</div>' +
+      '<div class="boss-preview-copy"><div class="boss-preview-name" style="color:rgb(' + hexToRgbTriplet(boss.accent) + ')">' + escapeHtml(boss.name) + '</div>' +
+      '<div class="boss-preview-tag">' + escapeHtml(boss.tag) + '</div><div class="boss-preview-meta">' + hp + ' HP</div></div>' +
+      (tag ? '<div class="boss-preview-badge' + (isNext ? ' next' : '') + '">' + tag + '</div>' : '') +
+      '</div>';
+  }).join('');
+  modal.classList.add('active');
+}
+function closeBossViewer() {
+  const modal = document.getElementById('bossViewModal');
+  if (modal) modal.classList.remove('active');
+}
+
 function renderBossCard() {
   const nameEl = document.getElementById('bossName');
   const tagEl = document.getElementById('bossTag');
@@ -756,6 +803,7 @@ function renderBossCard() {
     showToast(msg, firstTimeEver ? 'palette' : 'gift');
   }
   renderBossDmgBreakdown();
+  renderBossCountdown();
 }
 
 /* ---- elemental damage breakdown ----
@@ -864,6 +912,13 @@ function renderHome() {
   renderTreasureChest();
   renderDailyQuests();
 }
+
+let bossCountdownHandle = null;
+function startBossCountdownLoop() {
+  if (bossCountdownHandle) clearInterval(bossCountdownHandle);
+  bossCountdownHandle = setInterval(renderBossCountdown, 1000);
+}
+startBossCountdownLoop();
 
 /** Combined streak across Cindy sessions + Custom Workout sessions. */
 function computeCombinedStreak() {
