@@ -731,16 +731,6 @@ body{
   border-radius:14px;overflow:visible;
   transition:background .4s ease;
 }
-/* floating dust/embers drifting up behind the boss art, tinted per-boss.
-   Same concentric-ring trick the page background already uses for its star
-   field (repeating-radial-gradient anchored off-box so the rings read as
-   scattered flecks), just animated upward and faded at the top/bottom edges
-   via mask so it looks like it's rising out of the stage rather than being
-   hard-cropped. Sits at z-index:0, strictly behind .boss-art (z-index:1) and
-   .boss-boom (z-index:2), so it never covers the boss or the hit/explode fx. */
-.boss-stage::before{display:none;}
-@keyframes bossDustFloat{
-  from{background-position:0 0, 0 0;}
   to{background-position:0 -52px, 0 -68px;}
 }
 .boss-art{position:relative;z-index:1;width:190px;height:170px;transition:opacity .4s ease, filter .4s ease;}
@@ -798,6 +788,11 @@ body{
 .boss-preview-badge{font-size:8px;font-weight:800;letter-spacing:1px;padding:4px 6px;border-radius:5px;border:1px solid var(--card-border);color:var(--text-dim);}
 .boss-preview-badge.next{color:var(--warning);border-color:var(--warning);}
 
+
+
+.boss-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;}
+.boss-countdown{font-size:10px;color:var(--text-faint);letter-spacing:.3px;}
+.boss-view-btn{font-size:10px;font-weight:800;letter-spacing:1px;color:var(--text);background:var(--bg-elev);border:1px solid var(--card-border);border-radius:6px;padding:5px 10px;cursor:pointer;}
 
 .boss-dmg-breakdown{margin-top:12px;}
 .boss-dmg-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
