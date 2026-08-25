@@ -1487,16 +1487,24 @@ function rankForLevel(level) {
  * First 2 tiers only, wired for an APK smoke test — same "same training
  * ground, evolving with the player" concept as MASCOT_SKINS. Deliberately
  * paired with the same level milestones as the skins (LV.5 etc.) rather than
- * its own unlock track, so a level-up reveals both at once. More tiers
- * (LV.10/15/20, boss trophy scenes) get appended here later; nothing else
- * needs to change when they do. User-selectable via the backdrop picker
- * below (same staged/confirm pattern as the skin picker) — the saved pick
- * is used as long as it's still unlocked, otherwise falls back to the
- * highest unlocked tier for the current level. */
+ * its own unlock track, so a level-up reveals both at once. LV.10/15/20
+ * added below continue the same escalation (cyber-energy hall → arcane
+ * blue rune circle → gold/crimson legend throne room), each a visibly
+ * bigger leap than the last so leveling up keeps paying off visually.
+ * User-selectable via the backdrop picker below (same staged/confirm
+ * pattern as the skin picker) — the saved pick is used as long as it's
+ * still unlocked, otherwise falls back to the highest unlocked tier for
+ * the current level. */
 const BACKDROPS = [
   { id: 'default', name: 'สนามฝึกเปล่า', img: 'assets/backdrops/bg-default.jpg', unlock: null },
   { id: 'lv5', name: 'สนามเริ่มมีพลังงาน', img: 'assets/backdrops/bg-lv5.jpg',
-    unlock: { type: 'level', value: 5 }, cond: 'ถึง LV.5' }
+    unlock: { type: 'level', value: 5 }, cond: 'ถึง LV.5' },
+  { id: 'lv10', name: 'สนามฝึกพลังไซเบอร์', img: 'assets/backdrops/bg-lv10.jpg',
+    unlock: { type: 'level', value: 10 }, cond: 'ถึง LV.10' },
+  { id: 'lv15', name: 'สนามพลังเวทอาถรรพ์', img: 'assets/backdrops/bg-lv15.jpg',
+    unlock: { type: 'level', value: 15 }, cond: 'ถึง LV.15' },
+  { id: 'lv20', name: 'ห้องบัลลังก์นักสู้ในตำนาน', img: 'assets/backdrops/bg-lv20.jpg',
+    unlock: { type: 'level', value: 20 }, cond: 'ถึง LV.20' }
 ];
 function isBackdropUnlocked(bd) {
   if (!bd.unlock) return true;
