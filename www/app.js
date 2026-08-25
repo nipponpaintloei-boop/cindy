@@ -1907,20 +1907,33 @@ function showRestSkipBonusEffect(bonus) {
   }
 }
 
+/* Selection made inside the picker is only "staged" until confirmed —
+ * nothing is saved/applied to the avatar until confirmMascotSkinChange().
+ * Resets to the currently-equipped skin every time the modal opens. */
+let stagedSkinId = null;
 function openSkinPicker() {
+  stagedSkinId = loadActiveSkin();
   renderSkinGrid();
   document.getElementById('skinPickerModal').classList.add('active');
+}
+function stageMascotSkin(id) {
+  const skin = MASCOT_SKINS.find(s => s.id === id);
+  if (!skin || !isSkinUnlocked(skin)) return;
+  stagedSkinId = id;
+  renderSkinGrid();
 }
 function renderSkinGrid() {
   const grid = document.getElementById('skinGrid');
   if (!grid) return;
   const activeId = loadActiveSkin();
+  const stagedId = stagedSkinId || activeId;
   grid.innerHTML = MASCOT_SKINS.map(skin => {
     const unlocked = isSkinUnlocked(skin);
     const isActive = skin.id === activeId;
-    const cls = 'skin-item' + (isActive ? ' active' : '') + (unlocked ? '' : ' locked');
-    const clickAttr = unlocked ? ' onclick="selectMascotSkin(\'' + skin.id + '\')"' : '';
-    const cornerHtml = isActive ? '<div class="active-check">' + iconHtml('check') + '</div>' : (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>');
+    const isStaged = skin.id === stagedId;
+    const cls = 'skin-item' + (isActive ? ' active' : '') + (isStaged && !isActive ? ' staged' : '') + (unlocked ? '' : ' locked');
+    const clickAttr = unlocked ? ' onclick="stageMascotSkin(\'' + skin.id + '\')"' : '';
+    const cornerHtml = isStaged ? '<div class="active-check">' + iconHtml('check') + '</div>' : (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>');
     const thumbFilter = unlocked ? skin.filter : 'grayscale(1) brightness(.4)';
     const thumbShadow = unlocked && skin.aura ? 'box-shadow:0 0 ' + (skin.strong ? '14px 3px' : '9px 2px') + ' ' + skin.aura + ';border-radius:50%;' : '';
     const accessoryHtml = unlocked && skin.accIcon ? '<div class="skin-thumb-accessory">' + badgeHtml(skin.accIcon, skin.accC1, skin.accC2, { glow: !!skin.strong }) + '</div>' : '';
@@ -1931,6 +1944,50 @@ function renderSkinGrid() {
       (unlocked ? '' : '<div class="skin-cond">' + skin.cond + '</div>') +
       '</div>';
   }).join('');
+  const bar = document.getElementById('skinConfirmBar');
+  if (bar) bar.classList.toggle('show', stagedId !== activeId);
+}
+/** Applies the staged skin (if different from what's equipped) and plays
+ * the one-shot equip effect on the home avatar. Closes the picker first so
+ * the effect is visible immediately behind it, no lingering overlay. */
+function confirmMascotSkinChange() {
+  const activeId = loadActiveSkin();
+  if (!stagedSkinId || stagedSkinId === activeId) {
+    closeModal('skinPickerModal');
+    return;
+  }
+  const skin = MASCOT_SKINS.find(s => s.id === stagedSkinId);
+  if (!skin || !isSkinUnlocked(skin)) return;
+  closeModal('skinPickerModal');
+  saveActiveSkin(skin.id);
+  playMascotSkinChangeEffect(skin);
+  showToast('เปลี่ยนสกินเป็น ' + skin.name);
+}
+/** One-shot equip effect: expanding ring + particle burst tinted to the
+ * new skin's own aura color, with the avatar art cross-fading to the new
+ * skin at the burst's peak. Never loops — plays once per confirm, then the
+ * .play class is removed so it can be re-triggered next time. */
+function playMascotSkinChangeEffect(skin) {
+  const avatar = document.getElementById('mascotAvatar');
+  const fx = document.getElementById('mascotSkinFx');
+  if (!avatar || !fx) { applyActiveMascotSkinFilter(); return; }
+  const fxColor = skin.aura || 'rgba(255,255,255,.6)';
+  avatar.style.setProperty('--fx-color', fxColor);
+  fx.classList.remove('play');
+  void fx.offsetWidth; // restart animation
+  fx.classList.add('play');
+  avatar.classList.add('skin-fx-swap');
+  setTimeout(() => {
+    applyActiveMascotSkinFilter();
+    avatar.classList.remove('skin-fx-swap');
+    avatar.classList.remove('skin-fx-bounce');
+    void avatar.offsetWidth;
+    avatar.classList.add('skin-fx-bounce');
+  }, 220);
+  setTimeout(() => {
+    fx.classList.remove('play');
+    avatar.classList.remove('skin-fx-bounce');
+  }, 1000);
 }
 /* ================= COLLECTION / TROPHY ROOM =================
  * One screen combining the three collectible sets that already exist
@@ -2004,15 +2061,6 @@ function renderCollectionTitles() {
       + '<div class="skin-cond">LV.' + r.min + (r.max === Infinity ? '+' : ('–' + r.max)) + '</div>'
       + '</div>';
   }).join('');
-}
-
-function selectMascotSkin(id) {
-  const skin = MASCOT_SKINS.find(s => s.id === id);
-  if (!skin || !isSkinUnlocked(skin)) return;
-  saveActiveSkin(id);
-  renderSkinGrid();
-  applyActiveMascotSkinFilter();
-  showToast('เปลี่ยนสกินเป็น ' + skin.name);
 }
 
 function didPlayToday() {
