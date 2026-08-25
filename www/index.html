@@ -597,9 +597,25 @@ body{
 /* overflow stays visible here (not hidden) so the level-badge nameplate
    and corner badges, which intentionally poke past the art's edges, are
    never clipped — only the photo itself needs the rounded corner. */
-#characterAvatar{position:absolute;inset:0;width:100%;height:100%;}
+#characterAvatar{
+  position:absolute;inset:0;width:100%;height:100%;
+  /* .mascot-avatar (shared with Home's small peeking icon) carries
+     margin-top:-46px/margin-bottom:-22px for that context's "peek over
+     the card" look. Those margins silently still applied here too (inset
+     doesn't reset margin), quietly resizing/shifting this full-bleed box
+     and cropping the portrait unpredictably. Neutralize them so this box
+     is exactly the column's bounds, nothing else. */
+  margin:0;
+}
 #characterAvatar img{
-  width:100%;height:100%;object-fit:cover;object-position:center 8%;
+  /* was object-fit:cover with a percentage anchor — cover always crops
+     part of the image to fill the box, and which end got cropped (head
+     vs feet) depended unpredictably on this box's exact aspect ratio vs
+     the art's own, which is how the character's head ended up clipped.
+     contain guarantees the full figure (head to feet) is always shown in
+     frame, matching the same object-fit Home's own mascot avatar uses —
+     any leftover space just reveals this wrap's own gradient background. */
+  width:100%;height:100%;object-fit:contain;object-position:center bottom;
   border-radius:var(--radius) 0 0 var(--radius);
 }
 .character-hero-info{

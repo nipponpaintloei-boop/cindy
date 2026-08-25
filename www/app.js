@@ -103,7 +103,8 @@ const BADGE_ICONS = {
   fang: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 2.5c3-1 9-1 12 0 2 3.2 1.6 7-1 9.6L15 21l-2-6.2c-.3-.9-1.7-.9-2 0L9 21l-2-8.9C4.4 9.5 4 5.7 6 2.5z"/></svg>',
   vortex: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 12c-4-3-8-1-8 3s4 5 7 3-1-6-4-4"/><path d="M12 12c4-3 8-1 8 3s-4 5-7 3 1-6 4-4"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>',
   wing: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21c-1-4.5-.5-9 1-13.5C14.5 3 17.5 1.6 21 2c-1.3 2.6-1.2 4.7.2 6.7-2.2-.4-3.6.2-4.6 2 1.9.1 3 .9 3.7 2.6-2-.3-3.3.3-4.2 2 1.6.2 2.6 1 3.1 2.5-2.2 0-3.8-.6-5.1-2-.6 2.1-1.2 3.8-2.1 5.2z"/></svg>',
-  core: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/><path d="M12 5v14M5 12h14M7.5 7.5l9 9M16.5 7.5l-9 9" stroke="rgba(255,255,255,.35)" stroke-width="1" fill="none"/></svg>'
+  core: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/><path d="M12 5v14M5 12h14M7.5 7.5l9 9M16.5 7.5l-9 9" stroke="rgba(255,255,255,.35)" stroke-width="1" fill="none"/></svg>',
+  tank: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 3.3c1.1 1.4 2.5 2.1 5 2.1s3.9-.7 5-2.1l2.6 2.7-1.9 2.6-1.2-.75V21H8.5V7.85l-1.2.75-1.9-2.6z"/></svg>'
 };
 /** Builds a small enamel-pin style badge: a two-tone metallic/gem disc
  * (sized via the caller's font-size, same 1em convention as .icon-inline)
@@ -1597,9 +1598,16 @@ function renderCharacterEquipment() {
   const skinIconEl = document.getElementById('characterEquipSkinIcon');
   const skinNameEl = document.getElementById('characterEquipSkinName');
   if (skinIconEl) {
+    // Same gem-badge coin shell used everywhere else on this screen (loot
+    // slot, trophy wall) so the SKIN slot doesn't stand out as a flat
+    // outlined glyph on its own — skins with earned gear use their own
+    // accent colors, the plain default skin gets a neutral steel tone.
     skinIconEl.innerHTML = skin.accIcon
       ? badgeHtml(skin.accIcon, skin.accC1, skin.accC2, { glow: !!skin.strong, ring: true })
-      : iconHtml('palette');
+      // darker steel tones than the first pass — the earlier light-silver
+      // gradient left the white glyph almost invisible against it, which
+      // is why the slot still read as "just a plain circle" after the fix
+      : badgeHtml('tank', '#7b8296', '#2a2d38', { ring: true });
   }
   if (skinNameEl) skinNameEl.textContent = skin.name;
 
