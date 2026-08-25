@@ -890,7 +890,30 @@ body{
   padding:16px 16px 18px;margin-top:12px;
   overflow:hidden;
 }
-/* faint accent wash behind the whole card, tinted per-boss */
+/* Per-boss backdrop photo. renderBossCard() sets --boss-backdrop-img (a url())
+   and toggles this class per BOSS_ROSTER[].bg — same convention as the
+   mascot-card/character-hero backdrops (see applyBackdropToEl). Unlike the
+   mascot-card, this box is tall+narrow (header, then the 158x158 boss-stage,
+   then the HP bar + damage breakdown all stacked), and it's full of text top
+   AND bottom rather than text on one side only — so the overlay here is a
+   vertical dark-light-dark gradient (darkest behind the header and the HP/
+   damage rows, lightest in the middle behind the boss-stage) instead of the
+   mascot-card's side-anchored fade. */
+.boss-card.has-backdrop{
+  background-image:
+    linear-gradient(180deg, rgba(6,7,10,.64) 0%, rgba(6,7,10,.38) 36%, rgba(6,7,10,.42) 64%, rgba(6,7,10,.8) 100%),
+    var(--boss-backdrop-img, none),
+    linear-gradient(155deg,var(--card) 0%,#0d0e14 100%);
+  background-size:auto, cover, cover;
+  /* "38%" keeps the artwork's own focal point (sunset core, reactor glow,
+     etc — see boss-background-briefs.md) roughly behind the boss-stage
+     silhouette rather than under the header text. Tweak per-image if a
+     given backdrop's hot spot sits higher/lower. */
+  background-position:center, center 38%, center bottom;
+  background-repeat:no-repeat, no-repeat, no-repeat;
+}
+/* faint accent wash behind the whole card, tinted per-boss — still painted
+   above the backdrop photo so the boss's rank color reads through either way */
 .boss-card::before{
   content:"";position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(ellipse 140% 90% at 50% -10%,rgba(var(--boss-accent-rgb),.16),transparent 60%);

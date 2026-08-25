@@ -488,14 +488,19 @@ function fmtTime(totalSeconds) {
    a themed arc rather than five reskinned punching bags. */
 const BOSS_ROSTER = [
   { id: 'grinder1', name: 'GRINDER-1', tag: 'SCRAP BRAWLER', baseHp: 250, accent: '#ff6a3d',
+    bg: 'assets/boss-backgrounds/bg-grinder1.png',
     story: 'ต่อขึ้นจากเศษเหล็กที่ทิ้งไว้ตอนเลิกกลางคัน มันคือด่านแรกที่ทุกคนต้องเจอ — แค่ลุกมาเริ่มในวันที่ไม่อยากขยับตัวเลย GRINDER-1 ไม่ได้แข็งแกร่ง มันแค่รอให้คุณยอมแพ้ก่อนยกแรก' },
   { id: 'ironmaw', name: 'IRON MAW', tag: 'SPLIT JAW', baseHp: 350, accent: '#8aa0b8',
+    bg: 'assets/boss-backgrounds/bg-ironmaw.png',
     story: 'ขากรรไกรเหล็กที่งับกลืนแรงจูงใจของนักสู้ที่เริ่มชินชากับกิจวัตรเดิม ๆ มันคือกำแพงเมื่อทุกอย่างเริ่ม "ง่ายเกินไป" จนลืมไปว่าความชินชาคือจุดที่คนส่วนใหญ่หยุดพัฒนา' },
   { id: 'void9', name: 'VOID-9', tag: 'FORMLESS THREAT', baseHp: 450, accent: '#a855f7',
+    bg: 'assets/boss-backgrounds/bg-void9.png',
     story: 'ไม่มีรูปร่างตายตัว เปลี่ยนหน้ากากไปเรื่อยตามข้ออ้างของแต่ละวัน — งานยุ่ง นอนไม่พอ ไม่มีอารมณ์ VOID-9 คือความไม่สม่ำเสมอที่กัดกร่อน streak จากข้างในโดยไม่ทันรู้ตัว' },
   { id: 'wingreaper', name: 'WING REAPER', tag: 'SKY HUNTER', baseHp: 550, accent: '#38bdf8',
+    bg: 'assets/boss-backgrounds/bg-wingreaper.png',
     story: 'โฉบลงมาตอนที่มั่นใจที่สุด เมื่อเริ่มฝืนหักโหมเกินร่างกายจะรับไหว WING REAPER คือเงาของอาการบาดเจ็บและ burnout ที่คอยจับตาอยู่บนฟ้า รอจังหวะที่ความทะเยอทะยานมาเกินความอดทน' },
   { id: 'corezero', name: 'CORE-ZERO', tag: 'FINAL REACTOR', baseHp: 700, accent: '#fbbf24',
+    bg: 'assets/boss-backgrounds/bg-corezero.png',
     story: 'แกนปฏิกรณ์ที่หลอมจากทุกวันที่เคยเลิกล้ม มันคือภาพของตัวเองในเวอร์ชันก่อนเริ่มฝึก ยังคงยืนรอเป็นด่านสุดท้ายเสมอ เพราะบอสตัวจริงไม่เคยเป็นใครอื่นนอกจากคนที่คุณเคยเป็น' }
 ];
 /** '#rrggbb' -> 'r,g,b' so CSS can build rgba() at any alpha via var(). */
@@ -869,7 +874,17 @@ function renderBossCard() {
     if (art) art.innerHTML = bossSilhouetteMarkup(state.boss.id);
   }
   const bossCard = stage.closest('.boss-card');
-  if (bossCard) bossCard.style.setProperty('--boss-accent-rgb', hexToRgbTriplet(state.boss.accent));
+  if (bossCard) {
+    bossCard.style.setProperty('--boss-accent-rgb', hexToRgbTriplet(state.boss.accent));
+    // Per-boss backdrop photo — same --backdrop-img + .has-backdrop convention
+    // as the mascot-card/character-hero backdrops (see applyBackdropToEl).
+    if (state.boss.bg) {
+      bossCard.style.setProperty('--boss-backdrop-img', 'url("' + state.boss.bg + '")');
+      bossCard.classList.add('has-backdrop');
+    } else {
+      bossCard.classList.remove('has-backdrop');
+    }
+  }
 
   const pct = state.targetHp > 0 ? Math.max(0, Math.min(1, state.hp / state.targetHp)) : 0;
   hpFill.style.width = Math.round(pct * 100) + '%';
