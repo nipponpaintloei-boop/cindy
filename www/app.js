@@ -3816,12 +3816,14 @@ function exportData() {
   }
 }
 
-/* Some mobile browsers/in-app WebViews (notably Samsung Internet and
- * anything rendering this page from a local file:// path rather than a
- * real http(s) origin) silently ignore the classic <a download> + blob
- * trick — the click fires, nothing throws, and the user just sees
- * nothing happen with no error and no download-manager notification.
- * Preference order:
+/* Some mobile browsers/in-app WebViews (notably Samsung Internet, iOS
+ * home-screen PWAs, and anything rendering this page from a local file://
+ * path rather than a real http(s) origin) silently ignore a *synthetic*
+ * <a download> + blob click — the click fires, nothing throws, and the
+ * person just sees nothing happen with no error and no download-manager
+ * notification. That used to be reported as a fake "ส่งออกสำเร็จ" toast
+ * even though no file ever appeared — indistinguishable from Export doing
+ * nothing at all. Preference order:
  *   1) File System Access API (showSaveFilePicker) — lets the person pick
  *      the exact folder + filename themselves via the OS's native save
  *      dialog. Only available in Chromium desktop browsers over a real
@@ -3832,9 +3834,14 @@ function exportData() {
  *   2) Native share sheet — reliable path on Android/Samsung: hands the
  *      file to "Save to My Files", Drive, etc. and always shows
  *      *something* happening.
- *   3) Classic anchor+blob download for normal desktop/browser contexts.
- *   4) Last resort: open the JSON in a new tab so the data is at least
- *      visible and can be saved manually rather than vanishing silently.
+ *   3) Guaranteed-visible manual panel (fallbackDownload -> 
+ *      openExportFallbackPanel): still attempts the classic anchor+blob
+ *      auto-click since it works fine in normal desktop/mobile browser
+ *      tabs, but never trusts it alone — always follows up by opening a
+ *      panel with a REAL, user-tappable download link (manual taps survive
+ *      restrictions that block synthetic clicks) plus a copy-to-clipboard
+ *      fallback of the raw JSON, so the person always sees something
+ *      concrete on screen no matter what the browser silently no-op'd.
  */
 async function deliverExportFile(json, fname) {
   const blob = new Blob([json], { type: 'application/json' });
@@ -3864,31 +3871,74 @@ async function deliverExportFile(json, fname) {
           .then(() => showToast('ส่งออกข้อมูลแล้ว (Cindy + Custom Workout + สกิน/ความคืบหน้า)'))
           .catch(err => {
             if (err && err.name === 'AbortError') return; // user cancelled the share sheet
-            fallbackDownload(blob, fname);
+            fallbackDownload(blob, fname, json);
           });
         return;
       }
     } catch (e) { /* fall through to the download-link path below */ }
   }
-  fallbackDownload(blob, fname);
+  fallbackDownload(blob, fname, json);
 }
 
-function fallbackDownload(blob, fname) {
-  try {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fname; a.rel = 'noopener';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    showToast('ส่งออกข้อมูลแล้ว เช็คโฟลเดอร์ Download หรือแอป Files ในเครื่อง');
-  } catch (e) {
+/* The classic <a download> + blob trick is attempted here, but it is NOT
+ * trusted on its own: some mobile browsers/in-app WebViews (notably Samsung
+ * Internet, iOS home-screen PWAs, and anything rendering this page from a
+ * local file:// path rather than a real http(s) origin) silently ignore a
+ * *synthetic* a.click() — no exception is thrown, so the old code here used
+ * to just show a "ส่งออกสำเร็จ" toast regardless, which is exactly the "I
+ * tapped Export and nothing happened" bug. A manually-tapped link survives
+ * restrictions that block synthetic clicks, so this always follows up by
+ * opening a small panel with a real, user-tappable download link plus a
+ * copy-to-clipboard fallback — something the person can always see and use,
+ * no matter what the auto-click silently no-op'd. */
+function fallbackDownload(blob, fname, json) {
+  let url = null;
+  try { url = URL.createObjectURL(blob); } catch (e) { /* handled below */ }
+
+  if (url) {
     try {
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      showToast('เปิดไฟล์ข้อมูลในแท็บใหม่ให้แล้ว กด \u2026 เพื่อบันทึกไฟล์');
-    } catch (e2) {
-      showToast('ส่งออกไม่สำเร็จ เบราว์เซอร์นี้ไม่รองรับการดาวน์โหลดไฟล์');
+      const a = document.createElement('a');
+      a.href = url; a.download = fname; a.rel = 'noopener';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    } catch (e) { /* ignore — the manual panel below is the real fallback */ }
+  }
+  openExportFallbackPanel(url, fname, json);
+}
+
+/** Guaranteed-visible export fallback: a real tappable download link (not a
+ * synthetic click) plus the raw JSON in a copyable textarea. Always shows
+ * something on screen, so it can't fail as silently as the auto-download. */
+function openExportFallbackPanel(url, fname, json) {
+  const link = document.getElementById('exportManualLink');
+  if (link) {
+    if (url) {
+      link.href = url; link.download = fname;
+      link.style.display = '';
+    } else {
+      link.style.display = 'none'; // couldn't even build a blob URL — copy is the only option
     }
+  }
+  const ta = document.getElementById('exportManualText');
+  if (ta) ta.value = json;
+  const modal = document.getElementById('exportFallbackModal');
+  if (modal) modal.classList.add('active');
+}
+
+/** Copies the exported JSON to the clipboard so the person can paste it into
+ * Notes/a chat/etc. as a manual backup even if no download path works at all. */
+function copyExportData() {
+  const ta = document.getElementById('exportManualText');
+  if (!ta) return;
+  const onDone = () => showToast('คัดลอกข้อมูลแล้ว วางเก็บไว้ในแอปโน้ตหรือแชทได้เลย');
+  const onFail = () => showToast('คัดลอกไม่สำเร็จ ลองแตะค้างที่กล่องข้อความแล้วเลือกคัดลอกเอง');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(ta.value).then(onDone).catch(() => {
+      try { ta.select(); document.execCommand('copy'); onDone(); }
+      catch (e) { onFail(); }
+    });
+  } else {
+    try { ta.select(); document.execCommand('copy'); onDone(); }
+    catch (e) { onFail(); }
   }
 }
 

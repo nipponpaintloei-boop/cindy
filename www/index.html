@@ -2312,6 +2312,32 @@ textarea.note-input::placeholder{color:var(--text-faint);}
   </div>
 </div>
 
+<!-- Export fallback panel — shown whenever the OS save-dialog / native share
+     sheet aren't available (or silently no-op'd, as some in-app WebViews and
+     iOS home-screen PWAs do to the classic <a download> trick without ever
+     throwing an error). This is the guaranteed-visible last resort: a real,
+     user-tappable download link (a manual tap survives restrictions that
+     block *synthetic* clicks) plus a copy-to-clipboard fallback of the raw
+     JSON, so the person always sees something concrete happen. See
+     deliverExportFile()/fallbackDownload() in app.js. -->
+<div id="exportFallbackModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Export ข้อมูล</span>
+      <span onclick="closeModal('exportFallbackModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
+    </div>
+    <div class="modal-body">เบราว์เซอร์นี้ดาวน์โหลดไฟล์อัตโนมัติให้ไม่ได้ ลองวิธีใดวิธีหนึ่งด้านล่าง:</div>
+    <div class="modal-row" style="grid-template-columns:1fr;margin-bottom:10px;">
+      <a id="exportManualLink" class="btn btn-primary btn-sm" download style="text-align:center;text-decoration:none;">⬇ แตะเพื่อดาวน์โหลดไฟล์</a>
+    </div>
+    <div class="modal-row" style="grid-template-columns:1fr;margin-bottom:10px;">
+      <button class="btn btn-outline btn-sm" onclick="copyExportData()">คัดลอกข้อมูล (Copy)</button>
+    </div>
+    <textarea id="exportManualText" class="note-input" readonly style="height:90px;font-size:10px;font-family:monospace;" onclick="this.select()"></textarea>
+  </div>
+</div>
+
+
 <!-- Protocol Editor Modal (create / edit) -->
 <div id="protocolEditorModal" class="modal-overlay">
   <div class="modal-card">
