@@ -480,13 +480,23 @@ function fmtTime(totalSeconds) {
 /* Each boss carries its own accent color so the whole card (background
    glow, HP bar, name) reskins per-boss instead of staying one flat gradient
    for all five — small touch, but it makes the weekly boss rotation
-   actually feel like a different fight instead of the same card relabeled. */
+   actually feel like a different fight instead of the same card relabeled.
+   `story` is short RPG flavor text shown in the Boss Archive (renderBossViewList)
+   — each one is written to mirror a real training obstacle (skipping day
+   one, hitting a plateau, losing consistency, overtraining/burnout, facing
+   the person you were before you started), so the weekly rotation reads as
+   a themed arc rather than five reskinned punching bags. */
 const BOSS_ROSTER = [
-  { id: 'grinder1', name: 'GRINDER-1', tag: 'SCRAP BRAWLER', baseHp: 250, accent: '#ff6a3d' },
-  { id: 'ironmaw', name: 'IRON MAW', tag: 'SPLIT JAW', baseHp: 350, accent: '#8aa0b8' },
-  { id: 'void9', name: 'VOID-9', tag: 'FORMLESS THREAT', baseHp: 450, accent: '#a855f7' },
-  { id: 'wingreaper', name: 'WING REAPER', tag: 'SKY HUNTER', baseHp: 550, accent: '#38bdf8' },
-  { id: 'corezero', name: 'CORE-ZERO', tag: 'FINAL REACTOR', baseHp: 700, accent: '#fbbf24' }
+  { id: 'grinder1', name: 'GRINDER-1', tag: 'SCRAP BRAWLER', baseHp: 250, accent: '#ff6a3d',
+    story: 'ต่อขึ้นจากเศษเหล็กที่ทิ้งไว้ตอนเลิกกลางคัน มันคือด่านแรกที่ทุกคนต้องเจอ — แค่ลุกมาเริ่มในวันที่ไม่อยากขยับตัวเลย GRINDER-1 ไม่ได้แข็งแกร่ง มันแค่รอให้คุณยอมแพ้ก่อนยกแรก' },
+  { id: 'ironmaw', name: 'IRON MAW', tag: 'SPLIT JAW', baseHp: 350, accent: '#8aa0b8',
+    story: 'ขากรรไกรเหล็กที่งับกลืนแรงจูงใจของนักสู้ที่เริ่มชินชากับกิจวัตรเดิม ๆ มันคือกำแพงเมื่อทุกอย่างเริ่ม "ง่ายเกินไป" จนลืมไปว่าความชินชาคือจุดที่คนส่วนใหญ่หยุดพัฒนา' },
+  { id: 'void9', name: 'VOID-9', tag: 'FORMLESS THREAT', baseHp: 450, accent: '#a855f7',
+    story: 'ไม่มีรูปร่างตายตัว เปลี่ยนหน้ากากไปเรื่อยตามข้ออ้างของแต่ละวัน — งานยุ่ง นอนไม่พอ ไม่มีอารมณ์ VOID-9 คือความไม่สม่ำเสมอที่กัดกร่อน streak จากข้างในโดยไม่ทันรู้ตัว' },
+  { id: 'wingreaper', name: 'WING REAPER', tag: 'SKY HUNTER', baseHp: 550, accent: '#38bdf8',
+    story: 'โฉบลงมาตอนที่มั่นใจที่สุด เมื่อเริ่มฝืนหักโหมเกินร่างกายจะรับไหว WING REAPER คือเงาของอาการบาดเจ็บและ burnout ที่คอยจับตาอยู่บนฟ้า รอจังหวะที่ความทะเยอทะยานมาเกินความอดทน' },
+  { id: 'corezero', name: 'CORE-ZERO', tag: 'FINAL REACTOR', baseHp: 700, accent: '#fbbf24',
+    story: 'แกนปฏิกรณ์ที่หลอมจากทุกวันที่เคยเลิกล้ม มันคือภาพของตัวเองในเวอร์ชันก่อนเริ่มฝึก ยังคงยืนรอเป็นด่านสุดท้ายเสมอ เพราะบอสตัวจริงไม่เคยเป็นใครอื่นนอกจากคนที่คุณเคยเป็น' }
 ];
 /** '#rrggbb' -> 'r,g,b' so CSS can build rgba() at any alpha via var(). */
 function hexToRgbTriplet(hex) {
@@ -808,11 +818,14 @@ function renderBossViewList() {
     const current = boss.id === state.boss.id;
     const next = i === (idx + 1) % BOSS_ROSTER.length;
     return `<div class="boss-view-item${current ? ' current' : ''}">
-      <div>
-        <div class="boss-view-item-name">${boss.name}</div>
-        <div class="boss-view-item-tag">${boss.tag}</div>
+      <div class="boss-view-item-top">
+        <div>
+          <div class="boss-view-item-name">${boss.name}</div>
+          <div class="boss-view-item-tag">${boss.tag}</div>
+        </div>
+        <div class="boss-view-item-status">${current ? 'CURRENT' : (next ? 'NEXT WEEK' : 'UPCOMING')}</div>
       </div>
-      <div class="boss-view-item-status">${current ? 'CURRENT' : (next ? 'NEXT WEEK' : 'UPCOMING')}</div>
+      ${boss.story ? `<div class="boss-view-item-story">${boss.story}</div>` : ''}
     </div>`;
   }).join('');
 }
