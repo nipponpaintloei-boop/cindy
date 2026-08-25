@@ -89,6 +89,15 @@ body.oled{
   border:1px solid rgba(255,255,255,.32);pointer-events:none;
 }
 .gem-badge.badge-locked{opacity:.9;}
+/* skinIconHtml()'s coin — same 1em-box convention as .gem-badge, but the
+   artwork already bakes in its own metal rim/gems so there's no separate
+   background gradient or ring here, just the image plus an optional glow. */
+.skin-icon-badge{
+  position:relative;display:inline-flex;align-items:center;justify-content:center;
+  width:1em;height:1em;flex-shrink:0;
+}
+.skin-icon-badge img{width:100%;height:100%;object-fit:contain;display:block;}
+.skin-icon-badge.skin-icon-glow img{filter:drop-shadow(0 0 0.16em var(--skin-icon-glow));}
 html,body{height:100%;}
 body{
   margin:0;
