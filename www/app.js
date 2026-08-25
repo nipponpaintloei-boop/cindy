@@ -1448,6 +1448,7 @@ function renderXpBar() {
     showToast('เลเวลอัพ! ตอนนี้ LV.' + info.level);
   }
   renderRankTag(info.level);
+  applyMascotBackdrop(info.level);
 }
 
 /* ================= RANK / TITLE =================
@@ -1467,6 +1468,128 @@ const RANK_ACCENT_HEX = {
 };
 function rankForLevel(level) {
   return RANK_TIERS.find(r => level >= r.min && level <= r.max) || RANK_TIERS[0];
+}
+
+/* ================= PROGRESSIVE BACKDROP =================
+ * First 2 tiers only, wired for an APK smoke test — same "same training
+ * ground, evolving with the player" concept as MASCOT_SKINS. Deliberately
+ * paired with the same level milestones as the skins (LV.5 etc.) rather than
+ * its own unlock track, so a level-up reveals both at once. More tiers
+ * (LV.10/15/20, boss trophy scenes) get appended here later; nothing else
+ * needs to change when they do. User-selectable via the backdrop picker
+ * below (same staged/confirm pattern as the skin picker) — the saved pick
+ * is used as long as it's still unlocked, otherwise falls back to the
+ * highest unlocked tier for the current level. */
+const BACKDROPS = [
+  { id: 'default', name: 'สนามฝึกเปล่า', img: 'assets/backdrops/bg-default.jpg', unlock: null },
+  { id: 'lv5', name: 'สนามเริ่มมีพลังงาน', img: 'assets/backdrops/bg-lv5.jpg',
+    unlock: { type: 'level', value: 5 }, cond: 'ถึง LV.5' }
+];
+function isBackdropUnlocked(bd) {
+  if (!bd.unlock) return true;
+  if (bd.unlock.type === 'level') return computeLevelInfo(computeTotalXP()).level >= bd.unlock.value;
+  return false;
+}
+/** Highest-tier backdrop the current level has unlocked (BACKDROPS is kept in
+ * ascending unlock order, so the last match wins). */
+function activeBackdropForLevel(level) {
+  let picked = BACKDROPS[0];
+  for (const bd of BACKDROPS) {
+    if (!bd.unlock) { picked = bd; continue; }
+    if (bd.unlock.type === 'level' && level >= bd.unlock.value) picked = bd;
+  }
+  return picked;
+}
+/** Applies the right backdrop image to one card element (.mascot-card on
+ * Home, or .character-hero-img-wrap on the Character sheet) for the given
+ * level. Both elements share the same --backdrop-img + .has-backdrop
+ * convention set up in CSS. */
+function applyBackdropToEl(el, level) {
+  if (!el) return;
+  const bd = activeBackdropForDisplay(level);
+  el.style.setProperty('--backdrop-img', 'url("' + bd.img + '")');
+  el.classList.add('has-backdrop');
+}
+function applyMascotBackdrop(level) {
+  applyBackdropToEl(document.querySelector('.mascot-card'), level);
+  applyBackdropToEl(document.querySelector('.character-hero-img-wrap'), level);
+}
+
+/* ================= BACKDROP PICKER (user-selectable) =================
+ * Lets the player manually choose among unlocked BACKDROPS instead of
+ * always showing the auto highest-unlocked tier. Mirrors the mascot skin
+ * picker's staged/confirm flow: a tap in the grid only "stages" a pick,
+ * nothing is saved/applied until confirmBackdropChange(). */
+const KEY_ACTIVE_BACKDROP = 'cindy_active_backdrop';
+function loadActiveBackdropId() {
+  return localStorage.getItem(KEY_ACTIVE_BACKDROP) || null;
+}
+function saveActiveBackdropId(id) {
+  localStorage.setItem(KEY_ACTIVE_BACKDROP, id);
+}
+/** Resolves which backdrop should actually be shown: the player's saved
+ * pick if it's still unlocked, otherwise the highest tier the current
+ * level has unlocked (same behavior as before the picker existed). */
+function activeBackdropForDisplay(level) {
+  const savedId = loadActiveBackdropId();
+  if (savedId) {
+    const bd = BACKDROPS.find(b => b.id === savedId);
+    if (bd && isBackdropUnlocked(bd)) return bd;
+  }
+  return activeBackdropForLevel(level);
+}
+let stagedBackdropId = null;
+function openBackdropPicker() {
+  const info = computeLevelInfo(computeTotalXP());
+  stagedBackdropId = activeBackdropForDisplay(info.level).id;
+  renderBackdropGrid();
+  document.getElementById('backdropPickerModal').classList.add('active');
+}
+function stageBackdrop(id) {
+  const bd = BACKDROPS.find(b => b.id === id);
+  if (!bd || !isBackdropUnlocked(bd)) return;
+  stagedBackdropId = id;
+  renderBackdropGrid();
+}
+function renderBackdropGrid() {
+  const grid = document.getElementById('backdropGrid');
+  if (!grid) return;
+  const info = computeLevelInfo(computeTotalXP());
+  const activeId = activeBackdropForDisplay(info.level).id;
+  const stagedId = stagedBackdropId || activeId;
+  grid.innerHTML = BACKDROPS.map(bd => {
+    const unlocked = isBackdropUnlocked(bd);
+    const isActive = bd.id === activeId;
+    const isStaged = bd.id === stagedId;
+    const cls = 'backdrop-item' + (isActive ? ' active' : '') + (isStaged && !isActive ? ' staged' : '') + (unlocked ? '' : ' locked');
+    const clickAttr = unlocked ? ' onclick="stageBackdrop(\'' + bd.id + '\')"' : '';
+    const cornerHtml = isStaged ? '<div class="active-check">' + iconHtml('check') + '</div>' : (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>');
+    const thumbStyle = 'background-image:url(\'' + bd.img + '\');' + (unlocked ? '' : 'filter:grayscale(1) brightness(.5);');
+    return '<div class="' + cls + '"' + clickAttr + '>' + cornerHtml +
+      '<div class="backdrop-thumb" style="' + thumbStyle + '"></div>' +
+      '<div class="skin-name">' + bd.name + '</div>' +
+      (unlocked ? '' : '<div class="skin-cond">' + bd.cond + '</div>') +
+      '</div>';
+  }).join('');
+  const bar = document.getElementById('backdropConfirmBar');
+  if (bar) bar.classList.toggle('show', stagedId !== activeId);
+}
+/** Applies the staged backdrop (if different from what's shown) and closes
+ * the picker. No one-shot FX here (unlike skins) — the backdrop is a
+ * static scene behind the card, so a clean re-render is enough. */
+function confirmBackdropChange() {
+  const info = computeLevelInfo(computeTotalXP());
+  const activeId = activeBackdropForDisplay(info.level).id;
+  if (!stagedBackdropId || stagedBackdropId === activeId) {
+    closeModal('backdropPickerModal');
+    return;
+  }
+  const bd = BACKDROPS.find(b => b.id === stagedBackdropId);
+  if (!bd || !isBackdropUnlocked(bd)) return;
+  closeModal('backdropPickerModal');
+  saveActiveBackdropId(bd.id);
+  applyMascotBackdrop(info.level);
+  showToast('เปลี่ยนพื้นหลังเป็น ' + bd.name);
 }
 function renderRankTag(level) {
   const el = document.getElementById('mascotRank');
@@ -1718,7 +1841,14 @@ function renderCharacterSheet() {
     RANK_TIERS.forEach(r => rankEl.classList.remove('rank-' + r.title.toLowerCase()));
     rankEl.classList.add('rank-' + rank.title.toLowerCase());
   }
+  applyMascotBackdrop(info.level);
   const tier = rank.title.toLowerCase();
+  // Character page's img-wrap lives outside .mascot-card's subtree, so it never
+  // inherited that element's --mascot-accent-rgb — the rank tint here (and the
+  // ::after edge-fade that depends on the same var) was silently a no-op before
+  // this. Set it directly on the wrap, same lookup Home's version uses.
+  const heroWrap = document.querySelector('.character-hero-img-wrap');
+  if (heroWrap) heroWrap.style.setProperty('--mascot-accent-rgb', hexToRgbTriplet(RANK_ACCENT_HEX[tier] || RANK_ACCENT_HEX.recruit));
   RANK_TIERS.forEach(r => avatar.classList.remove('aura-' + r.title.toLowerCase()));
   if (tier !== 'recruit') avatar.classList.add('aura-' + tier);
   if (levelBadge) {
