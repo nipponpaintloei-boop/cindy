@@ -3739,6 +3739,36 @@ async function shareCustomResult(id) {
   }, 'image/png');
 }
 
+/* ================= FORCE REFRESH (bust stale Service Worker cache) =========
+   The Service Worker (sw.js) caches app.js/index.html cache-first, keyed by
+   CACHE_NAME. If a person updates their bookmarked/installed copy without
+   that name changing, or just has an old SW still controlling the page,
+   they can be stuck looking at a stale version indefinitely with no visible
+   sign anything is wrong. This gives them a manual escape hatch: unregister
+   every SW controlling this page, delete every Cache Storage entry this
+   origin owns, then hard-reload with a cache-busting query string so the
+   browser's own HTTP cache can't quietly hand back the old files either. */
+async function forceRefreshApp() {
+  showToast('กำลังล้างแคชและโหลดเวอร์ชันล่าสุด...');
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(reg => reg.unregister().catch(() => {})));
+    }
+  } catch (e) { /* SW API unsupported or blocked — continue anyway */ }
+
+  try {
+    if (window.caches && caches.keys) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(key => caches.delete(key).catch(() => {})));
+    }
+  } catch (e) { /* Cache Storage unsupported or blocked — continue anyway */ }
+
+  const url = new URL(location.href);
+  url.searchParams.set('_refresh', Date.now().toString());
+  location.replace(url.toString());
+}
+
 /* ================= BACKUP (Export / Import) =================
    v2: covers ALL locally-stored user data, not just Cindy sessions.
    Previously this only exported KEY_SESSIONS ('cindy_sessions'), so

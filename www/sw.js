@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cindy-v2';
+const CACHE_NAME = 'cindy-v3';
 const ASSETS = [
   './index.html',
   './app.js',

@@ -1907,6 +1907,14 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()">IMPORT ข้อมูล</button>
       </div>
       <input type="file" id="importFile" accept="application/json" style="display:none;" onchange="importData(event)" />
+
+      <div class="section-label" style="margin-top:8px;">แอป</div>
+      <div class="control-row">
+        <button class="btn btn-outline btn-sm" onclick="forceRefreshApp()">🔄 รีเฟรชแอป (โหลดเวอร์ชันล่าสุด)</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-faint);margin-top:8px;line-height:1.5;">
+        กดปุ่มนี้ถ้าอัปเดตแอปใหม่ไปแล้วแต่หน้าจอยังเหมือนเดิม — จะล้างแคชเก่าแล้วโหลดเวอร์ชันล่าสุดให้ทันที
+      </div>
     </div>
     <div class="tabbar">
       <div class="tab" onclick="go('home')"><div class="dot"></div>HOME</div>
