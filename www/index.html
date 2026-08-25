@@ -385,24 +385,12 @@ body{
   animation:lvBadgePulsePurple 2s ease-in-out infinite;
   overflow:hidden;
 }
-.mascot-level-badge.lvbadge-elite::after{
-  content:'';position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.5) 50%,transparent 65%);
-  background-size:220% 100%;
-  animation:lvBadgeShine 2.4s ease-in-out infinite;
-}
 .mascot-level-badge.lvbadge-legend{
   color:#2a1900;
   background:linear-gradient(135deg,#FFD700,#FF9F1C,#FFD700);
   background-size:220% 220%;
   animation:lvBadgePulseGold 1.7s ease-in-out infinite, lvBadgeGoldShift 3.2s linear infinite;
   overflow:hidden;
-}
-.mascot-level-badge.lvbadge-legend::after{
-  content:'';position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(115deg,transparent 28%,rgba(255,255,255,.8) 50%,transparent 72%);
-  background-size:220% 100%;
-  animation:lvBadgeShine 1.6s ease-in-out infinite;
 }
 @keyframes lvBadgePulseBlue{
   0%,100%{box-shadow:0 2px 8px rgba(61,111,224,.45);}
@@ -423,10 +411,6 @@ body{
 @keyframes lvBadgeGoldShift{
   0%{background-position:0% 50%;}
   100%{background-position:200% 50%;}
-}
-@keyframes lvBadgeShine{
-  0%,15%{background-position:220% 0;}
-  85%,100%{background-position:-220% 0;}
 }
 
 /* ---- persistent rank aura + "gear" badge on the mascot avatar itself ----
