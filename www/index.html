@@ -272,11 +272,12 @@ body{
   background-size:auto, cover, cover;
   /* mascot-card is short+wide (unlike the tall .character-hero-img-wrap),
      so "cover" on a portrait backdrop image crops hard vertically. Anchoring
-     at "bottom" showed only the floor strip; "25%" samples higher into the
-     scene (gear/lighting) so the card reads as the same place as the
-     Character sheet instead of a flat floor tile. Tweak this % if it still
-     needs to shift up/down for a given backdrop's composition. */
-  background-position:center, center 25%, center bottom;
+     at "bottom" showed only the floor strip; "45%" samples from the
+     mid-scene (gear/lighting) so the card reads as the same place as the
+     Character sheet instead of a flat floor tile or an over-zoomed crop.
+     Tweak this % if it still needs to shift up/down for a given backdrop's
+     composition. */
+  background-position:center, center 45%, center bottom;
   background-repeat:no-repeat, no-repeat, no-repeat;
 }
 /* faint rarity wash behind the whole card, tinted per rank — same pattern as .boss-card::before */
