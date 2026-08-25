@@ -2331,19 +2331,37 @@ function computeStreak(sessions) {
   return streak;
 }
 
+/* ================= MOTIVATION MODAL (before starting a new Cindy workout) ================= */
+const MOTIVATION_MESSAGES = [
+  'ทุกก้าวที่ทำวันนี้ คือร่างกายที่ดีกว่าของพรุ่งนี้',
+  'ไม่ต้องสมบูรณ์แบบ แค่ลงมือทำให้ครบก็พอ',
+  'คุณแข็งแกร่งกว่าที่คิดไว้เสมอ ลุยเลย!',
+  'พักได้ แต่อย่าหยุด — เดี๋ยวก็ถึงเป้าหมาย',
+  'สิ่งเดียวที่แย่กว่าเหนื่อย คือความรู้สึกไม่ได้ลงมือทำ'
+];
+function openMotivationModal() {
+  const msg = MOTIVATION_MESSAGES[Math.floor(Math.random() * MOTIVATION_MESSAGES.length)];
+  document.getElementById('motivationMessage').textContent = msg;
+  document.getElementById('motivationModal').classList.add('active');
+}
+function confirmStartWorkoutFromModal() {
+  closeModal('motivationModal');
+  startNewWorkout();
+}
+
 function handleHomeMainBtn() {
   unlockAudio();
   const active = loadActive();
   if (active) {
     enterWorkoutScreen();
   } else {
-    startNewWorkout();
+    openMotivationModal();
   }
 }
 
 function confirmDiscardAndStartNew() {
   clearActive();
-  startNewWorkout();
+  openMotivationModal();
 }
 
 /* ================= WORKOUT ================= */

@@ -2237,6 +2237,17 @@ textarea.note-input::placeholder{color:var(--text-faint);}
   </div>
 </div>
 
+<!-- Motivation Modal (shown before starting a new Cindy workout) -->
+<div id="motivationModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title" style="text-align:center;">สู้ๆ นะ 💪</div>
+    <div id="motivationMessage" class="modal-body" style="text-align:center;font-size:15px;line-height:1.6;"></div>
+    <div class="modal-row">
+      <button class="btn btn-primary" style="width:100%;" onclick="confirmStartWorkoutFromModal()">ตกลง</button>
+    </div>
+  </div>
+</div>
+
 <!-- Rest Timer Modal -->
 <div id="restTimerModal" class="modal-overlay">
   <div class="modal-card">
