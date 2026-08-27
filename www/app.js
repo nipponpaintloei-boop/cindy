@@ -4523,24 +4523,37 @@ function init() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
-
+}
+/* Splash is just the brand animation — it must hide on its own timer
+ * regardless of login state, otherwise a logged-out player would stare at
+ * the splash forever instead of seeing the login screen underneath it. */
+function hideSplashSoon() {
   const splash = document.getElementById('splash');
-  if (splash) {
-    setTimeout(() => splash.classList.add('hide'), 1050);
-  }
+  if (splash) setTimeout(() => splash.classList.add('hide'), 1050);
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', hideSplashSoon);
+} else {
+  hideSplashSoon();
 }
 /* init() must not read localStorage until the storage-shim (storage-shim.js)
  * has finished hydrating its cache from @capacitor/preferences — otherwise
  * the app would render as if there's no save data for a moment on native
  * builds. window.__cindyStorageReady is a no-op-resolved promise on plain
- * web, so this behaves exactly as before there. */
-function whenStorageReady(fn) {
-  Promise.resolve(window.__cindyStorageReady).then(fn);
+ * web, so this behaves exactly as before there.
+ * init() also must not run until window.__cindyAuthReady resolves
+ * (firebase-auth.js) — that promise only resolves once a player is signed
+ * in with Google, so the game never boots for a logged-out user. */
+function whenAppReady(fn) {
+  Promise.all([
+    Promise.resolve(window.__cindyStorageReady),
+    Promise.resolve(window.__cindyAuthReady)
+  ]).then(fn);
 }
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => whenStorageReady(init));
+  document.addEventListener('DOMContentLoaded', () => whenAppReady(init));
 } else {
-  whenStorageReady(init);
+  whenAppReady(init);
 }
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') checkReminder();
