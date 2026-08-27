@@ -4047,6 +4047,7 @@ async function deliverExportFile(json, fname) {
   const blob = new Blob([json], { type: 'application/json' });
 
   if (window.showSaveFilePicker) {
+    const pickerCalledAt = Date.now();
     try {
       const handle = await window.showSaveFilePicker({
         suggestedName: fname,
@@ -4058,8 +4059,20 @@ async function deliverExportFile(json, fname) {
       showToast('ส่งออกข้อมูลแล้ว (Cindy + Custom Workout + สกิน/ความคืบหน้า)');
       return;
     } catch (e) {
-      if (e && e.name === 'AbortError') return; // user cancelled the save dialog
-      // any other failure (e.g. permission denied) falls through below
+      // A REAL user cancel only happens after the native dialog was actually
+      // shown and dismissed by hand — that always takes a non-trivial amount
+      // of time. Some contexts (file:// origin, installed/home-screen PWAs,
+      // in-app WebViews, sandboxed iframes) instead reject with the exact
+      // same AbortError *instantly*, before any dialog ever appeared, because
+      // the picker was refused outright rather than cancelled. Treating that
+      // as "user cancelled" and returning silently is what caused Export to
+      // look like it did nothing at all with no visible error. Guard against
+      // that: only trust AbortError as a genuine cancel if enough time
+      // passed for a person to have actually seen and closed the dialog.
+      const elapsed = Date.now() - pickerCalledAt;
+      if (e && e.name === 'AbortError' && elapsed > 400) return;
+      // any other failure (e.g. permission denied, or an instant/fake abort)
+      // falls through to the share-sheet / guaranteed-visible fallback below
     }
   }
 
