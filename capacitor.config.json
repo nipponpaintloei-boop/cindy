@@ -15,6 +15,10 @@
       "smallIcon": "ic_stat_icon",
       "iconColor": "#E8232A",
       "sound": "default"
+    },
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com"]
     }
   }
 }
