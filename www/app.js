@@ -46,6 +46,271 @@ function runMigrationsIfNeeded() {
     });
 }
 
+/* ================= PIN LOCK =================
+ * This app has no server-side auth of its own — data lives in localStorage
+ * and syncs via the player's Google account. So the PIN below is NOT a bank-
+ * grade security boundary; it exists only to stop someone else who picks up
+ * the phone from casually browsing/editing/wiping the player's data. That's
+ * why there's deliberately no lockout on wrong attempts (see product Q&A):
+ * the threat model is "someone in the same room", not a brute-force attacker,
+ * and a lockout would just be a way to get *yourself* locked out.
+ *
+ * Storage: only a SHA-256 hash of the PIN is ever persisted, never the PIN
+ * itself. Losing the PIN is unrecoverable by design (no server holds it),
+ * so the only way back in is proving you're still you via Google — see
+ * reauthenticateWithGoogle() below, which defers to a hook that firebase-
+ * auth.js is expected to provide.
+ *
+ * Gating points (per product spec): app open/resume after backgrounding,
+ * editing or deleting workout history (Cindy + Custom), resetting the
+ * character, and importing a backup file. Each call site wraps its real
+ * implementation with requirePin(label, fn) below — see the *Impl renames
+ * near those features. */
+const KEY_PIN_HASH = 'cindy_pin_hash';
+const KEY_PIN_LAST_ACTIVE = 'cindy_pin_last_active_ts';
+const PIN_LOCK_TIMEOUT_MS = 2 * 60 * 1000; // background >2min => re-lock
+
+async function sha256Hex(str) {
+  const enc = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function hasPinSet() {
+  return !!localStorage.getItem(KEY_PIN_HASH);
+}
+async function setPinHash(pin) {
+  localStorage.setItem(KEY_PIN_HASH, await sha256Hex(pin));
+}
+async function verifyPinValue(pin) {
+  const stored = localStorage.getItem(KEY_PIN_HASH);
+  if (!stored) return true; // no PIN set => nothing to check
+  return (await sha256Hex(pin)) === stored;
+}
+function clearPinHash() {
+  localStorage.removeItem(KEY_PIN_HASH);
+  localStorage.removeItem(KEY_PIN_LAST_ACTIVE);
+}
+function touchPinActivity() {
+  localStorage.setItem(KEY_PIN_LAST_ACTIVE, String(Date.now()));
+}
+
+/* ---- shared numeric keypad (used by lock screen, gate modal, setup modal) ---- */
+let _pinBuf = '';
+function setupPinPad(dotsId, keypadId, onComplete) {
+  _pinBuf = '';
+  updatePinDots(dotsId);
+  const el = document.getElementById(keypadId);
+  if (!el) return;
+  el.innerHTML = '';
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
+  keys.forEach(k => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pin-key' + (k === '' ? ' pin-key-blank' : '');
+    b.textContent = k;
+    if (k === '') {
+      b.disabled = true;
+    } else {
+      b.onclick = () => {
+        if (k === '⌫') { _pinBuf = _pinBuf.slice(0, -1); }
+        else if (_pinBuf.length < 4) { _pinBuf += k; }
+        updatePinDots(dotsId);
+        if (_pinBuf.length === 4) {
+          const val = _pinBuf;
+          _pinBuf = '';
+          setTimeout(() => onComplete(val), 80); // let the last dot render before advancing
+        }
+      };
+    }
+    el.appendChild(b);
+  });
+}
+function updatePinDots(dotsId) {
+  const el = document.getElementById(dotsId);
+  if (!el) return;
+  el.innerHTML = '';
+  for (let i = 0; i < 4; i++) {
+    const d = document.createElement('div');
+    d.className = 'pin-dot' + (i < _pinBuf.length ? ' filled' : '');
+    el.appendChild(d);
+  }
+}
+function shakePinDots(dotsId) {
+  const el = document.getElementById(dotsId);
+  if (!el) return;
+  el.classList.add('pin-shake');
+  setTimeout(() => el.classList.remove('pin-shake'), 400);
+}
+
+/* ---- app-lock screen (open/resume) ---- */
+function maybeShowAppLock() {
+  if (!hasPinSet()) return;
+  const last = parseInt(localStorage.getItem(KEY_PIN_LAST_ACTIVE), 10);
+  const locked = !Number.isFinite(last) || (Date.now() - last) > PIN_LOCK_TIMEOUT_MS;
+  if (locked) showPinLockScreen();
+}
+function showPinLockScreen() {
+  const scr = document.getElementById('pinLockScreen');
+  if (!scr) return;
+  scr.classList.add('active');
+  armPinLockPad();
+}
+function armPinLockPad() {
+  setupPinPad('pinLockDots', 'pinLockKeypad', onPinLockAttempt);
+}
+async function onPinLockAttempt(pin) {
+  const ok = await verifyPinValue(pin);
+  if (ok) {
+    touchPinActivity();
+    document.getElementById('pinLockScreen').classList.remove('active');
+  } else {
+    shakePinDots('pinLockDots');
+    showToast('PIN ไม่ถูกต้อง');
+    armPinLockPad();
+  }
+}
+
+/* ---- generic action gate (edit/delete history, reset character, import) ---- */
+let _pinGateOnSuccess = null;
+function requirePin(actionLabel, onSuccess) {
+  if (!hasPinSet()) { onSuccess(); return; }
+  const body = document.getElementById('pinGateBody');
+  if (body) body.textContent = actionLabel || 'การทำรายการนี้ต้องยืนยันตัวตนด้วย PIN';
+  _pinGateOnSuccess = onSuccess;
+  document.getElementById('pinGateModal').classList.add('active');
+  armPinGatePad();
+}
+function armPinGatePad() {
+  setupPinPad('pinGateDots', 'pinGateKeypad', onPinGateAttempt);
+}
+async function onPinGateAttempt(pin) {
+  const ok = await verifyPinValue(pin);
+  if (ok) {
+    closeModal('pinGateModal');
+    const fn = _pinGateOnSuccess;
+    _pinGateOnSuccess = null;
+    if (fn) fn();
+  } else {
+    shakePinDots('pinGateDots');
+    showToast('PIN ไม่ถูกต้อง');
+    armPinGatePad();
+  }
+}
+function cancelPinGate() {
+  _pinGateOnSuccess = null;
+  closeModal('pinGateModal');
+}
+
+/* ---- forgot PIN: re-auth with Google, then force a fresh PIN ----
+ * firebase-auth.js is expected to expose:
+ *   window.__cindyReauthWithGoogle = async () => boolean
+ * which re-prompts Google sign-in (e.g. reauthenticateWithPopup with
+ * GoogleAuthProvider) for the already-signed-in account and resolves true
+ * only on a successful, matching re-auth. Without that hook wired up, the
+ * forgot-PIN flow can't safely verify identity, so it fails closed. */
+async function reauthenticateWithGoogle() {
+  if (typeof window.__cindyReauthWithGoogle === 'function') {
+    try { return !!(await window.__cindyReauthWithGoogle()); }
+    catch (e) { console.error('[pin] Google re-auth failed:', e); return false; }
+  }
+  console.warn('[pin] window.__cindyReauthWithGoogle is not defined by firebase-auth.js');
+  return false;
+}
+async function startPinForgotFlow() {
+  document.getElementById('pinGateModal').classList.remove('active');
+  showToast('กำลังยืนยันตัวตนผ่าน Google...');
+  const ok = await reauthenticateWithGoogle();
+  if (ok) {
+    clearPinHash();
+    _pinGateOnSuccess = null;
+    document.getElementById('pinLockScreen').classList.remove('active');
+    showToast('ยืนยันตัวตนสำเร็จ ตั้ง PIN ใหม่ได้เลย');
+    openPinSetupModal(true);
+  } else {
+    showToast('ยืนยันตัวตนไม่สำเร็จ ลองใหม่อีกครั้ง');
+    if (hasPinSet()) showPinLockScreen();
+  }
+}
+
+/* ---- set / change PIN (from Character > ความปลอดภัย) ---- */
+let _pinSetupStage = 'new'; // 'current' -> 'new' -> 'confirm'
+let _pinSetupFirstEntry = '';
+function openPinSetupModal(skipCurrentCheck) {
+  document.getElementById('pinSetupModal').classList.add('active');
+  _pinSetupFirstEntry = '';
+  if (!skipCurrentCheck && hasPinSet()) {
+    _pinSetupStage = 'current';
+    setPinSetupCopy('ยืนยัน PIN เดิม', 'ใส่ PIN ปัจจุบันก่อนตั้งค่าใหม่');
+  } else {
+    _pinSetupStage = 'new';
+    setPinSetupCopy('ตั้ง PIN ใหม่', 'ตั้ง PIN 4 หลักเพื่อป้องกันไม่ให้คนอื่นแก้ไขข้อมูลของคุณ');
+  }
+  armPinSetupPad();
+}
+function setPinSetupCopy(title, body) {
+  document.getElementById('pinSetupTitle').textContent = title;
+  document.getElementById('pinSetupBody').textContent = body;
+}
+function armPinSetupPad() {
+  setupPinPad('pinSetupDots', 'pinSetupKeypad', onPinSetupDigitEntered);
+}
+async function onPinSetupDigitEntered(pin) {
+  if (_pinSetupStage === 'current') {
+    const ok = await verifyPinValue(pin);
+    if (!ok) { shakePinDots('pinSetupDots'); showToast('PIN เดิมไม่ถูกต้อง'); armPinSetupPad(); return; }
+    _pinSetupStage = 'new';
+    setPinSetupCopy('ตั้ง PIN ใหม่', 'ตั้ง PIN 4 หลัก');
+    armPinSetupPad();
+    return;
+  }
+  if (_pinSetupStage === 'new') {
+    _pinSetupFirstEntry = pin;
+    _pinSetupStage = 'confirm';
+    setPinSetupCopy('ยืนยัน PIN อีกครั้ง', 'ใส่ PIN เดิมอีกครั้งเพื่อยืนยัน');
+    armPinSetupPad();
+    return;
+  }
+  // confirm
+  if (pin !== _pinSetupFirstEntry) {
+    shakePinDots('pinSetupDots');
+    showToast('PIN ไม่ตรงกัน ลองใหม่');
+    _pinSetupStage = 'new';
+    setPinSetupCopy('ตั้ง PIN ใหม่', 'ตั้ง PIN 4 หลัก');
+    armPinSetupPad();
+    return;
+  }
+  await setPinHash(pin);
+  touchPinActivity();
+  closeModal('pinSetupModal');
+  showToast('ตั้งค่า PIN เรียบร้อย');
+  renderPinSettingsUI();
+}
+function confirmDisablePin() {
+  requirePin('ใส่ PIN เดิมเพื่อปิดการใช้งาน PIN', () => {
+    clearPinHash();
+    showToast('ปิดการใช้ PIN แล้ว');
+    renderPinSettingsUI();
+  });
+}
+function handlePinActionBtn() {
+  openPinSetupModal(false);
+}
+function renderPinSettingsUI() {
+  const statusText = document.getElementById('pinStatusText');
+  const actionBtn = document.getElementById('pinActionBtn');
+  const disableBtn = document.getElementById('pinDisableBtn');
+  if (!statusText || !actionBtn || !disableBtn) return;
+  if (hasPinSet()) {
+    statusText.textContent = 'เปิดใช้งานอยู่';
+    actionBtn.textContent = 'เปลี่ยน PIN';
+    disableBtn.style.display = '';
+  } else {
+    statusText.textContent = 'ยังไม่ได้ตั้งค่า';
+    actionBtn.textContent = 'ตั้งค่า';
+    disableBtn.style.display = 'none';
+  }
+}
+
 /* ================= ICON SET =================
  * Small inline SVG icons (stroke-based, same visual language as the header
  * icon buttons already in the HTML) used in place of emoji for the small,
@@ -2086,6 +2351,7 @@ function renderCharacterSheet() {
   renderCharacterEquipment();
   renderCharacterBossTrophyRow();
   renderCharacterRecentLog();
+  renderPinSettingsUI();
 }
 
 /* ================= MASCOT SKINS =================
@@ -3228,6 +3494,9 @@ function openDetail(id) {
 /* ================= EDIT / DELETE SESSION ================= */
 let pendingEditFeedback = { rpe: null, feeling: null };
 function openEditSessionModal(id) {
+  requirePin('ใส่ PIN เพื่อแก้ไขประวัติ Workout นี้', () => openEditSessionModalImpl(id));
+}
+function openEditSessionModalImpl(id) {
   const s = loadSessions().find(x => x.id === id);
   if (!s) return;
   currentDetailId = id;
@@ -3262,7 +3531,9 @@ function saveEditSession() {
   showToast('บันทึกการแก้ไขแล้ว');
 }
 function confirmDeleteSession() {
-  document.getElementById('deleteSessionModal').classList.add('active');
+  requirePin('ใส่ PIN เพื่อลบประวัติ Workout นี้', () => {
+    document.getElementById('deleteSessionModal').classList.add('active');
+  });
 }
 function deleteSessionExecute() {
   const sessions = loadSessions().filter(s => s.id !== currentDetailId);
@@ -3975,7 +4246,9 @@ async function forceRefreshApp() {
  * the next reload's pullFromCloud() would just write the old progress
  * straight back into localStorage from the still-intact cloud document. */
 function openResetCharacterModal() {
-  document.getElementById('resetCharacterModal').classList.add('active');
+  requirePin('ใส่ PIN เพื่อรีเซ็ตตัวละคร', () => {
+    document.getElementById('resetCharacterModal').classList.add('active');
+  });
 }
 async function resetCharacterExecute() {
   closeModal('resetCharacterModal');
@@ -4303,6 +4576,9 @@ function copyExportData() {
 }
 
 function importData(event) {
+  requirePin('ใส่ PIN เพื่อ Import ข้อมูล', () => importDataImpl(event));
+}
+function importDataImpl(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
@@ -4582,6 +4858,7 @@ async function handleInstallClick() {
 /* ================= INIT ================= */
 function init() {
   runMigrationsIfNeeded();
+  maybeShowAppLock(); // check first: a locked player still sees the lock screen over whatever renders below
   applyStoredTheme();
   applyProtocolToUI();
   const active = loadActive();
@@ -4640,7 +4917,12 @@ if (document.readyState === 'loading') {
   whenAppReady(init);
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') checkReminder();
+  if (document.visibilityState === 'hidden') {
+    if (hasPinSet()) touchPinActivity(); // stamp the moment we left, so the >2min check below is measured from here
+  } else if (document.visibilityState === 'visible') {
+    maybeShowAppLock();
+    checkReminder();
+  }
 });
 /* ================= CUSTOM WORKOUT — EXERCISE LIBRARY (PHASE 5a) ================= */
 /* Static list of preset exercises the Builder can offer as shortcuts.
@@ -5956,6 +6238,9 @@ function renderCustomHistoryDetail() {
 /* ---- edit / delete (mirrors Cindy's openEditSessionModal/saveEditSession) ---- */
 let pendingEditCustomFeedback = { rpe: null, feeling: null };
 function openEditCustomHistorySessionModal(id) {
+  requirePin('ใส่ PIN เพื่อแก้ไขประวัติ Workout นี้', () => openEditCustomHistorySessionModalImpl(id));
+}
+function openEditCustomHistorySessionModalImpl(id) {
   const s = loadCustomWorkoutSessions().find(x => x.id === id);
   if (!s) return;
   currentCustomHistoryDetailId = id;
@@ -5992,7 +6277,9 @@ function saveEditCustomHistorySession() {
 
 function confirmDeleteCustomHistorySession() {
   if (!currentCustomHistoryDetailId) return;
-  document.getElementById('customHistoryDeleteModal').classList.add('active');
+  requirePin('ใส่ PIN เพื่อลบประวัติ Workout นี้', () => {
+    document.getElementById('customHistoryDeleteModal').classList.add('active');
+  });
 }
 function deleteCustomHistorySessionExecute() {
   if (currentCustomHistoryDetailId) {
