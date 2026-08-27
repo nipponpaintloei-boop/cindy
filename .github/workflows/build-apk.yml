@@ -57,14 +57,16 @@ jobs:
       # loads them from disk instead of fetching from gstatic.com /
       # fonts.googleapis.com on every launch. Faster cold start, and the
       # app no longer stalls waiting on those two hosts on a slow/flaky
-      # connection. index.html references vendor/firebase/... and
-      # vendor/fonts/fonts.css directly.
-      - name: Bundle Firebase SDK and fonts locally (offline / faster load)
+      # loads fonts from disk instead of fetching from fonts.googleapis.com
+      # on every launch — faster cold start, and no stall on a slow/flaky
+      # connection. index.html references vendor/fonts/fonts.css directly.
+      # (Firebase SDK is intentionally back on CDN for now — bundling it
+      # locally pulled in a newer major "firebase" version than the pinned
+      # 10.13.0 the CDN used, which appears to have broken Google Sign-In.
+      # Revisit bundling it again once that's root-caused separately.)
+      - name: Bundle fonts locally (offline / faster load)
         run: |
-          mkdir -p www/vendor/firebase www/vendor/fonts
-          cp node_modules/firebase/firebase-app-compat.js www/vendor/firebase/
-          cp node_modules/firebase/firebase-auth-compat.js www/vendor/firebase/
-          cp node_modules/firebase/firebase-firestore-compat.js www/vendor/firebase/
+          mkdir -p www/vendor/fonts
           cat node_modules/@fontsource/inter/500.css \
               node_modules/@fontsource/inter/600.css \
               node_modules/@fontsource/inter/700.css \
