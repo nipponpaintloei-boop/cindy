@@ -34,6 +34,7 @@
 
   let resolveAuthReady;
   window.__cindyAuthReady = new Promise((resolve) => { resolveAuthReady = resolve; });
+  window.__cindyResolveAuthReady = resolveAuthReady;
 
   function els() {
     return {
@@ -108,7 +109,9 @@
     if (user) {
       window.cindyUser = { uid: user.uid, name: user.displayName, email: user.email, photo: user.photoURL };
       if (loginScreen) loginScreen.classList.remove('show');
-      if (!handledFirstState) { handledFirstState = true; resolveAuthReady(); }
+      // __cindyAuthReady is resolved by firestore-sync.js instead of here —
+      // it needs to pull the player's cloud data into localStorage first,
+      // so app.js's init() only ever sees fully-synced data.
     } else {
       window.cindyUser = null;
       if (loginScreen) loginScreen.classList.add('show');
