@@ -92,6 +92,12 @@ jobs:
       - name: Sync web assets into Android project
         run: npx cap sync android
 
+      # @capacitor/geolocation's manifest merge has been unreliable here,
+      # sometimes leaving the built APK with no location permission
+      # declared at all. This guarantees it's present.
+      - name: Ensure location permissions are declared
+        run: bash ci/patch-location.sh
+
       - name: Force stable debug signing (keeps app signature stable across builds)
         env:
           CINDY_KEYSTORE_PATH: ${{ github.workspace }}/ci/debug.keystore
