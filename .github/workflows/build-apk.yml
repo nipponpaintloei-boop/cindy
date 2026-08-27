@@ -23,6 +23,15 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      # Prints the SHA-1 fingerprint of the stable debug keystore into the
+      # build log. Needed once to register under Firebase Console >
+      # Project settings > your Android app > Add fingerprint, so Google
+      # Sign-In accepts this app. Placed early (right after JDK setup) so it
+      # still runs even if a later step fails — it only needs the keystore
+      # file and keytool, nothing else.
+      - name: Print debug keystore SHA-1 (for Firebase Console)
+        run: keytool -list -v -keystore ci/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep "SHA1:"
+
       - name: Install JS dependencies
         run: npm install
 
@@ -59,14 +68,6 @@ jobs:
         env:
           CINDY_KEYSTORE_PATH: ${{ github.workspace }}/ci/debug.keystore
         run: bash ci/patch-signing.sh
-
-      # Prints the SHA-1 fingerprint of the stable debug keystore into the
-      # build log. Needed once to register under Firebase Console >
-      # Project settings > your Android app > Add fingerprint, so Google
-      # Sign-In accepts this app. Since the keystore is stable across builds
-      # (see step above), you only need to copy this value in one time.
-      - name: Print debug keystore SHA-1 (for Firebase Console)
-        run: keytool -list -v -keystore ci/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep "SHA1:"
 
       - name: Install Android Home Screen Widget
         run: bash ci/patch-widget.sh
