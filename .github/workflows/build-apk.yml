@@ -45,9 +45,32 @@ jobs:
 
       # Native Google Sign-In (required — Google blocks OAuth popups opened
       # from inside an app's WebView, so the JS-only signInWithPopup flow
-      # cannot be used here).
+      # cannot be used here). "firebase" itself is pinned in package.json so
+      # its version stays fixed across builds.
       - name: Install Firebase Authentication plugin
-        run: npm install @capacitor-firebase/authentication firebase
+        run: npm install @capacitor-firebase/authentication
+
+      # Bundles the Firebase SDK and app fonts into www/vendor/ so the app
+      # loads them from disk instead of fetching from gstatic.com /
+      # fonts.googleapis.com on every launch. Faster cold start, and the
+      # app no longer stalls waiting on those two hosts on a slow/flaky
+      # connection. index.html references vendor/firebase/... and
+      # vendor/fonts/fonts.css directly.
+      - name: Bundle Firebase SDK and fonts locally (offline / faster load)
+        run: |
+          mkdir -p www/vendor/firebase www/vendor/fonts
+          cp node_modules/firebase/firebase-app-compat.js www/vendor/firebase/
+          cp node_modules/firebase/firebase-auth-compat.js www/vendor/firebase/
+          cp node_modules/firebase/firebase-firestore-compat.js www/vendor/firebase/
+          cat node_modules/@fontsource/inter/500.css \
+              node_modules/@fontsource/inter/600.css \
+              node_modules/@fontsource/inter/700.css \
+              node_modules/@fontsource/inter/800.css \
+              node_modules/@fontsource/inter/900.css \
+              node_modules/@fontsource/bebas-neue/400.css \
+              > www/vendor/fonts/fonts.css
+          cp -r node_modules/@fontsource/inter/files www/vendor/fonts/
+          cp -r node_modules/@fontsource/bebas-neue/files www/vendor/fonts/
 
       - name: Add Android platform (first run only)
         run: |
