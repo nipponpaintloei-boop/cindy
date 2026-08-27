@@ -1062,6 +1062,66 @@ body{
   100%{opacity:0;transform:translate(-50%,-50%) scale(2.6);}
 }
 
+/* ---- battle cutscene battlefield dressing ----
+ * Style-only wrapper around the existing turn-by-turn HP drain (see
+ * startBossBattleCutscene() in app.js) — a painted sky/hills/ground stage
+ * behind the boss + floating damage numbers on each hit, so the same
+ * set->damage mechanic reads as a proper battle scene. Scoped to
+ * #screen-bossbattle only; the Home boss-card keeps its plain status-card
+ * look untouched. CSS-painted (no image asset) — swap in a real pixel-art
+ * PNG later via .battle-field's background-image if you get one made,
+ * same way boss.bg backdrops already work on the Home card. */
+#screen-bossbattle .boss-card{overflow:visible;}
+.battle-field{
+  position:relative;margin:10px -16px 14px;padding:20px 16px 0;overflow:visible;
+  height:190px;border-radius:10px;
+  background:
+    linear-gradient(180deg,#bfe4f5 0%,#cdeaf7 38%,#a9d98f 39%,#8bc978 60%,#6fb85f 100%);
+}
+.battle-field::before{ /* distant hills, two soft peaks per side */
+  content:"";position:absolute;left:0;right:0;bottom:52%;height:70px;
+  background:
+    radial-gradient(ellipse 90px 60px at 18% 100%, #9fcf9a 60%, transparent 62%),
+    radial-gradient(ellipse 110px 70px at 55% 100%, #8fc78f 60%, transparent 62%),
+    radial-gradient(ellipse 90px 55px at 88% 100%, #9fcf9a 60%, transparent 62%);
+  opacity:.85;
+}
+.battle-field::after{ /* ground texture — a few dark speckles for a grassy feel */
+  content:"";position:absolute;left:0;right:0;bottom:0;height:46%;
+  background-image:radial-gradient(circle,rgba(0,0,0,.08) 2px,transparent 2.5px);
+  background-size:14px 14px;
+  background-position:0 0,7px 7px;
+}
+.battle-field-clouds{
+  position:absolute;top:10px;left:0;right:0;height:24px;
+  background:
+    radial-gradient(ellipse 26px 9px at 22% 50%, rgba(255,255,255,.85), transparent 70%),
+    radial-gradient(ellipse 34px 11px at 62% 40%, rgba(255,255,255,.75), transparent 70%),
+    radial-gradient(ellipse 20px 8px at 85% 55%, rgba(255,255,255,.7), transparent 70%);
+}
+/* boss stands on the field instead of floating on the card's own bg */
+.battle-field .boss-stage{
+  position:relative;margin:0 auto;background:radial-gradient(ellipse 70px 18px at 50% 96%, rgba(0,0,0,.22), transparent 75%);
+}
+
+/* floating damage number — one spawned per hit in startBossBattleCutscene(),
+ * removes itself when the animation ends (see spawnFloatingDamage() in app.js) */
+.floating-dmg{
+  position:absolute;left:50%;top:38%;z-index:3;pointer-events:none;
+  transform:translate(-50%,0);
+  font-family:var(--font-display);font-size:22px;font-weight:800;
+  color:#ffd23f;-webkit-text-stroke:1.5px #6b2a00;paint-order:stroke fill;
+  text-shadow:0 2px 0 rgba(0,0,0,.35);
+  animation:floatDmgUp .9s cubic-bezier(.2,.7,.3,1) forwards;
+}
+.floating-dmg.crit{font-size:27px;color:#ff5a4d;-webkit-text-stroke-color:#450a05;}
+@keyframes floatDmgUp{
+  0%{opacity:0;transform:translate(-50%,6px) scale(.7);}
+  15%{opacity:1;transform:translate(-50%,-6px) scale(1.08);}
+  30%{transform:translate(-50%,-14px) scale(1);}
+  100%{opacity:0;transform:translate(-50%,-54px) scale(1);}
+}
+
 .plan-cta{
   display:block;width:100%;text-align:left;
   background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);
@@ -1747,9 +1807,12 @@ textarea.note-input::placeholder{color:var(--text-faint);}
             <div id="battleBossTag" class="boss-tag">—</div>
           </div>
         </div>
-        <div id="battleBossStage" class="boss-stage">
-          <div class="boss-art"></div>
-          <div class="boss-boom"></div>
+        <div class="battle-field">
+          <div class="battle-field-clouds"></div>
+          <div id="battleBossStage" class="boss-stage">
+            <div class="boss-art"></div>
+            <div class="boss-boom"></div>
+          </div>
         </div>
         <div class="boss-hp-track"><div id="battleHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
         <div id="battleHpLabel" class="boss-hp-label">0 / 0 HP</div>

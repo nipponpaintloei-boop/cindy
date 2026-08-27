@@ -844,6 +844,18 @@ function computeBattleTurns(session, isCustom) {
   ].filter(t => t.dmg > 0);
 }
 
+function spawnFloatingDamage(stage, dmg, opts) {
+  opts = opts || {};
+  const el = document.createElement('div');
+  el.className = 'floating-dmg' + (opts.crit ? ' crit' : '');
+  el.textContent = '-' + dmg;
+  // small random horizontal drift + start-x so repeated hits don't stack exactly
+  const jitter = (Math.random() * 46 - 23).toFixed(1);
+  el.style.left = 'calc(50% + ' + jitter + 'px)';
+  stage.appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
+}
+
 let bossBattleTimer = null;
 function startBossBattleCutscene(session, isCustom, onDone) {
   const sessionDmg = isCustom ? totalVolumeOfCustomSession(session) : session.total.reps;
@@ -861,6 +873,7 @@ function startBossBattleCutscene(session, isCustom, onDone) {
   const skipBtn = document.getElementById('battleSkipBtn');
   if (!nameEl || !stage || !hpFill) { onDone(); return; }
 
+  stage.querySelectorAll('.floating-dmg').forEach(n => n.remove());
   nameEl.textContent = afterState.boss.name;
   if (tagEl) tagEl.textContent = afterState.boss.tag;
   stage.querySelector('.boss-art').innerHTML = bossSilhouetteMarkup(afterState.boss.id);
@@ -900,6 +913,7 @@ function startBossBattleCutscene(session, isCustom, onDone) {
     void stage.offsetWidth;
     stage.classList.add('boss-hit');
     setHp(hp);
+    spawnFloatingDamage(stage, turn.dmg, { crit: i === turns.length && hp <= 0 });
     logEl.textContent = turn.label + ' x' + turn.dmg + ' — โจมตี!';
     vibrate([30]);
     bossBattleTimer = setTimeout(step, 800);
