@@ -4133,6 +4133,18 @@ function fallbackDownload(blob, fname, json) {
  * synthetic click) plus the raw JSON in a copyable textarea. Always shows
  * something on screen, so it can't fail as silently as the auto-download. */
 function openExportFallbackPanel(url, fname, json) {
+  // iOS home-screen ("Add to Home Screen") installs run in WebKit's
+  // standalone display mode, where a long-standing, still-open WebKit bug
+  // means an <a download> pointing at a blob: URL is silently a no-op — the
+  // tap registers but nothing happens, no error, no share sheet, nothing.
+  // The exact same link works fine in a normal Safari tab; it's specifically
+  // the installed-icon mode that WebKit doesn't support here. There's no
+  // code-side fix for that (Apple's own bug tracker confirms it's
+  // unresolved), so in that mode we make Copy the primary, recommended
+  // action instead of a link that's known not to work.
+  const isStandalone = (typeof navigator !== 'undefined' && navigator.standalone === true) ||
+    (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches);
+
   const link = document.getElementById('exportManualLink');
   if (link) {
     if (url) {
@@ -4141,9 +4153,33 @@ function openExportFallbackPanel(url, fname, json) {
     } else {
       link.style.display = 'none'; // couldn't even build a blob URL — copy is the only option
     }
+    if (isStandalone) {
+      link.classList.remove('btn-primary'); link.classList.add('btn-outline');
+    } else {
+      link.classList.remove('btn-outline'); link.classList.add('btn-primary');
+    }
   }
   const ta = document.getElementById('exportManualText');
   if (ta) ta.value = json;
+
+  const copyBtn = document.getElementById('exportManualCopyBtn');
+  const hint = document.getElementById('exportManualHint');
+  if (isStandalone) {
+    if (copyBtn) { copyBtn.classList.remove('btn-outline'); copyBtn.classList.add('btn-primary'); }
+    if (hint) hint.textContent = 'เปิดแอปนี้แบบไอคอนหน้าจอโฮมดาวน์โหลดไฟล์อัตโนมัติไม่ได้ (ข้อจำกัดของ iOS) — ใช้ปุ่ม "คัดลอกข้อมูล" ด้านล่างแทน แล้ววางเก็บไว้ในแอปโน้ตได้เลย';
+    // Best-effort: put it on the clipboard immediately so a person who
+    // never notices the hint text still ends up with their data saved
+    // somewhere the moment this panel opens, not only after tapping Copy.
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(json).catch(() => {});
+      }
+    } catch (e) { /* ignore — the visible Copy button still works */ }
+  } else {
+    if (copyBtn) { copyBtn.classList.remove('btn-primary'); copyBtn.classList.add('btn-outline'); }
+    if (hint) hint.textContent = '';
+  }
+
   const modal = document.getElementById('exportFallbackModal');
   if (modal) modal.classList.add('active');
 }
