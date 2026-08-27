@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1093035797902",
+    "project_id": "cindy-2ebab",
+    "storage_bucket": "cindy-2ebab.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1093035797902:android:4f549f9c7160038e2b48df",
+        "android_client_info": {
+          "package_name": "com.cindy.workout"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1093035797902-8hph24rsvrtj794e9mtmls6f3dn636nf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cindy.workout",
+            "certificate_hash": "c48745e641a1d0f355de8d1baa41eec069b757ca"
+          }
+        },
+        {
+          "client_id": "1093035797902-8v3a3pu17ub2famtqmiu9ebihbn327m3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZhckK64uQs_O2aAXGLEPNfN2bdBOnBuc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1093035797902-8v3a3pu17ub2famtqmiu9ebihbn327m3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
