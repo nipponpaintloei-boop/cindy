@@ -26,6 +26,14 @@ jobs:
       - name: Install JS dependencies
         run: npm install
 
+      # localStorage inside the WebView is not reliable persistent storage on
+      # Android (Capacitor's own docs call it transient — the OS can reclaim
+      # it, and it's been reported to clear on app close). This plugin backs
+      # our storage shim (storage-shim.js) with real Android SharedPreferences
+      # instead, which is what actually survives app restarts.
+      - name: Install Capacitor Preferences plugin
+        run: npm install @capacitor/preferences
+
       - name: Add Android platform (first run only)
         run: |
           if [ ! -d "android" ]; then
