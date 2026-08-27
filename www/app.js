@@ -4496,7 +4496,19 @@ function init() {
     setTimeout(() => splash.classList.add('hide'), 1050);
   }
 }
-document.addEventListener('DOMContentLoaded', init);
+/* init() must not read localStorage until the storage-shim (storage-shim.js)
+ * has finished hydrating its cache from @capacitor/preferences — otherwise
+ * the app would render as if there's no save data for a moment on native
+ * builds. window.__cindyStorageReady is a no-op-resolved promise on plain
+ * web, so this behaves exactly as before there. */
+function whenStorageReady(fn) {
+  Promise.resolve(window.__cindyStorageReady).then(fn);
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => whenStorageReady(init));
+} else {
+  whenStorageReady(init);
+}
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') checkReminder();
 });
