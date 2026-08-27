@@ -4044,6 +4044,39 @@ function exportData() {
  *      concrete on screen no matter what the browser silently no-op'd.
  */
 async function deliverExportFile(json, fname) {
+  /* Native app (Capacitor): same proven path as shareResult() above — write
+     the file into app cache via @capacitor/filesystem, then hand it to the
+     OS share sheet via @capacitor/share (Save to Files, Drive, LINE, etc.).
+     This MUST come first: none of the plain web APIs below (File System
+     Access, navigator.share, <a download>+blob) have anywhere to route to
+     inside a bare Android WebView — there's no download manager wired up,
+     so they can silently no-op even while still opening the fallback panel.
+     That's exactly why the fallback panel was showing a download link that
+     never produced a real file. */
+  const nativePlugins = capPlugins();
+  if (nativePlugins && nativePlugins.Filesystem && nativePlugins.Share) {
+    try {
+      const written = await nativePlugins.Filesystem.writeFile({
+        path: fname,
+        data: json,
+        directory: 'CACHE',
+        encoding: 'utf8'
+      });
+      await nativePlugins.Share.share({
+        title: 'CINDY Backup',
+        text: 'ไฟล์สำรองข้อมูล CINDY',
+        url: written.uri,
+        dialogTitle: 'บันทึก/แชร์ไฟล์สำรอง CINDY'
+      });
+      showToast('ส่งออกข้อมูลแล้ว (Cindy + Custom Workout + สกิน/ความคืบหน้า)');
+      return;
+    } catch (e) {
+      if (e && String(e.message || e).toLowerCase().includes('cancel')) return; // user backed out of share sheet
+      // any other native failure falls through to the web-based paths below
+      // as a last resort, rather than leaving the person with nothing
+    }
+  }
+
   const blob = new Blob([json], { type: 'application/json' });
 
   if (window.showSaveFilePicker) {
