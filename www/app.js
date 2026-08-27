@@ -3924,17 +3924,40 @@ async function forceRefreshApp() {
  * `cindy_`, plus the two legacy-named custom workout keys) and reloads
  * to a fresh LV.1 start. Confirmed via resetCharacterModal first, since
  * this is irreversible — EXPORT via the backup system above is the
- * escape hatch if someone changes their mind after the fact. */
+ * escape hatch if someone changes their mind after the fact.
+ *
+ * Must also wipe the Firestore copy (via __cindyResetCloudData from
+ * firestore-sync.js) BEFORE clearing localStorage and reloading — that
+ * file only watches localStorage.setItem, never removeItem, so clearing
+ * local data alone never told the cloud a reset happened. Without this,
+ * the next reload's pullFromCloud() would just write the old progress
+ * straight back into localStorage from the still-intact cloud document. */
 function openResetCharacterModal() {
   document.getElementById('resetCharacterModal').classList.add('active');
 }
-function resetCharacterExecute() {
+async function resetCharacterExecute() {
+  closeModal('resetCharacterModal');
+  showToast('กำลังรีเซ็ต...');
+
+  // Cancel any debounced push still pending from actions right before the
+  // reset, so it can't fire after the wipe below and re-upload old data.
+  if (window.__cindyCancelPendingSync) window.__cindyCancelPendingSync();
+
+  if (window.__cindyResetCloudData) {
+    try {
+      await window.__cindyResetCloudData();
+    } catch (e) {
+      // Fail open: still reset the local copy even if the cloud wipe
+      // failed (e.g. offline) rather than leaving the user stuck.
+      console.error('[reset] cloud reset failed, resetting local data anyway:', e);
+    }
+  }
+
   Object.keys(localStorage).forEach(k => {
     if (k.startsWith('cindy_') || k === 'custom_workouts' || k === 'custom_workout_sessions') {
       localStorage.removeItem(k);
     }
   });
-  closeModal('resetCharacterModal');
   showToast('รีเซ็ตตัวละครแล้ว');
   setTimeout(() => location.reload(), 500);
 }

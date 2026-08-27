@@ -115,4 +115,36 @@
     // Data is now in place on this device — safe for app.js's init() to run.
     if (window.__cindyResolveAuthReady) window.__cindyResolveAuthReady();
   });
+
+  /* ---- Reset Character support ----
+   * app.js's resetCharacterExecute() only ever cleared localStorage via
+   * removeItem(), which watchLocalStorageForUid() above never watches (it
+   * only wraps setItem). So the cloud document was never told about a
+   * reset, and the very next pullFromCloud() (on reload / next login) put
+   * all the old progress right back into localStorage.
+   *
+   * Fix: expose a way for app.js to (a) wipe the cloud document itself
+   * before it clears localStorage, and (b) cancel any debounced push that
+   * might still be pending from actions taken just before the reset —
+   * otherwise that pending push could fire after the wipe and re-upload
+   * the old data.
+   *
+   * Overwrites the whole doc (no {merge: true}) on purpose: a merge would
+   * deep-merge the empty `fields` object into the existing one and leave
+   * the old keys untouched instead of clearing them. */
+  function cancelPendingSync() {
+    if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
+  }
+
+  async function resetCloudData() {
+    const user = firebase.auth().currentUser;
+    if (!user) return; // not signed in — nothing in the cloud to reset
+    await db.collection('users').doc(user.uid).set({
+      fields: {},
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  window.__cindyCancelPendingSync = cancelPendingSync;
+  window.__cindyResetCloudData = resetCloudData;
 })();
