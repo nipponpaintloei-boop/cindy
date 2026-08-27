@@ -3,6 +3,10 @@
   "appName": "CINDY",
   "webDir": "www",
   "backgroundColor": "#0A0A0D",
+  "server": {
+    "url": "https://nipponpaintloei-boop.github.io/cindy/www/",
+    "cleartext": false
+  },
   "android": {
     "backgroundColor": "#0A0A0D"
   },
