@@ -871,9 +871,20 @@ function startBossBattleCutscene(session, isCustom, onDone) {
   const hpLabel = document.getElementById('battleHpLabel');
   const logEl = document.getElementById('battleLog');
   const skipBtn = document.getElementById('battleSkipBtn');
-  if (!nameEl || !stage || !hpFill) { onDone(); return; }
+  const startBtn = document.getElementById('battleStartBtn');
+  if (!nameEl || !stage || !hpFill || !startBtn) { onDone(); return; }
 
   stage.querySelectorAll('.floating-dmg').forEach(n => n.remove());
+  const fieldEl = stage.closest('.battle-field');
+  if (fieldEl) {
+    if (afterState.boss.bg) {
+      fieldEl.style.setProperty('--battle-field-img', 'url("' + afterState.boss.bg + '")');
+      fieldEl.classList.add('has-photo');
+    } else {
+      fieldEl.style.removeProperty('--battle-field-img');
+      fieldEl.classList.remove('has-photo');
+    }
+  }
   nameEl.textContent = afterState.boss.name;
   if (tagEl) tagEl.textContent = afterState.boss.tag;
   stage.querySelector('.boss-art').innerHTML = bossSilhouetteMarkup(afterState.boss.id);
@@ -887,17 +898,20 @@ function startBossBattleCutscene(session, isCustom, onDone) {
     stage.classList.toggle('boss-critical', hp > 0 && pct <= 0.25);
   };
   setHp(beforeHp);
-  logEl.textContent = 'เตรียมตัว...';
+  logEl.textContent = 'พร้อมลุยหรือยัง?';
 
   let hp = beforeHp;
   let i = 0;
   let finished = false;
+  let started = false;
   function finish() {
     if (finished) return;
     finished = true;
     clearTimeout(bossBattleTimer);
     bossBattleTimer = null;
     skipBtn.onclick = null;
+    startBtn.onclick = null;
+    startBtn.classList.remove('show');
     setHp(Math.max(0, afterState.targetHp - afterState.damage));
     if (afterState.defeated) {
       stage.classList.add('boss-defeated');
@@ -916,10 +930,19 @@ function startBossBattleCutscene(session, isCustom, onDone) {
     spawnFloatingDamage(stage, turn.dmg, { crit: i === turns.length && hp <= 0 });
     logEl.textContent = turn.label + ' x' + turn.dmg + ' — โจมตี!';
     vibrate([30]);
-    bossBattleTimer = setTimeout(step, 800);
+    bossBattleTimer = setTimeout(step, 1500); // slow enough to actually read each hit before the next one lands
+  }
+  function begin() {
+    if (started) return;
+    started = true;
+    startBtn.onclick = null;
+    startBtn.classList.remove('show');
+    logEl.textContent = 'เตรียมตัว...';
+    bossBattleTimer = setTimeout(step, 500);
   }
   skipBtn.onclick = finish;
-  bossBattleTimer = setTimeout(step, 450);
+  startBtn.onclick = begin;
+  startBtn.classList.add('show');
 }
 
 

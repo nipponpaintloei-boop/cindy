@@ -1076,9 +1076,16 @@ body{
   position:relative;margin:10px -16px 14px;padding:20px 16px 0;overflow:visible;
   height:190px;border-radius:10px;
   background:
-    linear-gradient(180deg,#bfe4f5 0%,#cdeaf7 38%,#a9d98f 39%,#8bc978 60%,#6fb85f 100%);
+    linear-gradient(180deg,rgba(6,7,10,.12) 0%,rgba(6,7,10,.05) 40%,rgba(6,7,10,.35) 100%),
+    var(--battle-field-img, linear-gradient(180deg,#bfe4f5 0%,#cdeaf7 38%,#a9d98f 39%,#8bc978 60%,#6fb85f 100%));
+  background-size:cover, cover;
+  background-position:center, center 32%;
+  background-repeat:no-repeat, no-repeat;
 }
-.battle-field::before{ /* distant hills, two soft peaks per side */
+/* fallback painted scenery — only shows when a boss has no .bg photo set
+   (--battle-field-img falls back to this gradient, so ::before/::after
+   only need to exist for that plain-gradient case) */
+.battle-field:not(.has-photo)::before{
   content:"";position:absolute;left:0;right:0;bottom:52%;height:70px;
   background:
     radial-gradient(ellipse 90px 60px at 18% 100%, #9fcf9a 60%, transparent 62%),
@@ -1086,7 +1093,7 @@ body{
     radial-gradient(ellipse 90px 55px at 88% 100%, #9fcf9a 60%, transparent 62%);
   opacity:.85;
 }
-.battle-field::after{ /* ground texture — a few dark speckles for a grassy feel */
+.battle-field:not(.has-photo)::after{
   content:"";position:absolute;left:0;right:0;bottom:0;height:46%;
   background-image:radial-gradient(circle,rgba(0,0,0,.08) 2px,transparent 2.5px);
   background-size:14px 14px;
@@ -1099,10 +1106,29 @@ body{
     radial-gradient(ellipse 34px 11px at 62% 40%, rgba(255,255,255,.75), transparent 70%),
     radial-gradient(ellipse 20px 8px at 85% 55%, rgba(255,255,255,.7), transparent 70%);
 }
+.battle-field.has-photo .battle-field-clouds{display:none;}
 /* boss stands on the field instead of floating on the card's own bg */
 .battle-field .boss-stage{
   position:relative;margin:0 auto;background:radial-gradient(ellipse 70px 18px at 50% 96%, rgba(0,0,0,.22), transparent 75%);
 }
+/* pre-battle gate — covers the field until tapped, so the hit sequence
+ * (and its floating damage numbers) doesn't fire before the person's even
+ * looking. Also dims+blurs the boss art underneath via the sibling
+ * selector below so it reads as "not started yet" rather than a stuck
+ * screen. */
+.battle-start-btn{
+  position:absolute;inset:0;z-index:4;
+  display:none;align-items:center;justify-content:center;
+  width:100%;height:100%;
+  font-family:var(--font-display);font-size:15px;letter-spacing:.5px;color:#fff;
+  background:rgba(6,7,10,.5);border:none;cursor:pointer;
+}
+.battle-start-btn.show{display:flex;}
+.battle-start-btn span{
+  background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.35);border-radius:10px;
+  padding:10px 18px;
+}
+.battle-field:has(.battle-start-btn.show) .boss-stage{filter:blur(2px) brightness(.75);}
 
 /* floating damage number — one spawned per hit in startBossBattleCutscene(),
  * removes itself when the animation ends (see spawnFloatingDamage() in app.js) */
@@ -1813,6 +1839,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
             <div class="boss-art"></div>
             <div class="boss-boom"></div>
           </div>
+          <button id="battleStartBtn" class="battle-start-btn"><span>แตะเพื่อเริ่มการต่อสู้ ⚔️</span></button>
         </div>
         <div class="boss-hp-track"><div id="battleHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
         <div id="battleHpLabel" class="boss-hp-label">0 / 0 HP</div>
