@@ -5043,12 +5043,35 @@ function confirmDiscardRunAndStartNew() {
 }
 
 /* ---- permission gate + start ---- */
-function requestRunPermissionAndStart() {
+/** On Android (APK/Capacitor build), the WebView's navigator.geolocation
+ * never triggers the OS runtime permission dialog on its own — nothing
+ * calls the native permission API, so it just fails silently forever even
+ * though the manifest declares the permission. window.Capacitor.Plugins.
+ * Geolocation.requestPermissions() is the one that actually pops the
+ * native Android dialog. We call it first (no-op / instantly resolves on
+ * a plain desktop/mobile browser where window.Capacitor doesn't exist),
+ * then fall through to the normal navigator.geolocation flow, which will
+ * now succeed because the OS-level permission is actually granted. */
+async function requestRunPermissionAndStart() {
   if (!('geolocation' in navigator)) {
     document.getElementById('runGpsDeniedModal').classList.add('active');
     return;
   }
   showToast('กำลังขอสิทธิ์ตำแหน่ง...');
+  try {
+    const geoPlugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Geolocation;
+    if (geoPlugin) {
+      const status = await geoPlugin.requestPermissions();
+      const granted = status && (status.location === 'granted' || status.coarseLocation === 'granted');
+      if (!granted) {
+        document.getElementById('runGpsDeniedModal').classList.add('active');
+        return;
+      }
+    }
+  } catch (e) {
+    // Plugin missing/unsupported on this platform — fall through and let
+    // navigator.geolocation below handle it (e.g. plain browser use).
+  }
   navigator.geolocation.getCurrentPosition(
     () => { startNewRun(); },
     () => { document.getElementById('runGpsDeniedModal').classList.add('active'); },
