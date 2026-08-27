@@ -34,11 +34,20 @@ jobs:
       - name: Install Capacitor Preferences plugin
         run: npm install @capacitor/preferences
 
+      # Native Google Sign-In (required — Google blocks OAuth popups opened
+      # from inside an app's WebView, so the JS-only signInWithPopup flow
+      # cannot be used here).
+      - name: Install Firebase Authentication plugin
+        run: npm install @capacitor-firebase/authentication firebase
+
       - name: Add Android platform (first run only)
         run: |
           if [ ! -d "android" ]; then
             npx cap add android
           fi
+
+      - name: Add google-services.json and Gradle plugin for Firebase Auth
+        run: bash ci/patch-firebase.sh
 
       - name: Generate app icons from resources/
         run: npx capacitor-assets generate --android
@@ -50,6 +59,14 @@ jobs:
         env:
           CINDY_KEYSTORE_PATH: ${{ github.workspace }}/ci/debug.keystore
         run: bash ci/patch-signing.sh
+
+      # Prints the SHA-1 fingerprint of the stable debug keystore into the
+      # build log. Needed once to register under Firebase Console >
+      # Project settings > your Android app > Add fingerprint, so Google
+      # Sign-In accepts this app. Since the keystore is stable across builds
+      # (see step above), you only need to copy this value in one time.
+      - name: Print debug keystore SHA-1 (for Firebase Console)
+        run: keytool -list -v -keystore ci/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep "SHA1:"
 
       - name: Install Android Home Screen Widget
         run: bash ci/patch-widget.sh
