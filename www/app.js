@@ -316,9 +316,15 @@ function saveProtocolEditor() {
     builtin: false,
     name,
     mode,
-    pull: Math.max(0, parseInt(document.getElementById('cfgPull').value, 10) || 0),
-    push: Math.max(0, parseInt(document.getElementById('cfgPush').value, 10) || 0),
-    squat: Math.max(0, parseInt(document.getElementById('cfgSquat').value, 10) || 0)
+    // Clamped to the 0-99 range the inputs' own max="99" already claims —
+    // same reasoning as REST_SKIP_BONUS_MAX_SEC: that attribute is a UI
+    // hint only, not enforced by the browser on every input path, so an
+    // absurd reps-per-round value here (paired with an early FINISH NOW)
+    // used to be a free-XP exploit. See completeWorkout()'s `completed`
+    // gate for the other half of that fix.
+    pull: Math.min(99, Math.max(0, parseInt(document.getElementById('cfgPull').value, 10) || 0)),
+    push: Math.min(99, Math.max(0, parseInt(document.getElementById('cfgPush').value, 10) || 0)),
+    squat: Math.min(99, Math.max(0, parseInt(document.getElementById('cfgSquat').value, 10) || 0))
   };
   if (mode === 'amrap') {
     proto.durationMin = Math.max(1, parseInt(document.getElementById('cfgDuration').value, 10) || 20);
@@ -1311,7 +1317,11 @@ const QUEST_POOL = [
 ];
 function todayQuestContext() {
   const todayKey = dayKey(Date.now());
-  const cindyToday = loadSessions().filter(s => dayKey(s.finished) === todayKey);
+  // Only completed Cindy sessions count toward quests — an early FINISH NOW
+  // shouldn't satisfy "play a session today" or count toward the reps/rounds
+  // quests any more than it counts toward XP. See completeWorkout()'s
+  // `completed` flag.
+  const cindyToday = loadSessions().filter(s => dayKey(s.finished) === todayKey && s.completed !== false);
   const customToday = loadCustomWorkoutSessions().filter(s => dayKey(s.completedAt) === todayKey);
   const cindyRepsToday = cindyToday.reduce((sum, s) => sum + (s.total ? s.total.reps : 0), 0);
   const customRepsToday = customToday.reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
@@ -1573,7 +1583,11 @@ let _xpCache = null; // { cindyXP, customXP } | null when stale
 function invalidateXPCache() { _xpCache = null; }
 function computeSessionXP() {
   if (_xpCache) return _xpCache;
-  const cindyXP = loadSessions().reduce((sum, s) => sum + (s.total ? s.total.reps : 0), 0);
+  // Only completed sessions (full protocol duration reached) count toward
+  // XP — see the completed flag set in completeWorkout(). Custom Workout
+  // sessions aren't affected by this since they don't have the same
+  // Finish-early race-the-clock structure.
+  const cindyXP = loadSessions().filter(s => s.completed !== false).reduce((sum, s) => sum + (s.total ? s.total.reps : 0), 0);
   const customXP = loadCustomWorkoutSessions().reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
   _xpCache = { cindyXP, customXP };
   return _xpCache;
@@ -2948,7 +2962,21 @@ function confirmFinishNow() {
   completeWorkout(active, 'manual');
 }
 
-/* ================= COMPLETE ================= */
+/* ================= COMPLETE =================
+ * completed === false marks a session that stopped early via FINISH NOW
+ * before the clock ran out (or, for EMOM, before its rounds — though EMOM
+ * is already time-locked per interval so this mainly matters for AMRAP).
+ * Such sessions are still saved to history for the player's own reference,
+ * but earn no isPR flag and no combo bonus XP, and computeSessionXP() /
+ * todayQuestContext() below both exclude them from reps/rounds entirely.
+ *
+ * Why: a custom Protocol's pull/push/squat-per-round values are plain
+ * numbers the player sets themselves with no upper bound, so completing
+ * just 1 round of an inflated protocol and hitting FINISH NOW used to bank
+ * a huge "reps" total in a few seconds — bigger reps-per-round previously
+ * meant more free XP, not more effort. Requiring the full clock closes
+ * that off: the reward now scales with time actually spent, same as the
+ * real Cindy WOD is meant to work (race the clock for max rounds). */
 function completeWorkout(active, reason) {
   releaseWakeLock();
   if (active.mode === 'emom' && active.emomLastLoggedInterval < active.emomRounds - 1) {
@@ -2966,12 +2994,14 @@ function completeWorkout(active, reason) {
   const totalSquat = rounds * REPS.squat;
   const totalReps = totalPull + totalPush + totalSquat;
 
+  const completed = reason === 'timeout' || elapsedMs >= DURATION_MS;
+
   const sessions = loadSessions();
-  const prevBest = sessions.reduce((m, s) => Math.max(m, s.rounds), 0);
-  const isNewPR = rounds > prevBest && rounds > 0;
+  const prevBest = sessions.filter(s => s.completed !== false).reduce((m, s) => Math.max(m, s.rounds), 0);
+  const isNewPR = completed && rounds > prevBest && rounds > 0;
 
   const maxCombo = active.maxCombo || 0;
-  const comboBonusXp = comboBonusForMaxCombo(maxCombo);
+  const comboBonusXp = completed ? comboBonusForMaxCombo(maxCombo) : 0;
   if (comboBonusXp > 0) addComboBonusXP(comboBonusXp);
 
   const session = {
@@ -2984,6 +3014,7 @@ function completeWorkout(active, reason) {
     skip_log: active.skipLog || [],
     total: { pull: totalPull, push: totalPush, squat: totalSquat, reps: totalReps },
     isPR: isNewPR,
+    completed,
     protocolName: active.protocolName || 'Cindy (Classic)',
     mode: active.mode || 'amrap',
     maxCombo,
@@ -3101,7 +3132,7 @@ function renderHistory() {
       const s = item.data;
       return `<div class="history-item" onclick="openDetail('${s.id}')">
         <div>
-          <div class="date">${fmtDate(s.finished)}<span class="type-tag cindy">CINDY</span>${s.mode === 'emom' ? ' <span class="proto-active-tag">EMOM</span>' : ''}</div>
+          <div class="date">${fmtDate(s.finished)}<span class="type-tag cindy">CINDY</span>${s.mode === 'emom' ? ' <span class="proto-active-tag">EMOM</span>' : ''}${s.completed === false ? ' <span class="proto-active-tag incomplete">ยังไม่จบ</span>' : ''}</div>
           <div class="reps">${s.total.reps} REPS · ${escapeHtml(s.protocolName || 'Cindy')}</div>
         </div>
         <div class="rounds">${s.rounds} R</div>
@@ -3983,18 +4014,15 @@ async function resetCharacterExecute() {
    category back in on import (still backward-compatible with old
    v1 backups, which only ever contained `sessions`).
 
-   v3: also covers mascot progression (level/streak-chest/boss unlocks and
-   the equipped skin — none of which lived in `sessions`, so a v2 backup
-   would restore workout history but silently reset every unlocked skin,
-   including bossVoid9, back to locked) plus the small settings/state
-   pieces (theme, voice cues, reminder, active protocol, quests/combo
-   bonus XP, ring goals, weekly plan). Achievement-style lists (opened
-   chests, defeated bosses) are unioned like the v2 collections; single
-   values that aren't naturally mergeable only fill in if this device
-   doesn't already have one set, so importing a backup never clobbers
-   whatever's already active on the device it's imported into; running
-   XP counters take the max of the two rather than adding, since adding
-   would double-count XP that's also embedded in the session history. */
+   v4: also covers loot inventory, equipped loot, and active backdrop —
+   all three were earned/chosen by the player (boss-drop loot, which piece
+   is worn, which backdrop is active) but were never in any export payload
+   at all, so a device switch silently lost them even though skins and
+   boss-defeat flags were already covered by v3. Loot inventory unions like
+   the other achievement-style collections (max count per item, so a
+   device that already has 2 of something never loses that to a backup
+   that only has 1); equipped loot and backdrop only fill in if this
+   device hasn't chosen one yet, same as activeSkin above. */
 function exportData() {
   try {
     const sessions = loadSessions();
@@ -4003,16 +4031,18 @@ function exportData() {
     const customProtocols = loadCustomProtocols();
     const streakChestsOpened = loadOpenedChests();
     const bossEverDefeated = loadBossEverDefeated();
+    const lootInventory = loadLootInventory();
 
     if (!sessions.length && !customWorkouts.length && !customWorkoutSessions.length &&
-        !customProtocols.length && !streakChestsOpened.length && !bossEverDefeated.length) {
+        !customProtocols.length && !streakChestsOpened.length && !bossEverDefeated.length &&
+        !Object.keys(lootInventory).length) {
       showToast('ยังไม่มีข้อมูลให้ส่งออก');
       return;
     }
 
     const payload = {
       app: 'CINDY',
-      version: 3,
+      version: 4,
       exportedAt: Date.now(),
       sessions,
       customWorkouts,
@@ -4022,7 +4052,10 @@ function exportData() {
         lastSeenLevel: loadLastSeenLevel(),
         streakChestsOpened,
         bossEverDefeated,
-        activeSkin: loadActiveSkin()
+        activeSkin: loadActiveSkin(),
+        lootInventory,
+        equippedLootId: loadEquippedLootId(),
+        activeBackdrop: loadActiveBackdropId()
       },
       settings: {
         theme: localStorage.getItem(KEY_THEME),
@@ -4357,6 +4390,23 @@ function importData(event) {
         }
         if (incomingProgression.activeSkin && loadActiveSkin() === 'default') {
           saveActiveSkin(incomingProgression.activeSkin);
+        }
+        if (incomingProgression.lootInventory && typeof incomingProgression.lootInventory === 'object') {
+          const current = loadLootInventory();
+          const merged = { ...current };
+          Object.keys(incomingProgression.lootInventory).forEach(itemId => {
+            const incomingCount = incomingProgression.lootInventory[itemId];
+            if (Number.isFinite(incomingCount)) {
+              merged[itemId] = Math.max(current[itemId] || 0, incomingCount);
+            }
+          });
+          saveLootInventory(merged);
+        }
+        if (incomingProgression.equippedLootId && !loadEquippedLootId()) {
+          saveEquippedLootId(incomingProgression.equippedLootId);
+        }
+        if (incomingProgression.activeBackdrop && !loadActiveBackdropId()) {
+          saveActiveBackdropId(incomingProgression.activeBackdrop);
         }
       }
 

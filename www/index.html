@@ -302,6 +302,25 @@ body{
   z-index:1;pointer-events:none;
   filter:drop-shadow(0 10px 14px rgba(0,0,0,.45));
 }
+/* Idle sway: a small rotate oscillation layered on top of the same
+   translateX(-50%) centering above. Pure CSS on the existing PNG — no
+   sprite sheet or new art needed for a "breathing while standing" feel.
+   transform-origin at the bottom center keeps the feet planted, like the
+   character is shifting weight rather than floating.
+   Scoped to #mascotImg only, not its #mascotImgGlow twin — the glow
+   already carries its own aura-pulse animation per rank further down
+   (.mascot-avatar.aura-fighter #mascotImgGlow etc.); giving both the same
+   animation here would fight that more specific rule for ranked players.
+   The glow staying still while the art sways is imperceptible in practice
+   since it's just a soft blurred silhouette behind the real image. */
+#mascotImg{
+  transform-origin:50% 100%;
+  animation: mascotIdleSway 3.6s ease-in-out infinite;
+}
+@keyframes mascotIdleSway{
+  0%, 100% { transform:translateX(-50%) rotate(-1.1deg); }
+  50%      { transform:translateX(-50%) rotate(1.1deg); }
+}
 /* glow clone — sits directly behind #mascotImg, same src, brightness(0) turns its
    visible pixels solid black while keeping the PNG's alpha shape. Fully hidden
    under the real (correctly skin-tinted) image on top; only the animated
@@ -1430,6 +1449,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 .exercise-card .field-row{grid-template-columns:1fr 70px;margin-bottom:8px;}
 .exercise-card .field-row:last-child{margin-bottom:0;}
 .proto-active-tag{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--success);border:1px solid var(--success);border-radius:5px;padding:1px 5px;vertical-align:1px;margin-left:4px;}
+.proto-active-tag.incomplete{color:var(--danger);border-color:var(--danger);}
 #screen-workout.mode-emom #skipRoundBtn{display:none;}
 #screen-workout.mode-emom #saveRoundBtn{pointer-events:none;opacity:.85;}
 .time-input{
@@ -2480,7 +2500,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 <div id="finishModal" class="modal-overlay">
   <div class="modal-card">
     <div class="modal-title">Finish Now?</div>
-    <div class="modal-body">ระบบจะบันทึก Workout ด้วยเวลาปัจจุบันและจำนวนรอบที่ทำได้</div>
+    <div class="modal-body">ยังไม่ครบเวลาที่ตั้งไว้ — ระบบจะบันทึกไว้เป็นประวัติ แต่จะ<b>ไม่ได้รับ XP หรือรางวัลใดๆ</b> เพราะยังไม่จบตามเวลา ถ้าเล่นจนครบเวลาค่อยกด Finish ถึงจะได้รางวัลเต็ม</div>
     <div class="modal-row">
       <button class="btn btn-outline btn-sm" onclick="closeModal('finishModal')">CANCEL</button>
       <button class="btn btn-success btn-sm" onclick="confirmFinishNow()">FINISH</button>
