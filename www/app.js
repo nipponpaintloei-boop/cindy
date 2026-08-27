@@ -3,6 +3,8 @@ const RING_CIRC = 2 * Math.PI * 108;
 const KEY_SESSIONS = 'cindy_sessions';
 const KEY_ACTIVE = 'cindy_active_workout';
 const KEY_LAST_SEEN_LEVEL = 'cindy_last_seen_level';
+const KEY_RUN_SESSIONS = 'cindy_run_sessions';
+const KEY_RUN_ACTIVE = 'cindy_run_active';
 
 /* ================= SCHEMA / MIGRATIONS =================
  * Single version stamp in localStorage + a chokepoint that runs once per
@@ -637,7 +639,8 @@ async function releaseWakeLock() {
 }
 document.addEventListener('visibilitychange', async () => {
   const workoutActive = document.getElementById('screen-workout').classList.contains('active')
-    || (document.getElementById('screen-customplayer') && document.getElementById('screen-customplayer').classList.contains('active'));
+    || (document.getElementById('screen-customplayer') && document.getElementById('screen-customplayer').classList.contains('active'))
+    || (document.getElementById('screen-running') && document.getElementById('screen-running').classList.contains('active'));
   if (document.visibilityState === 'visible' && workoutActive) {
     await acquireWakeLock();
   }
@@ -719,6 +722,24 @@ function saveActive(a) {
 }
 function clearActive() {
   localStorage.removeItem(KEY_ACTIVE);
+}
+function loadRunSessions() {
+  try { return JSON.parse(localStorage.getItem(KEY_RUN_SESSIONS)) || []; }
+  catch (e) { return []; }
+}
+function saveRunSessions(list) {
+  localStorage.setItem(KEY_RUN_SESSIONS, JSON.stringify(list));
+  invalidateXPCache();
+}
+function loadRunActive() {
+  try { return JSON.parse(localStorage.getItem(KEY_RUN_ACTIVE)); }
+  catch (e) { return null; }
+}
+function saveRunActive(a) {
+  localStorage.setItem(KEY_RUN_ACTIVE, JSON.stringify(a));
+}
+function clearRunActive() {
+  localStorage.removeItem(KEY_RUN_ACTIVE);
 }
 
 /* ---------- theme ---------- */
@@ -1435,6 +1456,7 @@ function go(name) {
   if (name === 'collection') renderCollection();
   if (name === 'cardiolist') renderCardioList();
   if (name === 'character') renderCharacterSheet();
+  if (name === 'run') renderRunHome();
 }
 
 /* ================= HOME (dashboard) ================= */
@@ -1459,7 +1481,8 @@ function renderHome() {
 function computeCombinedStreak() {
   const cindyDays = loadSessions().map(s => dayKey(s.finished));
   const customDays = loadCustomWorkoutSessions().map(s => dayKey(s.completedAt));
-  const days = new Set(cindyDays.concat(customDays));
+  const runDays = loadRunSessions().map(s => dayKey(s.completedAt));
+  const days = new Set(cindyDays.concat(customDays).concat(runDays));
   if (days.size === 0) return 0;
   let streak = 0;
   let cursor = new Date();
@@ -1588,10 +1611,11 @@ function todayQuestContext() {
   // `completed` flag.
   const cindyToday = loadSessions().filter(s => dayKey(s.finished) === todayKey && s.completed !== false);
   const customToday = loadCustomWorkoutSessions().filter(s => dayKey(s.completedAt) === todayKey);
+  const runToday = loadRunSessions().filter(s => dayKey(s.completedAt) === todayKey);
   const cindyRepsToday = cindyToday.reduce((sum, s) => sum + (s.total ? s.total.reps : 0), 0);
   const customRepsToday = customToday.reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
   return {
-    playedToday: cindyToday.length > 0 || customToday.length > 0,
+    playedToday: cindyToday.length > 0 || customToday.length > 0 || runToday.length > 0,
     customPlayedToday: customToday.length > 0,
     todayTotalReps: cindyRepsToday + customRepsToday,
     todayMaxRounds: cindyToday.reduce((m, s) => Math.max(m, s.rounds || 0), 0)
@@ -1854,12 +1878,13 @@ function computeSessionXP() {
   // Finish-early race-the-clock structure.
   const cindyXP = loadSessions().filter(s => s.completed !== false).reduce((sum, s) => sum + (s.total ? s.total.reps : 0), 0);
   const customXP = loadCustomWorkoutSessions().reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
-  _xpCache = { cindyXP, customXP };
+  const runXP = loadRunSessions().reduce((sum, s) => sum + (s.xp || 0), 0);
+  _xpCache = { cindyXP, customXP, runXP };
   return _xpCache;
 }
 function computeTotalXP() {
-  const { cindyXP, customXP } = computeSessionXP();
-  return cindyXP + customXP + loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP();
+  const { cindyXP, customXP, runXP } = computeSessionXP();
+  return cindyXP + customXP + runXP + loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP();
 }
 function xpRequiredForLevel(level) {
   return 100 + (level - 1) * 50;
@@ -2678,7 +2703,8 @@ function didPlayToday() {
   const todayKey = dayKey(Date.now());
   const cindyToday = loadSessions().some(s => dayKey(s.finished) === todayKey);
   if (cindyToday) return true;
-  return loadCustomWorkoutSessions().some(s => dayKey(s.completedAt) === todayKey);
+  if (loadCustomWorkoutSessions().some(s => dayKey(s.completedAt) === todayKey)) return true;
+  return loadRunSessions().some(s => dayKey(s.completedAt) === todayKey);
 }
 
 /** Counts sessions with a timestamp within the last n days (including today). */
@@ -2890,6 +2916,18 @@ function renderProgramHubCards() {
   } else {
     const last = cardioSessions.reduce((m, s) => Math.max(m, s.completedAt), 0);
     cardioEl.textContent = 'เล่นแล้ว ' + cardioSessions.length + ' ครั้ง · ล่าสุด ' + fmtDate(last);
+  }
+
+  const runEl = document.getElementById('programRunStat');
+  if (runEl) {
+    const runSessions = loadRunSessions();
+    if (runSessions.length === 0) {
+      runEl.textContent = 'ยังไม่เคยวิ่ง';
+    } else {
+      const totalKm = runSessions.reduce((sum, s) => sum + s.distanceKm, 0);
+      const last = runSessions.reduce((m, s) => Math.max(m, s.completedAt), 0);
+      runEl.textContent = 'สะสม ' + totalKm.toFixed(1) + ' กม. · ล่าสุด ' + fmtDate(last);
+    }
   }
 
   const customNudge = document.getElementById('programCustomNudge');
@@ -3385,7 +3423,8 @@ function finishCompleteFlow() {
 function renderHistory() {
   const cindyItems = loadSessions().map(s => ({ kind: 'cindy', ts: s.finished, data: s }));
   const customItems = loadCustomWorkoutSessions().map(s => ({ kind: 'custom', ts: s.completedAt, data: s }));
-  const merged = cindyItems.concat(customItems).sort((a, b) => b.ts - a.ts);
+  const runItems = loadRunSessions().map(s => ({ kind: 'run', ts: s.completedAt, data: s }));
+  const merged = cindyItems.concat(customItems).concat(runItems).sort((a, b) => b.ts - a.ts);
 
   const wrap = document.getElementById('historyList');
   if (merged.length === 0) {
@@ -3402,6 +3441,16 @@ function renderHistory() {
           <div class="reps">${s.total.reps} REPS · ${escapeHtml(s.protocolName || 'Cindy')}</div>
         </div>
         <div class="rounds">${s.rounds} R</div>
+      </div>`;
+    }
+    if (item.kind === 'run') {
+      const s = item.data;
+      return `<div class="history-item" onclick="openRunDetail('${s.id}')">
+        <div>
+          <div class="date">${fmtDate(s.completedAt)}<span class="type-tag run">วิ่ง</span></div>
+          <div class="reps">${s.distanceKm.toFixed(2)} กม. · เพซ ${fmtPace(s.paceSecPerKm)}/กม.</div>
+        </div>
+        <div class="rounds tabular">${fmtTime(s.movingSec)}</div>
       </div>`;
     }
     const s = item.data;
@@ -3623,7 +3672,8 @@ function renderProgress() {
 function renderCombinedXpChart() {
   const cindyItems = all_progress_cindy_items();
   const customItems = loadCustomWorkoutSessions().map(s => ({ ts: s.completedAt, xp: totalVolumeOfCustomSession(s) }));
-  let merged = cindyItems.concat(customItems);
+  const runItems = loadRunSessions().map(s => ({ ts: s.completedAt, xp: s.xp || 0 }));
+  let merged = cindyItems.concat(customItems).concat(runItems);
 
   if (currentPeriod !== 'all') {
     const days = parseInt(currentPeriod, 10);
@@ -4302,25 +4352,27 @@ function exportData() {
     const customWorkouts = loadCustomWorkouts();
     const customWorkoutSessions = loadCustomWorkoutSessions();
     const customProtocols = loadCustomProtocols();
+    const runSessions = loadRunSessions();
     const streakChestsOpened = loadOpenedChests();
     const bossEverDefeated = loadBossEverDefeated();
     const lootInventory = loadLootInventory();
 
     if (!sessions.length && !customWorkouts.length && !customWorkoutSessions.length &&
-        !customProtocols.length && !streakChestsOpened.length && !bossEverDefeated.length &&
-        !Object.keys(lootInventory).length) {
+        !customProtocols.length && !runSessions.length && !streakChestsOpened.length &&
+        !bossEverDefeated.length && !Object.keys(lootInventory).length) {
       showToast('ยังไม่มีข้อมูลให้ส่งออก');
       return;
     }
 
     const payload = {
       app: 'CINDY',
-      version: 4,
+      version: 5,
       exportedAt: Date.now(),
       sessions,
       customWorkouts,
       customWorkoutSessions,
       customProtocols,
+      runSessions,
       progression: {
         lastSeenLevel: loadLastSeenLevel(),
         streakChestsOpened,
@@ -4589,12 +4641,14 @@ function importDataImpl(event) {
       const incomingWorkouts = Array.isArray(parsed) ? null : parsed.customWorkouts;
       const incomingWorkoutSessions = Array.isArray(parsed) ? null : parsed.customWorkoutSessions;
       const incomingProtocols = Array.isArray(parsed) ? null : parsed.customProtocols;
+      const incomingRunSessions = Array.isArray(parsed) ? null : parsed.runSessions;
       const incomingProgression = Array.isArray(parsed) ? null : parsed.progression;
       const incomingSettings = Array.isArray(parsed) ? null : parsed.settings;
       const incomingQuestsAndGoals = Array.isArray(parsed) ? null : parsed.questsAndGoals;
 
       if (!Array.isArray(incomingSessions) && !Array.isArray(incomingWorkouts) &&
           !Array.isArray(incomingWorkoutSessions) && !Array.isArray(incomingProtocols) &&
+          !Array.isArray(incomingRunSessions) &&
           !incomingProgression && !incomingSettings && !incomingQuestsAndGoals) {
         throw new Error('invalid format');
       }
@@ -4647,6 +4701,18 @@ function importDataImpl(event) {
           }
         });
         saveCustomProtocols(Array.from(byId.values()));
+      }
+
+      if (Array.isArray(incomingRunSessions)) {
+        const existing = loadRunSessions();
+        const byId = new Map(existing.map(s => [s.id, s]));
+        incomingRunSessions.forEach(s => {
+          if (s && s.id && s.completedAt != null) {
+            if (!byId.has(s.id)) added++;
+            byId.set(s.id, s);
+          }
+        });
+        saveRunSessions(Array.from(byId.values()).sort((a, b) => a.completedAt - b.completedAt));
       }
 
       // Mascot progression: achievement lists union (never lose an unlock),
@@ -4856,6 +4922,348 @@ async function handleInstallClick() {
 }
 
 /* ================= INIT ================= */
+/* ================= RUNNING (GPS AUTO-TRACK) =================
+ * GPS-only tracking — there is deliberately no manual-entry fallback. If
+ * location permission is denied/unavailable the run cannot start; see
+ * requestRunPermissionAndStart(). Distance is accumulated live via
+ * watchPosition() + the Haversine formula, one accepted GPS fix at a time.
+ *
+ * Anti-noise: any fix with accuracy worse than RUN_GPS_ACCURACY_MAX_M is
+ * dropped entirely (not used for distance, doesn't move the "last fix"
+ * pointer either) — this is the single agreed-on defense against GPS
+ * dropouts (e.g. tunnels) suddenly jumping distance. No additional
+ * speed-based filter is applied, by request.
+ *
+ * XP: 60 XP/km base. The session's average *moving* pace (paused time
+ * excluded) must fall within RUN_PACE_CEILING_SEC_PER_KM..
+ * RUN_PACE_FLOOR_SEC_PER_KM (3:00–15:00 /km) to earn XP at the full
+ * distance-based rate. Outside that range (either direction), XP is
+ * capped as if the whole moving duration had been run at the nearer
+ * pace boundary instead of the actual (suspicious/too-fast, or
+ * idle/drifting-too-slow) pace — so neither GPS spoofing nor standing
+ * still with GPS noise running can inflate XP past what a legitimate
+ * boundary-pace run of the same duration would earn. Sessions under
+ * RUN_MIN_XP_DISTANCE_KM earn 0 XP (anti session-spam-farming) but are
+ * still saved to history with their real distance/time.
+ */
+const RUN_GPS_ACCURACY_MAX_M = 20;
+const RUN_PACE_CEILING_SEC_PER_KM = 180; // 3:00 /km — fastest pace paid at full rate
+const RUN_PACE_FLOOR_SEC_PER_KM = 900;   // 15:00 /km — slowest pace paid at full rate
+const RUN_MIN_XP_DISTANCE_KM = 0.3;
+const RUN_XP_PER_KM = 60;
+
+let runWatchId = null;
+let runTickHandle = null;
+
+/** Great-circle distance between two lat/lon points, in meters. */
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** mm:ss pace string from seconds-per-km. '--:--' when not yet meaningful. */
+function fmtPace(secPerKm) {
+  if (!secPerKm || !isFinite(secPerKm) || secPerKm <= 0) return '--:--';
+  const m = Math.floor(secPerKm / 60);
+  const s = Math.round(secPerKm % 60);
+  return String(m) + ':' + String(s).padStart(2, '0');
+}
+
+function computeRunXP(distanceKm, movingSec) {
+  if (distanceKm < RUN_MIN_XP_DISTANCE_KM || movingSec <= 0) return 0;
+  const paceSecPerKm = movingSec / distanceKm;
+  if (paceSecPerKm >= RUN_PACE_CEILING_SEC_PER_KM && paceSecPerKm <= RUN_PACE_FLOOR_SEC_PER_KM) {
+    return Math.round(distanceKm * RUN_XP_PER_KM);
+  }
+  const boundaryPace = paceSecPerKm < RUN_PACE_CEILING_SEC_PER_KM ? RUN_PACE_CEILING_SEC_PER_KM : RUN_PACE_FLOOR_SEC_PER_KM;
+  const equivalentKm = movingSec / boundaryPace;
+  return Math.round(equivalentKm * RUN_XP_PER_KM);
+}
+
+/** Moving time so far, in ms — persisted movingMs plus the live segment
+ * since the last resume (0 if currently paused). */
+function getRunMovingMs(active) {
+  if (!active) return 0;
+  const extra = active.isPaused ? 0 : (Date.now() - active.lastResumeTs);
+  return (active.movingMs || 0) + extra;
+}
+
+/* ---- Program screen "RUN" card / start screen ---- */
+function renderRunHome() {
+  const mainBtn = document.getElementById('runMainBtn');
+  const secWrap = document.getElementById('runSecondaryWrap');
+  const active = loadRunActive();
+  if (mainBtn) {
+    if (active) {
+      mainBtn.textContent = 'RESUME การวิ่ง';
+      mainBtn.classList.remove('btn-primary');
+      mainBtn.classList.add('btn-resume');
+      if (secWrap) secWrap.style.display = 'block';
+    } else {
+      mainBtn.textContent = 'เริ่มวิ่ง';
+      mainBtn.classList.add('btn-primary');
+      mainBtn.classList.remove('btn-resume');
+      if (secWrap) secWrap.style.display = 'none';
+    }
+  }
+  const sessions = loadRunSessions();
+  const bestEl = document.getElementById('runStatBest');
+  const sessionsEl = document.getElementById('runStatSessions');
+  const totalEl = document.getElementById('runStatTotal');
+  const streakEl = document.getElementById('runStatStreak');
+  if (bestEl) {
+    const best = sessions.reduce((m, s) => Math.max(m, s.distanceKm), 0);
+    bestEl.textContent = best > 0 ? best.toFixed(2) : '0';
+  }
+  if (sessionsEl) sessionsEl.textContent = sessions.length;
+  if (totalEl) {
+    const total = sessions.reduce((sum, s) => sum + s.distanceKm, 0);
+    totalEl.textContent = total.toFixed(1);
+  }
+  if (streakEl) streakEl.textContent = computeCombinedStreak();
+}
+function handleRunMainBtn() {
+  unlockAudio();
+  const active = loadRunActive();
+  if (active) {
+    enterRunScreen();
+  } else {
+    requestRunPermissionAndStart();
+  }
+}
+function confirmDiscardRunAndStartNew() {
+  detachRunWatch();
+  stopRunTickLoop();
+  clearRunActive();
+  requestRunPermissionAndStart();
+}
+
+/* ---- permission gate + start ---- */
+function requestRunPermissionAndStart() {
+  if (!('geolocation' in navigator)) {
+    document.getElementById('runGpsDeniedModal').classList.add('active');
+    return;
+  }
+  showToast('กำลังขอสิทธิ์ตำแหน่ง...');
+  navigator.geolocation.getCurrentPosition(
+    () => { startNewRun(); },
+    () => { document.getElementById('runGpsDeniedModal').classList.add('active'); },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+}
+function retryRunPermission() {
+  closeModal('runGpsDeniedModal');
+  requestRunPermissionAndStart();
+}
+
+function startNewRun() {
+  const now = Date.now();
+  const active = {
+    id: 'run_' + now,
+    startedAt: now,
+    distanceM: 0,
+    movingMs: 0,
+    lastResumeTs: now,
+    isPaused: false,
+    lastFixLat: null,
+    lastFixLon: null,
+    weakGpsFlag: false
+  };
+  saveRunActive(active);
+  enterRunScreen();
+}
+function enterRunScreen() {
+  go('running');
+  acquireWakeLock();
+  attachRunWatch();
+  startRunTickLoop();
+  refreshRunUI();
+}
+
+function attachRunWatch() {
+  if (runWatchId !== null) return;
+  runWatchId = navigator.geolocation.watchPosition(onRunPosition, onRunPositionError, {
+    enableHighAccuracy: true, maximumAge: 1000, timeout: 20000
+  });
+}
+function detachRunWatch() {
+  if (runWatchId !== null) {
+    navigator.geolocation.clearWatch(runWatchId);
+    runWatchId = null;
+  }
+}
+function onRunPositionError() {
+  // Transient errors mid-run (brief signal loss, timeout) — don't kill the
+  // session, just skip this fix and wait for the next one. Only the
+  // initial permission check (requestRunPermissionAndStart) treats a
+  // failure as fatal.
+}
+function onRunPosition(pos) {
+  const active = loadRunActive();
+  if (!active || active.isPaused) return;
+  const { latitude, longitude, accuracy } = pos.coords;
+  if (accuracy != null && accuracy > RUN_GPS_ACCURACY_MAX_M) {
+    active.weakGpsFlag = true;
+    saveRunActive(active);
+    refreshRunUI();
+    return; // fix too noisy — dropped, doesn't move distance or the last-fix pointer
+  }
+  active.weakGpsFlag = false;
+  if (active.lastFixLat != null) {
+    active.distanceM += haversineMeters(active.lastFixLat, active.lastFixLon, latitude, longitude);
+  }
+  active.lastFixLat = latitude;
+  active.lastFixLon = longitude;
+  saveRunActive(active);
+  refreshRunUI();
+}
+
+/* ---- pause / resume / live UI ---- */
+function startRunTickLoop() {
+  stopRunTickLoop();
+  runTickHandle = setInterval(refreshRunUI, 1000);
+}
+function stopRunTickLoop() {
+  if (runTickHandle) { clearInterval(runTickHandle); runTickHandle = null; }
+}
+function toggleRunPause() {
+  const active = loadRunActive();
+  if (!active) return;
+  if (active.isPaused) {
+    active.lastResumeTs = Date.now();
+    active.isPaused = false;
+    // Don't count the pre-pause -> post-pause gap as distance travelled
+    // (tied shoelaces, waited at a light, etc.) — start a fresh fix pair.
+    active.lastFixLat = null;
+    active.lastFixLon = null;
+  } else {
+    active.movingMs = getRunMovingMs(active);
+    active.isPaused = true;
+  }
+  saveRunActive(active);
+  refreshRunUI();
+}
+function refreshRunUI() {
+  const active = loadRunActive();
+  if (!active) return;
+  const distanceKm = active.distanceM / 1000;
+  const movingSec = getRunMovingMs(active) / 1000;
+  const paceSecPerKm = distanceKm > 0.02 ? movingSec / distanceKm : 0;
+
+  const distEl = document.getElementById('runDistanceBig');
+  const timeEl = document.getElementById('runTimeVal');
+  const paceEl = document.getElementById('runPaceVal');
+  const statusPill = document.getElementById('runStatusPill');
+  const pauseBtn = document.getElementById('runPauseBtn');
+  const gpsWarn = document.getElementById('runGpsWeakHint');
+  if (distEl) distEl.textContent = distanceKm.toFixed(2);
+  if (timeEl) timeEl.textContent = fmtTime(movingSec);
+  if (paceEl) paceEl.textContent = fmtPace(paceSecPerKm);
+  if (statusPill) {
+    statusPill.textContent = active.isPaused ? 'พักอยู่' : 'กำลังวิ่ง';
+    statusPill.classList.toggle('paused', !!active.isPaused);
+  }
+  if (pauseBtn) pauseBtn.textContent = active.isPaused ? 'RESUME' : 'PAUSE';
+  if (gpsWarn) gpsWarn.style.display = active.weakGpsFlag && !active.isPaused ? 'block' : 'none';
+}
+
+/* ---- end / discard / save ---- */
+function openRunEndModal() { document.getElementById('runEndModal').classList.add('active'); }
+function confirmDiscardRun() {
+  detachRunWatch();
+  stopRunTickLoop();
+  releaseWakeLock();
+  clearRunActive();
+  closeModal('runEndModal');
+  go('home');
+}
+function confirmFinishRun() {
+  closeModal('runEndModal');
+  finishRunSession();
+}
+function finishRunSession() {
+  const active = loadRunActive();
+  if (!active) return;
+  detachRunWatch();
+  stopRunTickLoop();
+  releaseWakeLock();
+
+  const distanceKm = Math.round((active.distanceM / 1000) * 100) / 100;
+  const movingSec = Math.round(getRunMovingMs(active) / 1000);
+  const paceSecPerKm = distanceKm > 0 ? Math.round(movingSec / distanceKm) : 0;
+  const xp = computeRunXP(distanceKm, movingSec);
+
+  const session = {
+    id: active.id,
+    startedAt: active.startedAt,
+    completedAt: Date.now(),
+    distanceKm,
+    movingSec,
+    paceSecPerKm,
+    xp
+  };
+  const sessions = loadRunSessions();
+  sessions.push(session);
+  saveRunSessions(sessions);
+  clearRunActive();
+
+  renderRunCompleteScreen(session);
+  go('runcomplete');
+}
+function renderRunCompleteScreen(session) {
+  document.getElementById('runCompleteDistance').textContent = session.distanceKm.toFixed(2);
+  document.getElementById('runCompleteTime').textContent = fmtTime(session.movingSec);
+  document.getElementById('runCompletePace').textContent = fmtPace(session.paceSecPerKm) + ' /กม.';
+  document.getElementById('runCompleteXp').textContent = '+' + session.xp + ' XP';
+  const hint = document.getElementById('runCompleteXpHint');
+  if (hint) {
+    if (session.xp === 0 && session.distanceKm < RUN_MIN_XP_DISTANCE_KM) {
+      hint.textContent = 'ระยะสั้นกว่า ' + RUN_MIN_XP_DISTANCE_KM + ' กม. เลยยังไม่ได้ XP รอบนี้';
+      hint.style.display = 'block';
+    } else {
+      hint.style.display = 'none';
+    }
+  }
+}
+function finishRunCompleteFlow() { go('home'); }
+
+/* ---- history detail / delete ---- */
+let currentRunDetailId = null;
+function openRunDetail(id) {
+  const s = loadRunSessions().find(x => x.id === id);
+  if (!s) return;
+  currentRunDetailId = id;
+  document.getElementById('runDetailWrap').innerHTML = `
+    <div class="complete-hero" style="padding-top:4px;">
+      <div class="complete-rounds tabular">${s.distanceKm.toFixed(2)}</div>
+      <div class="complete-lbl">กม. · ${fmtDate(s.completedAt)}</div>
+    </div>
+    <div class="metric-grid">
+      <div class="metric-card"><div class="v tabular">${fmtTime(s.movingSec)}</div><div class="l">เวลาวิ่ง</div></div>
+      <div class="metric-card"><div class="v tabular">${fmtPace(s.paceSecPerKm)}</div><div class="l">เพซเฉลี่ย /กม.</div></div>
+      <div class="metric-card"><div class="v">${s.xp}</div><div class="l">XP ที่ได้</div></div>
+    </div>
+  `;
+  go('rundetail');
+}
+function confirmDeleteRunSession() {
+  requirePin('ใส่ PIN เพื่อลบประวัติการวิ่งนี้', () => {
+    document.getElementById('deleteRunModal').classList.add('active');
+  });
+}
+function deleteRunSessionExecute() {
+  const sessions = loadRunSessions().filter(s => s.id !== currentRunDetailId);
+  saveRunSessions(sessions);
+  closeModal('deleteRunModal');
+  currentRunDetailId = null;
+  showToast('ลบการวิ่งนี้แล้ว');
+  go('history');
+}
+
 function init() {
   runMigrationsIfNeeded();
   maybeShowAppLock(); // check first: a locked player still sees the lock screen over whatever renders below

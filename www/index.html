@@ -33,6 +33,7 @@
   --pull:#3D6FE0;
   --push:#E8232A;
   --squat:#FFB020;
+  --run:#22C7B0;
   --radius:14px;
   --radius-sm:10px;
   --font-display:"Bebas Neue",Impact,"Arial Narrow",sans-serif;
@@ -1193,6 +1194,7 @@ body{
 .type-tag{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.5px;border-radius:5px;padding:2px 6px;vertical-align:1px;margin-left:6px;}
 .type-tag.cindy{color:var(--pull);border:1px solid var(--pull);}
 .type-tag.custom{color:var(--success);border:1px solid var(--success);}
+.type-tag.run{color:var(--run);border:1px solid var(--run);}
 
 /* ---- program screen ---- */
 .program-card{
@@ -1219,6 +1221,8 @@ body{
 .program-card-link.mode-custom .sub2{color:var(--success);}
 .program-card-link.mode-cardio .program-card-icon{color:var(--danger);background:rgba(232,35,42,.14);}
 .program-card-link.mode-cardio .sub2{color:var(--danger);}
+.program-card-link.mode-run .program-card-icon{color:var(--run);background:rgba(34,199,176,.14);}
+.program-card-link.mode-run .sub2{color:var(--run);}
 .program-today-badge{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--warning);border:1px solid var(--warning);border-radius:5px;padding:1px 5px;vertical-align:1px;margin-left:4px;}
 
 /* ---- bottom tabbar ---- */
@@ -1247,6 +1251,17 @@ body{
 .timer-center{position:absolute;display:flex;flex-direction:column;align-items:center;}
 .timer-digits{font-family:var(--font-display);font-size:64px;line-height:1;letter-spacing:1px;}
 .timer-sub{font-size:11px;color:var(--text-dim);letter-spacing:2px;margin-top:6px;text-transform:uppercase;}
+
+/* ---- run (GPS) screen ---- */
+.run-wrap{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;padding:16px 20px 20px;}
+.run-top{flex-shrink:0;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.run-distance-wrap{text-align:center;margin:26px auto 10px;}
+.run-distance-big{font-family:var(--font-display);font-size:76px;line-height:1;letter-spacing:1px;color:var(--run);}
+.run-distance-unit{font-size:12px;color:var(--text-dim);letter-spacing:2px;margin-top:4px;text-transform:uppercase;}
+.run-gps-hint{display:none;text-align:center;font-size:11px;color:var(--warning);margin-top:10px;font-weight:600;}
+.run-stat-card .v{color:var(--run);}
+
+.complete-star.run-icon{color:var(--run);}
 
 .combo-badge{
   position:absolute;top:-6px;left:50%;transform:translateX(-50%) scale(0);
@@ -1796,6 +1811,20 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         </div>
       </div>
 
+      <div class="program-card-link mode-run" onclick="go('run')">
+        <div class="program-card-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="14.5" cy="4.5" r="1.8"/><path d="M8 21l2.5-5.5L14 13l-1-4-3 1.2M10.5 15.5L7 17.5M14 13l3 2 3.5-1"/></svg>
+        </div>
+        <div>
+          <div class="title">วิ่ง (GPS)</div>
+          <div class="sub">แทร็กระยะ/เวลา/เพซแบบเรียลไทม์ด้วย GPS — ต้องเปิด location permission</div>
+          <div class="sub2" id="programRunStat"></div>
+        </div>
+        <div class="arrow">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+      </div>
+
       <div id="homeCustomWrap" style="display:none;margin-top:14px;">
         <div class="section-label" style="margin-top:0;">CUSTOM WORKOUT ล่าสุด</div>
         <div id="homeCustomCard"></div>
@@ -1857,6 +1886,104 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="list-wrap">
       <div class="empty-hint" style="text-align:left;padding:0 0 10px;">โปรแกรมคาร์ดิโอสำเร็จรูป กดเล่นได้ทันที</div>
       <div id="cardioPresetList"></div>
+    </div>
+  </section>
+
+  <!-- RUN (GPS) — start screen -->
+  <section id="screen-run" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('program')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">วิ่ง (GPS)</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="home-content">
+      <div class="hero-card" style="margin-top:22px;">
+        <div style="font-size:11px;letter-spacing:2px;color:var(--text-faint);text-transform:uppercase;margin-bottom:2px;">GPS AUTO-TRACK</div>
+        <div class="hero-eyebrow">ระยะ · เวลา · เพซ แบบเรียลไทม์</div>
+        <div class="hero-title" style="font-size:14px;line-height:1.5;">ต้องเปิด location permission ถึงจะเริ่มวิ่งได้ (ไม่มีโหมดกรอกระยะเอง) — ถ้าสัญญาณ GPS หลุดกลางทาง ระบบจะกรองจุดที่ความแม่นยำแย่เกินไปทิ้งอัตโนมัติ</div>
+        <button id="runMainBtn" class="btn btn-primary" onclick="handleRunMainBtn()">เริ่มวิ่ง</button>
+        <div id="runSecondaryWrap" style="margin-top:10px;display:none;">
+          <button class="btn btn-ghost btn-sm" onclick="confirmDiscardRunAndStartNew()">เริ่มใหม่ (ไม่เอาที่ค้างอยู่)</button>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card run-stat-card"><div class="v" id="runStatBest">0</div><div class="l">ระยะไกลสุด (กม.)</div></div>
+        <div class="stat-card run-stat-card"><div class="v" id="runStatSessions">0</div><div class="l">จำนวนครั้ง</div></div>
+        <div class="stat-card run-stat-card"><div class="v" id="runStatTotal">0</div><div class="l">ระยะสะสม (กม.)</div></div>
+        <div class="stat-card run-stat-card"><div class="v" id="runStatStreak">0</div><div class="l">STREAK</div></div>
+      </div>
+
+      <div class="section-label" style="margin-top:18px;">กติกา XP</div>
+      <div class="metric-card" style="font-size:12px;color:var(--text-dim);line-height:1.6;">
+        60 XP ต่อกม. — ต้องรักษาเพซเฉลี่ยไว้ที่ 3:00–15:00 นาที/กม. ถึงจะได้ XP เต็ม (เร็ว/ช้ากว่านี้ XP จะถูก cap ไว้) และต้องวิ่งอย่างน้อย 0.3 กม. ถึงจะเริ่มได้ XP
+      </div>
+    </div>
+  </section>
+
+  <!-- RUN (GPS) — live tracking screen -->
+  <section id="screen-running" class="screen">
+    <div class="run-wrap">
+      <div class="run-top">
+        <button class="iconbtn" onclick="openRunEndModal()" aria-label="Back">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+        <div id="runStatusPill" class="status-pill">กำลังวิ่ง</div>
+        <div style="width:38px;"></div>
+      </div>
+
+      <div class="run-distance-wrap">
+        <div id="runDistanceBig" class="run-distance-big tabular">0.00</div>
+        <div class="run-distance-unit">กิโลเมตร</div>
+        <div id="runGpsWeakHint" class="run-gps-hint">สัญญาณ GPS อ่อน — กำลังรอจุดที่แม่นยำกว่านี้</div>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric-card"><div id="runTimeVal" class="v tabular">00:00</div><div class="l">เวลาที่วิ่ง</div></div>
+        <div class="metric-card"><div id="runPaceVal" class="v tabular">--:--</div><div class="l">เพซปัจจุบัน /กม.</div></div>
+      </div>
+
+      <div class="control-row" style="margin-top:16px;">
+        <button id="runPauseBtn" class="btn btn-outline btn-sm" onclick="toggleRunPause()">PAUSE</button>
+        <button class="btn btn-ghost btn-sm" onclick="openRunEndModal()">จบการวิ่ง</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RUN (GPS) — complete screen -->
+  <section id="screen-runcomplete" class="screen">
+    <div class="complete-wrap">
+      <div class="complete-hero">
+        <div class="complete-star run-icon">★</div>
+        <div id="runCompleteDistance" class="complete-rounds tabular">0.00</div>
+        <div class="complete-lbl">กิโลเมตร</div>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-card"><div id="runCompleteTime" class="v tabular">00:00</div><div class="l">เวลาที่วิ่ง</div></div>
+        <div class="metric-card"><div id="runCompletePace" class="v tabular">--:-- /กม.</div><div class="l">เพซเฉลี่ย</div></div>
+      </div>
+      <div class="metric-card combo-result-card" style="margin-top:14px;">
+        <div class="combo-result-title" id="runCompleteXp">+0 XP</div>
+        <div id="runCompleteXpHint" class="combo-result-xp" style="display:none;"></div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:22px;" onclick="finishRunCompleteFlow()">กลับหน้าหลัก</button>
+    </div>
+  </section>
+
+  <!-- RUN (GPS) — history detail -->
+  <section id="screen-rundetail" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('history')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">RUN REPORT</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap" id="runDetailWrap"></div>
+    <div style="padding:0 20px 20px;">
+      <button class="btn btn-danger btn-sm" onclick="confirmDeleteRunSession()">ลบ</button>
     </div>
   </section>
 
@@ -2797,6 +2924,45 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="modal-row">
       <button class="btn btn-outline btn-sm" onclick="closeModal('deleteSessionModal')">ยกเลิก</button>
       <button class="btn btn-danger btn-sm" onclick="deleteSessionExecute()">ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- RUN (GPS) — location permission denied/unavailable -->
+<div id="runGpsDeniedModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">ต้องเปิด Location Permission</div>
+    <div class="modal-body">โหมดวิ่งใช้ GPS ในการแทร็กระยะทางอย่างเดียว (ไม่มีโหมดกรอกระยะเอง) กรุณาอนุญาตสิทธิ์ตำแหน่งให้เบราว์เซอร์/แอปนี้ก่อนเริ่มวิ่ง</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('runGpsDeniedModal')">ปิด</button>
+      <button class="btn btn-primary btn-sm" onclick="retryRunPermission()">ลองอีกครั้ง</button>
+    </div>
+  </div>
+</div>
+
+<!-- RUN (GPS) — end/finish confirm -->
+<div id="runEndModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">จบการวิ่ง?</div>
+    <div class="modal-body">บันทึกระยะ/เวลา/XP ของรอบนี้ หรือยกเลิกทิ้งโดยไม่บันทึก</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('runEndModal')">วิ่งต่อ</button>
+      <button class="btn btn-danger btn-sm" onclick="confirmDiscardRun()">ทิ้งไม่บันทึก</button>
+    </div>
+    <div class="modal-row" style="grid-template-columns:1fr;margin-top:10px;">
+      <button class="btn btn-primary btn-sm" onclick="confirmFinishRun()">บันทึกและจบ</button>
+    </div>
+  </div>
+</div>
+
+<!-- RUN (GPS) — delete history session -->
+<div id="deleteRunModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">ลบการวิ่งนี้?</div>
+    <div class="modal-body">ข้อมูลการวิ่งนี้จะถูกลบถาวรและกู้คืนไม่ได้</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('deleteRunModal')">ยกเลิก</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteRunSessionExecute()">ลบถาวร</button>
     </div>
   </div>
 </div>
