@@ -1379,13 +1379,24 @@ function addComboBonusXP(amount) {
  * into bonus XP at REST_SKIP_BONUS_RATE per second, folded into the same
  * running-counter pattern as combo/quest bonus XP above. Skips this close to
  * the rest naturally finishing (< REST_SKIP_BONUS_MIN_SEC left) pay nothing,
- * so mashing skip right at 0:01 isn't a meaningful farm. */
+ * so mashing skip right at 0:01 isn't a meaningful farm.
+ *
+ * REST_SKIP_BONUS_MAX_SEC caps the bonus independent of how long the rest
+ * was actually configured for. Without this, a rest duration is a plain
+ * number the player enters themselves in the Custom Workout builder with no
+ * upper bound enforced in JS (the HTML input's max="600" is a UI hint only,
+ * not a real constraint) — so setting an exercise's rest to an absurd value
+ * and skipping it immediately turned "reward for pushing through rest
+ * early" into a free multi-hour-workout's worth of XP for one tap. Capping
+ * the *bonus calculation* here (not just the input) closes that off however
+ * a bogus duration reaches this function. */
 const KEY_REST_SKIP_BONUS_XP = 'cindy_rest_skip_bonus_xp';
 const REST_SKIP_BONUS_RATE = 0.5;   // XP per second of rest skipped
 const REST_SKIP_BONUS_MIN_SEC = 3;  // below this, no bonus — not worth the toast spam
+const REST_SKIP_BONUS_MAX_SEC = 90; // cap the payout regardless of configured rest length
 function restSkipBonusXP(remainingSec) {
   if (!Number.isFinite(remainingSec) || remainingSec < REST_SKIP_BONUS_MIN_SEC) return 0;
-  return Math.round(remainingSec * REST_SKIP_BONUS_RATE);
+  return Math.round(Math.min(remainingSec, REST_SKIP_BONUS_MAX_SEC) * REST_SKIP_BONUS_RATE);
 }
 function loadRestSkipBonusXP() {
   const n = parseInt(localStorage.getItem(KEY_REST_SKIP_BONUS_XP), 10);
@@ -5138,6 +5149,13 @@ function updateCustomExerciseField(idx, field, value) {
     customEditorDraft.exercises[idx][field] = Math.max(0, parseFloat(value) || 0);
   } else if (field === 'supersetWithNext') {
     customEditorDraft.exercises[idx][field] = !!value;
+  } else if (field === 'restBetweenSetsSec' || field === 'restAfterSec') {
+    // Clamp to the 0-600s range the input's own max="600" already claims —
+    // that attribute is a UI hint only and isn't enforced by the browser
+    // against every input path, so it must also be enforced here. See the
+    // note on REST_SKIP_BONUS_MAX_SEC for why an unbounded rest value here
+    // used to be exploitable for free XP.
+    customEditorDraft.exercises[idx][field] = Math.min(600, Math.max(0, parseInt(value, 10) || 0));
   } else {
     customEditorDraft.exercises[idx][field] = parseInt(value, 10) || 0;
   }
