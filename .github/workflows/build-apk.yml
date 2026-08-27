@@ -45,10 +45,13 @@ jobs:
 
       # Native Google Sign-In (required — Google blocks OAuth popups opened
       # from inside an app's WebView, so the JS-only signInWithPopup flow
-      # cannot be used here). "firebase" itself is pinned in package.json so
-      # its version stays fixed across builds.
+      # cannot be used here). Installed together in one command so npm
+      # resolves a "firebase" version compatible with this plugin's peer
+      # dependency itself — pinning "firebase" separately in package.json
+      # causes an ERESOLVE conflict here, since the plugin may require a
+      # newer major version than whatever got pinned.
       - name: Install Firebase Authentication plugin
-        run: npm install @capacitor-firebase/authentication
+        run: npm install @capacitor-firebase/authentication firebase
 
       # Bundles the Firebase SDK and app fonts into www/vendor/ so the app
       # loads them from disk instead of fetching from gstatic.com /
