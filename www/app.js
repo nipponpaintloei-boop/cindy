@@ -801,6 +801,114 @@ function bossSilhouetteMarkup(bossId) {
   }
 }
 
+/* ================= BOSS BATTLE CUTSCENE =================
+ * Auto-play "battle report" shown right after finishing a workout, before
+ * the results screen (screen-complete / screen-customcomplete) — turns the
+ * damage that workout already dealt (same numbers currentBossState() sums
+ * up) into a short sequence of hits instead of a single silent HP-bar jump.
+ * Purely a presentation layer: it does NOT decide whether the boss is
+ * defeated or roll loot — that authority stays with renderBossCard(), which
+ * still runs normally once the person reaches Home and will show the
+ * "defeated!" toast + loot drop exactly as before. This just dramatizes the
+ * damage tally that already happened.
+ *
+ * Turn breakdown:
+ *  - Cindy (AMRAP) sessions: 3 turns, PULL/PUSH/SQUAT reps (session.total).
+ *  - Custom Workout sessions: one turn per distinct exercise name in the
+ *    log, summed by name; capped at 5 turns (top 4 by volume + "ท่าที่เหลือ"
+ *    for the rest) so a 15-exercise workout doesn't drag the cutscene out.
+ * Auto-advances on a timer; tapping "ข้าม" jumps straight to the final
+ * state. Either way it calls onDone() to hand off to the normal results
+ * screen — nothing about that flow changes, this just runs first. */
+function computeBattleTurns(session, isCustom) {
+  if (isCustom) {
+    const byName = {};
+    (session.exerciseLog || []).forEach(e => {
+      byName[e.name] = (byName[e.name] || 0) + (e.repsOrSecDone || 0);
+    });
+    let turns = Object.keys(byName)
+      .map(name => ({ label: name, dmg: byName[name] }))
+      .filter(t => t.dmg > 0);
+    if (turns.length > 5) {
+      turns.sort((a, b) => b.dmg - a.dmg);
+      const top = turns.slice(0, 4);
+      const restDmg = turns.slice(4).reduce((s, t) => s + t.dmg, 0);
+      turns = restDmg > 0 ? top.concat([{ label: 'ท่าที่เหลือ', dmg: restDmg }]) : top;
+    }
+    return turns.length ? turns : [{ label: 'TOTAL', dmg: totalVolumeOfCustomSession(session) }];
+  }
+  return [
+    { label: 'PULL', dmg: session.total.pull },
+    { label: 'PUSH', dmg: session.total.push },
+    { label: 'SQUAT', dmg: session.total.squat }
+  ].filter(t => t.dmg > 0);
+}
+
+let bossBattleTimer = null;
+function startBossBattleCutscene(session, isCustom, onDone) {
+  const sessionDmg = isCustom ? totalVolumeOfCustomSession(session) : session.total.reps;
+  const afterState = currentBossState(); // session is already saved by the time this is called
+  const beforeDamage = Math.max(0, afterState.damage - sessionDmg);
+  const beforeHp = Math.max(0, afterState.targetHp - beforeDamage);
+  const turns = computeBattleTurns(session, isCustom);
+
+  const nameEl = document.getElementById('battleBossName');
+  const tagEl = document.getElementById('battleBossTag');
+  const stage = document.getElementById('battleBossStage');
+  const hpFill = document.getElementById('battleHpFill');
+  const hpLabel = document.getElementById('battleHpLabel');
+  const logEl = document.getElementById('battleLog');
+  const skipBtn = document.getElementById('battleSkipBtn');
+  if (!nameEl || !stage || !hpFill) { onDone(); return; }
+
+  nameEl.textContent = afterState.boss.name;
+  if (tagEl) tagEl.textContent = afterState.boss.tag;
+  stage.querySelector('.boss-art').innerHTML = bossSilhouetteMarkup(afterState.boss.id);
+  stage.closest('.boss-card').style.setProperty('--boss-accent-rgb', hexToRgbTriplet(afterState.boss.accent));
+  stage.classList.remove('boss-defeated', 'boss-critical', 'boss-hit', 'boss-explode');
+
+  const setHp = (hp) => {
+    const pct = afterState.targetHp > 0 ? Math.max(0, Math.min(1, hp / afterState.targetHp)) : 0;
+    hpFill.style.width = Math.round(pct * 100) + '%';
+    hpLabel.textContent = Math.round(hp) + ' / ' + afterState.targetHp + ' HP';
+    stage.classList.toggle('boss-critical', hp > 0 && pct <= 0.25);
+  };
+  setHp(beforeHp);
+  logEl.textContent = 'เตรียมตัว...';
+
+  let hp = beforeHp;
+  let i = 0;
+  let finished = false;
+  function finish() {
+    if (finished) return;
+    finished = true;
+    clearTimeout(bossBattleTimer);
+    bossBattleTimer = null;
+    skipBtn.onclick = null;
+    setHp(Math.max(0, afterState.targetHp - afterState.damage));
+    if (afterState.defeated) {
+      stage.classList.add('boss-defeated');
+      logEl.textContent = afterState.boss.name + ' ล้มลง!';
+    }
+    setTimeout(onDone, afterState.defeated ? 900 : 350);
+  }
+  function step() {
+    if (i >= turns.length) { finish(); return; }
+    const turn = turns[i++];
+    hp = Math.max(0, hp - turn.dmg);
+    stage.classList.remove('boss-hit');
+    void stage.offsetWidth;
+    stage.classList.add('boss-hit');
+    setHp(hp);
+    logEl.textContent = turn.label + ' x' + turn.dmg + ' — โจมตี!';
+    vibrate([30]);
+    bossBattleTimer = setTimeout(step, 800);
+  }
+  skipBtn.onclick = finish;
+  bossBattleTimer = setTimeout(step, 450);
+}
+
+
 function renderBossCountdown() {
   const el = document.getElementById('bossCountdown');
   if (!el) return;
@@ -2844,8 +2952,11 @@ function completeWorkout(active, reason) {
 
   if (isNativeApp()) rescheduleNativeReminder(true); // done today — push reminder to tomorrow
 
-  renderCompleteScreen(session);
-  go('complete');
+  go('bossbattle');
+  startBossBattleCutscene(session, false, () => {
+    renderCompleteScreen(session);
+    go('complete');
+  });
 }
 
 function renderCompleteScreen(session) {
@@ -3769,6 +3880,28 @@ async function forceRefreshApp() {
   location.replace(url.toString());
 }
 
+/** Reset Character: wipes every piece of saved progress this app owns
+ * (sessions, XP/level seen-marker, streak chests, protocols, boss
+ * defeats/loot, equipped skin and backdrop, quest/combo bonus flags,
+ * custom workouts, weekly plan — every localStorage key prefixed
+ * `cindy_`, plus the two legacy-named custom workout keys) and reloads
+ * to a fresh LV.1 start. Confirmed via resetCharacterModal first, since
+ * this is irreversible — EXPORT via the backup system above is the
+ * escape hatch if someone changes their mind after the fact. */
+function openResetCharacterModal() {
+  document.getElementById('resetCharacterModal').classList.add('active');
+}
+function resetCharacterExecute() {
+  Object.keys(localStorage).forEach(k => {
+    if (k.startsWith('cindy_') || k === 'custom_workouts' || k === 'custom_workout_sessions') {
+      localStorage.removeItem(k);
+    }
+  });
+  closeModal('resetCharacterModal');
+  showToast('รีเซ็ตตัวละครแล้ว');
+  setTimeout(() => location.reload(), 500);
+}
+
 /* ================= BACKUP (Export / Import) =================
    v2: covers ALL locally-stored user data, not just Cindy sessions.
    Previously this only exported KEY_SESSIONS ('cindy_sessions'), so
@@ -3897,13 +4030,24 @@ async function deliverExportFile(json, fname) {
     try {
       const file = new File([blob], fname, { type: 'application/json' });
       if (navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: fname })
-          .then(() => showToast('ส่งออกข้อมูลแล้ว (Cindy + Custom Workout + สกิน/ความคืบหน้า)'))
-          .catch(err => {
-            if (err && err.name === 'AbortError') return; // user cancelled the share sheet
-            fallbackDownload(blob, fname, json);
-          });
-        return;
+        // Some browsers/standalone PWA contexts (notably iOS home-screen
+        // installs) expose navigator.share/canShare as true but the actual
+        // share() call can silently hang forever — no share sheet appears,
+        // and the promise never resolves or rejects. Racing it against a
+        // timeout guarantees this function always reaches an outcome
+        // (toast or the guaranteed-visible fallback panel below) instead
+        // of leaving the person staring at a button that "did nothing."
+        const result = await Promise.race([
+          navigator.share({ files: [file], title: fname }).then(() => 'shared').catch(err =>
+            (err && err.name === 'AbortError') ? 'cancelled' : 'failed'),
+          new Promise(resolve => setTimeout(() => resolve('timeout'), 3500))
+        ]);
+        if (result === 'shared') {
+          showToast('ส่งออกข้อมูลแล้ว (Cindy + Custom Workout + สกิน/ความคืบหน้า)');
+          return;
+        }
+        if (result === 'cancelled') return; // user backed out of the share sheet on purpose
+        // 'failed' or 'timeout' — fall through to the guaranteed panel below
       }
     } catch (e) { /* fall through to the download-link path below */ }
   }
@@ -5131,8 +5275,11 @@ function finishCustomPlayerWorkout() {
   beep(660, 200, 0.2);
   customPlayer = null;
   lastCompletedCustomSessionId = session.id;
-  renderCustomCompleteScreen(session);
-  go('customcomplete');
+  go('bossbattle');
+  startBossBattleCutscene(session, true, () => {
+    renderCustomCompleteScreen(session);
+    go('customcomplete');
+  });
 }
 
 function openCustomPlayerEndModal() {

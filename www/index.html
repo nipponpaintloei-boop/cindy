@@ -966,6 +966,10 @@ body{
 .boss-view-item.current .boss-view-item-status{color:var(--success);}
 .boss-view-item-story{font-size:10.5px;line-height:1.5;color:var(--text-dim);border-top:1px solid var(--card-border);padding-top:6px;}
 
+/* ---- boss battle cutscene (screen-bossbattle) ---- */
+.battle-eyebrow{text-align:center;font-size:11px;font-weight:800;letter-spacing:1.2px;color:var(--text-faint);text-transform:uppercase;margin-bottom:14px;}
+.battle-log{text-align:center;margin-top:16px;font-size:14px;font-weight:700;color:var(--text);min-height:20px;}
+
 .boss-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
 .boss-name{font-family:var(--font-display);font-size:20px;letter-spacing:1px;}
 .boss-tag{font-size:10px;color:rgba(var(--boss-accent-rgb),.75);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;font-weight:700;}
@@ -1728,6 +1732,33 @@ textarea.note-input::placeholder{color:var(--text-faint);}
   </section>
 
   <!-- COMPLETE -->
+  <!-- BOSS BATTLE CUTSCENE (auto-play recap shown right after finishing a
+       workout, before the results screen — see startBossBattleCutscene()
+       in app.js. Reuses the Home boss-card's classes (.boss-stage/.boss-art/
+       .boss-hp-track/etc.) so hit/critical/defeated animations work
+       identically without duplicating any CSS.) -->
+  <section id="screen-bossbattle" class="screen">
+    <div class="complete-wrap" style="display:flex;flex-direction:column;justify-content:center;min-height:80vh;">
+      <div class="battle-eyebrow">ผลศึกจากรอบนี้</div>
+      <div class="boss-card">
+        <div class="boss-header">
+          <div>
+            <div id="battleBossName" class="boss-name">—</div>
+            <div id="battleBossTag" class="boss-tag">—</div>
+          </div>
+        </div>
+        <div id="battleBossStage" class="boss-stage">
+          <div class="boss-art"></div>
+          <div class="boss-boom"></div>
+        </div>
+        <div class="boss-hp-track"><div id="battleHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
+        <div id="battleHpLabel" class="boss-hp-label">0 / 0 HP</div>
+      </div>
+      <div id="battleLog" class="battle-log">เตรียมตัว...</div>
+      <button id="battleSkipBtn" class="btn btn-outline btn-sm" style="margin-top:18px;">ข้าม</button>
+    </div>
+  </section>
+
   <section id="screen-complete" class="screen">
     <div class="complete-wrap">
       <div class="complete-hero">
@@ -1914,6 +1945,13 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       </div>
       <div style="font-size:11px;color:var(--text-faint);margin-top:8px;line-height:1.5;">
         กดปุ่มนี้ถ้าอัปเดตแอปใหม่ไปแล้วแต่หน้าจอยังเหมือนเดิม — จะล้างแคชเก่าแล้วโหลดเวอร์ชันล่าสุดให้ทันที
+      </div>
+
+      <div class="control-row" style="margin-top:12px;">
+        <button class="btn btn-danger btn-sm" onclick="openResetCharacterModal()">🗑 รีเซ็ตตัวละคร</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-faint);margin-top:8px;line-height:1.5;">
+        ลบข้อมูลทั้งหมดในเครื่องนี้ถาวร (เลเวล, Streak, ประวัติ Workout, สกิน/ไอเทม, Boss ที่ปราบแล้ว) แล้วเริ่มใหม่จาก LV.1 — แนะนำให้ EXPORT ข้อมูลเก็บไว้ก่อนถ้ายังไม่แน่ใจ
       </div>
     </div>
     <div class="tabbar">
@@ -2587,6 +2625,18 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="modal-row">
       <button class="btn btn-outline btn-sm" onclick="closeModal('customHistoryDeleteModal')">ยกเลิก</button>
       <button class="btn btn-danger btn-sm" onclick="deleteCustomHistorySessionExecute()">ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Character Modal -->
+<div id="resetCharacterModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">รีเซ็ตตัวละคร?</div>
+    <div class="modal-body">ข้อมูลทั้งหมดในเครื่องนี้จะถูกลบถาวรและกู้คืนไม่ได้ — เลเวล, XP, Streak, ประวัติ Workout ทั้งหมด, สกิน/ไอเทมที่ปลดล็อค, Boss ที่ปราบแล้ว, และพื้นหลังที่เลือกไว้ แนะนำให้ EXPORT ข้อมูลเก็บไว้ก่อนถ้ายังไม่แน่ใจ</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('resetCharacterModal')">ยกเลิก</button>
+      <button class="btn btn-danger btn-sm" onclick="resetCharacterExecute()">รีเซ็ตถาวร</button>
     </div>
   </div>
 </div>
