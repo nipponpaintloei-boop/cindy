@@ -5060,8 +5060,11 @@ async function requestRunPermissionAndStart() {
   showToast('กำลังขอสิทธิ์ตำแหน่ง...');
   try {
     const geoPlugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Geolocation;
-    if (geoPlugin) {
+    if (!geoPlugin) {
+      showToast('DEBUG: ไม่พบ Capacitor.Plugins.Geolocation');
+    } else {
       const status = await geoPlugin.requestPermissions();
+      showToast('DEBUG status: ' + JSON.stringify(status));
       const granted = status && (status.location === 'granted' || status.coarseLocation === 'granted');
       if (!granted) {
         document.getElementById('runGpsDeniedModal').classList.add('active');
@@ -5069,12 +5072,14 @@ async function requestRunPermissionAndStart() {
       }
     }
   } catch (e) {
-    // Plugin missing/unsupported on this platform — fall through and let
-    // navigator.geolocation below handle it (e.g. plain browser use).
+    showToast('DEBUG error: ' + (e && e.message ? e.message : String(e)));
   }
   navigator.geolocation.getCurrentPosition(
     () => { startNewRun(); },
-    () => { document.getElementById('runGpsDeniedModal').classList.add('active'); },
+    (err) => {
+      showToast('DEBUG geo fail: code=' + (err && err.code) + ' msg=' + (err && err.message));
+      document.getElementById('runGpsDeniedModal').classList.add('active');
+    },
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
   );
 }
