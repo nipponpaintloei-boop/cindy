@@ -83,6 +83,10 @@ jobs:
             npx cap add android
           fi
 
+      # Health Connect (step-count → XP) requires minSdkVersion 26+.
+      - name: Patch minSdkVersion for Health Connect
+        run: bash ci/patch-health.sh
+
       - name: Add google-services.json and Gradle plugin for Firebase Auth
         run: bash ci/patch-firebase.sh
 
