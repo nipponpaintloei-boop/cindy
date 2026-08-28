@@ -5060,11 +5060,8 @@ async function requestRunPermissionAndStart() {
   showToast('กำลังขอสิทธิ์ตำแหน่ง...');
   try {
     const geoPlugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Geolocation;
-    if (!geoPlugin) {
-      showToast('DEBUG: ไม่พบ Capacitor.Plugins.Geolocation');
-    } else {
+    if (geoPlugin) {
       const status = await geoPlugin.requestPermissions();
-      showToast('DEBUG status: ' + JSON.stringify(status));
       const granted = status && (status.location === 'granted' || status.coarseLocation === 'granted');
       if (!granted) {
         document.getElementById('runGpsDeniedModal').classList.add('active');
@@ -5072,12 +5069,12 @@ async function requestRunPermissionAndStart() {
       }
     }
   } catch (e) {
-    showToast('DEBUG error: ' + (e && e.message ? e.message : String(e)));
+    // Fall through to navigator.geolocation below, which will surface its
+    // own error via the denied-modal if the native plugin call failed.
   }
   navigator.geolocation.getCurrentPosition(
     () => { startNewRun(); },
-    (err) => {
-      showToast('DEBUG geo fail: code=' + (err && err.code) + ' msg=' + (err && err.message));
+    () => {
       document.getElementById('runGpsDeniedModal').classList.add('active');
     },
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
