@@ -1567,6 +1567,7 @@ function renderHome() {
   renderHomeLastWorkout();
   renderTreasureChest();
   renderDailyQuests();
+  renderStepsCard();
 }
 
 /** Combined streak across Cindy sessions + Custom Workout sessions. */
@@ -1797,6 +1798,144 @@ function addRestSkipBonusXP(amount) {
   if (amount <= 0) return;
   localStorage.setItem(KEY_REST_SKIP_BONUS_XP, String(loadRestSkipBonusXP() + amount));
 }
+
+/* ================= STEP COUNT → BONUS XP (Health Connect) =================
+ * Reads today's cumulative step count from Android Health Connect via the
+ * @capgo/capacitor-health plugin and converts it into the same running
+ * bonus-XP counter pattern as quests/combo/rest-skip above. Health Connect
+ * keeps counting steps at the OS level even while this app is closed — we
+ * don't run any background polling ourselves, we just read the running
+ * daily total whenever the app is opened/foregrounded or the player taps
+ * refresh.
+ *
+ * KEY_STEPS_CONVERTED tracks how many of today's steps have already been
+ * turned into XP, so re-reading the same growing daily total never
+ * double-awards — only the *new* steps since the last conversion count.
+ * Any steps not yet enough for a whole XP point (the remainder after
+ * dividing by STEPS_PER_EXP) are left unconverted and picked up on the
+ * next refresh rather than lost.
+ *
+ * STEPS_PER_EXP is the one number to tune for game balance later —
+ * nothing else here needs to change to adjust the rate.
+ */
+const KEY_STEPS_BONUS_XP = 'cindy_steps_bonus_xp';
+const KEY_STEPS_CONVERTED = 'cindy_steps_converted_v1'; // { date, steps } — steps already turned into XP today
+const STEPS_PER_EXP = 100; // TODO: tune for game balance
+let stepsHealthAuthorized = false;
+let stepsTodayCount = 0;
+
+function loadStepsBonusXP() {
+  const n = parseInt(localStorage.getItem(KEY_STEPS_BONUS_XP), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+function addStepsBonusXP(amount) {
+  if (amount <= 0) return;
+  localStorage.setItem(KEY_STEPS_BONUS_XP, String(loadStepsBonusXP() + amount));
+}
+function loadStepsConvertedToday() {
+  let state;
+  try { state = JSON.parse(localStorage.getItem(KEY_STEPS_CONVERTED)); } catch (e) { state = null; }
+  const todayKey = dayKey(Date.now());
+  if (!state || state.date !== todayKey) {
+    state = { date: todayKey, steps: 0 };
+    localStorage.setItem(KEY_STEPS_CONVERTED, JSON.stringify(state));
+  }
+  return state;
+}
+function saveStepsConvertedToday(state) {
+  localStorage.setItem(KEY_STEPS_CONVERTED, JSON.stringify(state));
+}
+function getHealthPlugin() {
+  return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Health;
+}
+/** Called once at app boot. Only checks existing authorization (no prompt) —
+ * the actual permission dialog only ever shows when the player explicitly
+ * taps "เชื่อมต่อ Health Connect" via connectHealthConnect() below. */
+async function initStepsIntegration() {
+  const health = getHealthPlugin();
+  if (!health) { renderStepsCard(); return; } // not running as the Android app (e.g. plain browser) — skip silently
+  try {
+    const status = await health.checkAuthorization({ read: ['steps'] });
+    stepsHealthAuthorized = !!(status && status.readAuthorized && status.readAuthorized.indexOf('steps') !== -1);
+  } catch (e) {
+    stepsHealthAuthorized = false;
+  }
+  if (stepsHealthAuthorized) { await refreshStepsToday(); }
+  else { renderStepsCard(); }
+}
+async function connectHealthConnect() {
+  const health = getHealthPlugin();
+  if (!health) return;
+  try {
+    const avail = await health.isAvailable();
+    if (!avail || !avail.available) {
+      showToast('ไม่พบ Health Connect บนเครื่องนี้', 'alert');
+      return;
+    }
+    const status = await health.requestAuthorization({ read: ['steps'] });
+    stepsHealthAuthorized = !!(status && status.readAuthorized && status.readAuthorized.indexOf('steps') !== -1);
+    if (stepsHealthAuthorized) {
+      showToast('เชื่อมต่อ Health Connect สำเร็จ', 'check');
+      await refreshStepsToday();
+    } else {
+      showToast('ยังไม่ได้รับสิทธิ์อ่านข้อมูลก้าวเดิน', 'alert');
+      renderStepsCard();
+    }
+  } catch (e) {
+    showToast('เชื่อมต่อ Health Connect ไม่สำเร็จ', 'alert');
+  }
+}
+async function refreshStepsToday() {
+  const health = getHealthPlugin();
+  if (!health || !stepsHealthAuthorized) { renderStepsCard(); return; }
+  try {
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const result = await health.queryAggregated({
+      dataType: 'steps',
+      startDate: start.toISOString(),
+      endDate: new Date().toISOString(),
+      bucket: 'day',
+      aggregation: 'sum'
+    });
+    const total = (result && result.samples && result.samples[0] && result.samples[0].value) || 0;
+    stepsTodayCount = Math.max(0, Math.round(total));
+    const converted = loadStepsConvertedToday();
+    const newSteps = Math.max(0, stepsTodayCount - converted.steps);
+    const xpToAward = Math.floor(newSteps / STEPS_PER_EXP);
+    if (xpToAward > 0) {
+      converted.steps += xpToAward * STEPS_PER_EXP;
+      saveStepsConvertedToday(converted);
+      addStepsBonusXP(xpToAward);
+      renderXpBar();
+      showToast('ก้าวเดินวันนี้ +' + xpToAward + ' XP', 'target');
+    }
+  } catch (e) {
+    // read failed (Health Connect momentarily unavailable, etc.) — keep
+    // showing the last known count rather than clearing it
+  }
+  renderStepsCard();
+}
+function renderStepsCard() {
+  const body = document.getElementById('stepsCardBody');
+  if (!body) return;
+  const health = getHealthPlugin();
+  if (!health) {
+    body.innerHTML = '<div class="quest-desc">ใช้งานได้เฉพาะในแอป Android</div>';
+    return;
+  }
+  if (!stepsHealthAuthorized) {
+    body.innerHTML = '<button class="quest-claim-btn" onclick="connectHealthConnect()">เชื่อมต่อ Health Connect</button>';
+    return;
+  }
+  const converted = loadStepsConvertedToday();
+  const pending = Math.max(0, stepsTodayCount - converted.steps);
+  body.innerHTML = '<div class="quest-row">'
+    + '<div class="quest-info"><div class="quest-title">' + stepsTodayCount.toLocaleString('th-TH') + ' ก้าว</div>'
+    + '<div class="quest-desc">อีก ' + pending + ' ก้าว ได้ +1 XP</div></div>'
+    + '<button class="quest-claim-btn" onclick="refreshStepsToday()">รีเฟรช</button>'
+    + '</div>';
+}
+
 let lastRenderedCombo = null;
 function updateComboBadge(active) {
   const badge = document.getElementById('comboBadge');
@@ -1976,7 +2115,7 @@ function computeSessionXP() {
 }
 function computeTotalXP() {
   const { cindyXP, customXP, runXP } = computeSessionXP();
-  return cindyXP + customXP + runXP + loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP();
+  return cindyXP + customXP + runXP + loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP() + loadStepsBonusXP();
 }
 function xpRequiredForLevel(level) {
   return 100 + (level - 1) * 50;
@@ -4485,6 +4624,7 @@ function exportData() {
         questBonusXP: loadQuestBonusXP(),
         comboBonusXP: loadComboBonusXP(),
         restSkipBonusXP: loadRestSkipBonusXP(),
+        stepsBonusXP: loadStepsBonusXP(),
         ringGoals: loadRingGoals(),
         weeklyPlan: loadWeeklyPlan()
       }
@@ -4881,6 +5021,10 @@ function importDataImpl(event) {
         if (Number.isFinite(incomingQuestsAndGoals.restSkipBonusXP)) {
           const bump = incomingQuestsAndGoals.restSkipBonusXP - loadRestSkipBonusXP();
           if (bump > 0) addRestSkipBonusXP(bump);
+        }
+        if (Number.isFinite(incomingQuestsAndGoals.stepsBonusXP)) {
+          const bump = incomingQuestsAndGoals.stepsBonusXP - loadStepsBonusXP();
+          if (bump > 0) addStepsBonusXP(bump);
         }
         if (incomingQuestsAndGoals.ringGoals && localStorage.getItem(KEY_RING_GOALS) === null) {
           saveRingGoals(incomingQuestsAndGoals.ringGoals);
@@ -5405,6 +5549,7 @@ function init() {
   updateInstallButton();
   checkReminder();
   if (isNativeApp()) rescheduleNativeReminder(false);
+  initStepsIntegration();
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
