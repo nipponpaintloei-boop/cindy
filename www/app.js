@@ -1459,6 +1459,98 @@ function go(name) {
   if (name === 'run') renderRunHome();
 }
 
+/* ================= mobile back-button / nav-gesture trap =================
+ * On an installed PWA, the OS "back" gesture (Android nav bar / swipe-back)
+ * doesn't know anything about our in-app screens/modals — since this app
+ * never touched the History API, there was nothing for the browser to "go
+ * back" to, so the gesture just closed the whole app instantly.
+ *
+ * Fix: keep exactly one extra history entry alive whenever there is
+ * something to back out of (a modal, or a non-Home screen). A back
+ * action then pops that entry (via 'popstate') and we react by closing
+ * the topmost modal or returning Home, instead of letting the app exit.
+ * It only exits for real once the user is back at the bare Home screen
+ * with nothing open, which is the expected behavior. */
+(function () {
+  let suppressHistory = false;
+  let bufferPushed = false;
+
+  // Screens that represent an active session — back here should ask for
+  // confirmation via the screen's own "end" modal, same as tapping its
+  // in-app back button, rather than silently jumping to Home.
+  var GAMEPLAY_EXIT_FN = {
+    'screen-workout': 'openEndModal',
+    'screen-customplayer': 'openCustomPlayerEndModal',
+    'screen-running': 'openRunEndModal'
+  };
+
+  function isAnyModalOpen() {
+    if (document.querySelector('.modal-overlay.active')) return true;
+    var bv = document.getElementById('bossViewModal');
+    if (bv && bv.classList.contains('open')) return true;
+    return false;
+  }
+
+  function closeTopModal() {
+    document.querySelectorAll('.modal-overlay.active').forEach(function (m) { closeModal(m.id); });
+    var bv = document.getElementById('bossViewModal');
+    if (bv && bv.classList.contains('open') && typeof closeBossView === 'function') closeBossView();
+  }
+
+  // Keeps exactly one "buffer" history entry alive whenever there's
+  // something on screen to back out of. Runs after every navigation and
+  // after every modal open/close (via the MutationObserver below), so the
+  // ~30 existing call sites that toggle modals never need to be touched.
+  function syncHistoryBuffer() {
+    if (suppressHistory) return;
+    var homeScreen = document.getElementById('screen-home');
+    var needsBuffer = isAnyModalOpen() || !(homeScreen && homeScreen.classList.contains('active'));
+    if (needsBuffer && !bufferPushed) {
+      bufferPushed = true;
+      history.pushState({ trap: true }, '');
+    } else if (!needsBuffer && bufferPushed) {
+      bufferPushed = false;
+      history.back(); // consume the leftover entry (closed via in-app UI, not back)
+    }
+  }
+
+  new MutationObserver(syncHistoryBuffer).observe(document.body, {
+    attributes: true, attributeFilter: ['class'], subtree: true
+  });
+
+  var _go = go;
+  go = function (name) {
+    _go(name);
+    syncHistoryBuffer();
+  };
+
+  window.addEventListener('popstate', function () {
+    if (isAnyModalOpen()) {
+      suppressHistory = true;
+      closeTopModal();
+      suppressHistory = false;
+      syncHistoryBuffer();
+      return;
+    }
+    var activeScreen = document.querySelector('.screen.active');
+    if (activeScreen && activeScreen.id !== 'screen-home') {
+      var exitFn = GAMEPLAY_EXIT_FN[activeScreen.id];
+      suppressHistory = true;
+      if (exitFn && typeof window[exitFn] === 'function') {
+        window[exitFn](); // reopen the screen's own "end session?" confirm modal
+      } else {
+        go('home');
+      }
+      suppressHistory = false;
+      syncHistoryBuffer();
+      return;
+    }
+    // Already on Home with nothing open — let the normal exit happen.
+  });
+
+  history.replaceState({ trap: true }, '');
+})();
+
 /* ================= HOME (dashboard) ================= */
 /**
  * Home is now a combined dashboard summarizing both Cindy and Custom
