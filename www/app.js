@@ -734,14 +734,40 @@ function saveSessions(list) {
   localStorage.setItem(KEY_SESSIONS, JSON.stringify(list));
   invalidateXPCache();
 }
+/* ---- in-memory cache for the active-workout record ----
+   loadActive() used to hit localStorage.getItem + JSON.parse on every
+   single call — including from refreshWorkoutUI(), which runs on a
+   250ms setInterval for the entire duration of a workout (could be
+   20-45+ min). That's ~4 synchronous localStorage reads + JSON parses
+   per second doing nothing but re-reading data this same code just
+   wrote a moment ago.
+   KEY_ACTIVE is only ever touched via these three functions anywhere
+   in the app (no cross-tab 'storage' listener, no external writer), so
+   a shared in-memory cache is safe: every caller — the tick loop AND
+   the button handlers like saveRound()/togglePause()/skipRound() that
+   also call loadActive() mid-workout — reads and writes the exact same
+   object. A write from any one of them is instantly visible to all the
+   others, so there's no staleness window despite skipping the disk
+   round-trip on repeat reads. localStorage is only touched on the
+   first read after a page load and on every save/clear, exactly like
+   before — just not redundantly on every idle tick in between. */
+let _activeCache, _activeCacheLoaded = false;
 function loadActive() {
-  try { return JSON.parse(localStorage.getItem(KEY_ACTIVE)); }
-  catch (e) { return null; }
+  if (!_activeCacheLoaded) {
+    try { _activeCache = JSON.parse(localStorage.getItem(KEY_ACTIVE)); }
+    catch (e) { _activeCache = null; }
+    _activeCacheLoaded = true;
+  }
+  return _activeCache;
 }
 function saveActive(a) {
+  _activeCache = a;
+  _activeCacheLoaded = true;
   localStorage.setItem(KEY_ACTIVE, JSON.stringify(a));
 }
 function clearActive() {
+  _activeCache = null;
+  _activeCacheLoaded = true;
   localStorage.removeItem(KEY_ACTIVE);
 }
 function loadRunSessions() {
@@ -752,14 +778,27 @@ function saveRunSessions(list) {
   localStorage.setItem(KEY_RUN_SESSIONS, JSON.stringify(list));
   invalidateXPCache();
 }
+/* ---- same in-memory cache treatment as loadActive() above, and for
+   the same reason: refreshRunUI() re-reads this every 1s for the
+   whole duration of a run via loadRunActive(). Same safety argument
+   applies — KEY_RUN_ACTIVE is only ever read/written here. ---- */
+let _runActiveCache, _runActiveCacheLoaded = false;
 function loadRunActive() {
-  try { return JSON.parse(localStorage.getItem(KEY_RUN_ACTIVE)); }
-  catch (e) { return null; }
+  if (!_runActiveCacheLoaded) {
+    try { _runActiveCache = JSON.parse(localStorage.getItem(KEY_RUN_ACTIVE)); }
+    catch (e) { _runActiveCache = null; }
+    _runActiveCacheLoaded = true;
+  }
+  return _runActiveCache;
 }
 function saveRunActive(a) {
+  _runActiveCache = a;
+  _runActiveCacheLoaded = true;
   localStorage.setItem(KEY_RUN_ACTIVE, JSON.stringify(a));
 }
 function clearRunActive() {
+  _runActiveCache = null;
+  _runActiveCacheLoaded = true;
   localStorage.removeItem(KEY_RUN_ACTIVE);
 }
 
