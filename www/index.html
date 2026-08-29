@@ -12,6 +12,25 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="icon.svg" />
 <link href="vendor/fonts/fonts.css" rel="stylesheet" />
+<!-- Cinzel (used by cindy-ui-redesign.css's --font-display) loaded here
+     instead of via @import inside that CSS file. @import creates a serial
+     fetch chain — the browser must fetch+start-parsing
+     cindy-ui-redesign.css BEFORE it even discovers the Google Fonts
+     request buried inside it. A <link> here is discovered immediately,
+     in parallel with every other <head> resource. The media="print"
+     + onload swap keeps it non-render-blocking on top of that: the page
+     paints with the fallback font first (font-display=swap on the
+     Google Fonts request itself), then swaps in Cinzel once it arrives,
+     instead of holding up first paint while it downloads. Weights
+     trimmed to 400/700/800/900 — the four actually used across the app
+     (previously included unused 500/600 while missing 400/800, which
+     are core weights that this file's `.brand`, `.modal-title`, `.btn`,
+     and default-weight elements like `.complete-rounds`/`.boss-name`
+     all rely on). -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;800;900&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;800;900&display=swap"></noscript>
 <style>
 :root{
   --bg:#0A0A0D;
