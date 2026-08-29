@@ -728,6 +728,24 @@ body{
   padding:0 4px;margin-bottom:18px;
 }
 
+/* ---- Training Camp (Phase 2D) — one card per fitness test ---- */
+.tc-card{
+  background:linear-gradient(155deg,var(--card) 0%,var(--bg-elev) 100%);
+  border:1px solid var(--card-border);border-radius:var(--radius);
+  padding:14px;margin-bottom:12px;
+}
+.tc-card-top{display:flex;align-items:center;gap:12px;}
+.tc-icon{font-size:38px;flex-shrink:0;}
+.tc-card-title{min-width:0;}
+.tc-name{font-family:var(--font-display);font-size:15px;letter-spacing:.3px;}
+.tc-desc{font-size:11px;color:var(--text-dim);line-height:1.4;margin-top:2px;}
+.tc-stats-row{display:flex;gap:8px;margin-top:12px;}
+.tc-stat{flex:1;text-align:center;background:var(--bg-elev);border-radius:8px;padding:8px 4px;}
+.tc-stat-lbl{font-size:9px;font-weight:800;letter-spacing:1px;color:var(--text-faint);}
+.tc-stat-val{font-family:var(--font-display);font-size:16px;margin-top:2px;}
+.tc-delta-row{text-align:center;margin-top:8px;font-size:13px;}
+
+
 /* ---- character sheet ---- */
 .character-sheet-card{
   background:linear-gradient(155deg,var(--card) 0%,var(--bg-elev) 100%);
@@ -1830,6 +1848,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 #screen-program .mode-cardio::after{box-shadow:0 0 70px rgba(232,35,42,.18);}
 #screen-program .mode-cindy::after{box-shadow:0 0 70px rgba(143,105,255,.18);}
 #screen-program .mode-run::after{box-shadow:0 0 70px rgba(34,199,176,.18);}
+#screen-program .mode-trainingcamp::after{box-shadow:0 0 70px rgba(255,179,64,.18);}
 
 /* ---------------- CUSTOM WORKOUTS ---------------- */
 #screen-customlist .topbar,
@@ -2731,6 +2750,21 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         </div>
       </div>
 
+      <div class="program-card-link mode-trainingcamp" onclick="go('trainingcamp')">
+        <div class="program-card-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+        </div>
+        <div>
+          <div class="title">Training Camp</div>
+          <div class="sub">ทดสอบ Baseline ของตัวเอง — Pull-up, Push-up, Squat, Plank, Running แล้วดูพัฒนาการจริง</div>
+          <div class="sub2" id="programTrainingCampStat"></div>
+        </div>
+        <div class="arrow">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+      </div>
+
+
       <div id="homeCustomWrap" style="display:none;margin-top:14px;">
         <div class="section-label" style="margin-top:0;">CUSTOM WORKOUT ล่าสุด</div>
         <div id="homeCustomCard"></div>
@@ -2826,6 +2860,21 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       <div class="metric-card" style="font-size:12px;color:var(--text-dim);line-height:1.6;">
         60 XP ต่อกม. — ต้องรักษาเพซเฉลี่ยไว้ที่ 3:00–15:00 นาที/กม. ถึงจะได้ XP เต็ม (เร็ว/ช้ากว่านี้ XP จะถูก cap ไว้) และต้องวิ่งอย่างน้อย 0.3 กม. ถึงจะเริ่มได้ XP
       </div>
+    </div>
+  </section>
+
+  <!-- TRAINING CAMP — fitness baseline tests (Phase 2D) -->
+  <section id="screen-trainingcamp" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('program')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">TRAINING CAMP</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div class="empty-hint" style="text-align:left;padding:0 0 12px;">ทำ Test แต่ละอย่างครั้งแรกเพื่อตั้ง BASELINE ของตัวเอง แล้วกลับมาทดสอบซ้ำเมื่อไหร่ก็ได้เพื่อดูว่าตัวเองพัฒนาขึ้นแค่ไหน</div>
+      <div id="trainingCampList"></div>
     </div>
   </section>
 
@@ -3782,6 +3831,23 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     </div>
   </div>
 </div>
+
+<!-- Fitness Test entry modal (Training Camp, Phase 2D) -->
+<div id="fitnessTestModal" class="modal-overlay">
+  <div class="modal-card">
+    <div id="fitnessTestTitle" class="modal-title">Pull-up Test</div>
+    <div id="fitnessTestDesc" style="font-size:12.5px;color:var(--text-dim);line-height:1.5;margin:-6px 0 14px;"></div>
+    <div class="field-row" style="grid-template-columns:1fr 100px;">
+      <label id="fitnessTestUnitLabel">ครั้ง</label>
+      <input type="number" id="fitnessTestInput" min="0" step="1" placeholder="0" style="width:100%;box-sizing:border-box;text-align:right;background:var(--bg-elev);border:1.5px solid var(--card-border);border-radius:8px;color:var(--text);padding:8px 10px;font-size:14px;">
+    </div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('fitnessTestModal')">ยกเลิก</button>
+      <button class="btn btn-primary btn-sm" onclick="submitFitnessTest()">บันทึกผล</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- Streak Milestone Treasure Chest Modal -->
 <div id="treasureChestModal" class="modal-overlay">

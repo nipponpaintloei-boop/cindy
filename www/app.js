@@ -1551,6 +1551,7 @@ function go(name) {
   if (name === 'cardiolist') renderCardioList();
   if (name === 'character') renderCharacterSheet();
   if (name === 'run') renderRunHome();
+  if (name === 'trainingcamp') renderTrainingCamp();
 }
 
 /* ================= mobile back-button / nav-gesture trap =================
@@ -2515,6 +2516,72 @@ function exerciseCategoryOrGuess(entry) {
   const match = name && EXERCISE_LIBRARY.find(e => e.name.trim().toLowerCase() === name);
   return (match && match.category) || 'core';
 }
+/* ================= TRAINING CAMP / FITNESS TESTS (Phase 2D) =================
+ * A player-run baseline test per stat category — separate from logged
+ * workouts, meant to answer "how fit am I right now" directly rather than
+ * being inferred from accumulated training volume. The first result ever
+ * recorded for a key becomes its BASELINE; every result after that is
+ * compared back against the baseline to show real-world improvement
+ * (see fitnessTestInfo's deltaPct). Nothing here is timed or verified by
+ * the app — like the PIN lock (see its own comment above), the trust
+ * model is "the player is testing themselves honestly", not anti-cheat.
+ *
+ * Test keys match STAT_DEFS on purpose (pull/push/legs/core/cardio) so a
+ * test result plugs straight into the same stat buckets as workout
+ * volume — see the loadStatTotals() addition below. Units were chosen to
+ * match whatever unit that stat already accumulates in reps for
+ * pull/push/legs (matches Cindy/Custom Workout rep counts), seconds for
+ * core (matches Custom Workout's timed plank/hold entries) and cardio
+ * (matches Run sessions' movingSec) — so folding a test result into the
+ * stat totals never needs a conversion factor. */
+const FITNESS_TESTS = [
+  { key: 'pull', label: 'Pull-up Test', unit: 'ครั้ง',
+    desc: 'ดึงข้อขึ้น-ลงให้ได้มากที่สุดในเซ็ตเดียว (ฟอร์มถูกต้อง ไม่โยกตัว)', icon: 'mitten', color: 'var(--pull)' },
+  { key: 'push', label: 'Push-up Test', unit: 'ครั้ง',
+    desc: 'วิดพื้นให้ได้มากที่สุดในเซ็ตเดียว', icon: 'boxGlove', color: 'var(--push)' },
+  { key: 'legs', label: 'Squat Test', unit: 'ครั้ง',
+    desc: 'สควอทให้ได้มากที่สุดในเซ็ตเดียว', icon: 'tank', color: 'var(--squat)' },
+  { key: 'core', label: 'Plank Test', unit: 'วินาที',
+    desc: 'แพลงค์ค้างให้นานที่สุดเท่าที่ทำได้ (จับเวลาเป็นวินาที)', icon: 'core', color: 'var(--core)' },
+  { key: 'cardio', label: 'Running Test', unit: 'วินาที',
+    desc: 'วิ่งหรือวิ่งเหยาะต่อเนื่องให้นานที่สุดโดยไม่หยุดพัก (จับเวลาเป็นวินาที)', icon: 'flame', color: 'var(--run)' }
+];
+const KEY_FITNESS_TESTS = 'cindy_fitness_tests';
+function loadFitnessTests() {
+  try { return JSON.parse(localStorage.getItem(KEY_FITNESS_TESTS)) || {}; }
+  catch (e) { return {}; }
+}
+function saveFitnessTests(data) {
+  localStorage.setItem(KEY_FITNESS_TESTS, JSON.stringify(data));
+}
+/** null if the player has never tested this key yet. baseline = first
+ * entry ever logged (never overwritten); latest = most recent entry;
+ * best = highest value ever logged (ratchets upward, same "ever" pattern
+ * as loadBossEverDefeated/highest level seen elsewhere in this file). */
+function fitnessTestInfo(key) {
+  const log = (loadFitnessTests()[key] || {}).log || [];
+  if (!log.length) return null;
+  const baseline = log[0];
+  const latest = log[log.length - 1];
+  const best = log.reduce((b, e) => (e.value > b.value ? e : b), log[0]);
+  const deltaPct = baseline.value > 0 ? Math.round(((latest.value - baseline.value) / baseline.value) * 100) : 0;
+  return { baseline, latest, best, deltaPct, count: log.length };
+}
+function recordFitnessTest(key, rawValue) {
+  const value = Math.max(0, Math.round(Number(rawValue) || 0));
+  const data = loadFitnessTests();
+  if (!data[key]) data[key] = { log: [] };
+  data[key].log.push({ value, ts: Date.now() });
+  saveFitnessTests(data);
+  return fitnessTestInfo(key);
+}
+/** The one-time floor a test contributes into loadStatTotals() — see
+ * that function's comment for why this is "best", not "latest". */
+function fitnessTestBestValue(key) {
+  const info = fitnessTestInfo(key);
+  return info ? info.best.value : 0;
+}
+
 /** Lifetime totals per stat, pooled from every source that logs the
  * matching kind of work:
  * - Cindy sessions: fixed pull/push/squat reps per round (squat is a
@@ -2527,6 +2594,11 @@ function exerciseCategoryOrGuess(entry) {
  *   introduce a second, inconsistent balance model
  * - Run sessions: moving seconds counted into cardio, same "seconds
  *   count as volume" precedent as time-type Custom Workout exercises
+ * - Training Camp fitness tests (Phase 2D): the best-ever result per key
+ *   is added once as a floor, not accumulated per attempt — a test is a
+ *   snapshot of current ability, not training volume to sum repeatedly.
+ *   This is what lets a brand-new player's first Plank Test seed their
+ *   CORE stat immediately instead of waiting on logged workout history.
  * Shared by the stat bars, the derived "class" flavor title, and the
  * CP number so none of them drift out of sync with each other. */
 function loadStatTotals() {
@@ -2545,6 +2617,9 @@ function loadStatTotals() {
   });
   loadRunSessions().forEach(s => {
     totals.cardio += s.movingSec || 0;
+  });
+  STAT_DEFS.forEach(def => {
+    totals[def.key] += fitnessTestBestValue(def.key);
   });
   return totals;
 }
@@ -2931,6 +3006,77 @@ function renderCharacterSheet() {
   renderCharacterTitleTag();
   checkAndUnlockAchievements();
   renderPinSettingsUI();
+}
+
+/* ================= TRAINING CAMP SCREEN =================
+ * Renders one card per FITNESS_TESTS entry — either an "ยังไม่เคยทดสอบ"
+ * empty state with a start button, or the baseline/latest/best readout
+ * with a delta vs baseline and a retest button. All numbers come from
+ * fitnessTestInfo(); this function only formats. */
+function fmtFitnessTestValue(test, value) {
+  return test.unit === 'วินาที' ? fmtTime(value) : String(value);
+}
+function renderTrainingCamp() {
+  const wrap = document.getElementById('trainingCampList');
+  if (!wrap) return;
+  wrap.innerHTML = FITNESS_TESTS.map(test => {
+    const info = fitnessTestInfo(test.key);
+    const iconHtmlStr = badgeHtml(test.icon, '#fff', test.color, { cls: 'tc-icon' });
+    if (!info) {
+      return '<div class="tc-card">'
+        + '<div class="tc-card-top">' + iconHtmlStr
+        + '<div class="tc-card-title"><div class="tc-name">' + test.label + '</div>'
+        + '<div class="tc-desc">' + test.desc + '</div></div></div>'
+        + '<button class="btn btn-primary btn-sm" style="width:100%;margin-top:10px;" onclick="openFitnessTestModal(\'' + test.key + '\')">เริ่ม Test ครั้งแรก</button>'
+        + '</div>';
+    }
+    const deltaSign = info.deltaPct > 0 ? '+' : '';
+    const deltaColor = info.deltaPct > 0 ? 'var(--success)' : (info.deltaPct < 0 ? 'var(--danger)' : 'var(--text-faint)');
+    const deltaHtml = info.count > 1
+      ? '<span style="color:' + deltaColor + ';font-weight:800;">' + deltaSign + info.deltaPct + '%</span>'
+      : '<span style="color:var(--text-faint);">BASELINE</span>';
+    return '<div class="tc-card">'
+      + '<div class="tc-card-top">' + iconHtmlStr
+      + '<div class="tc-card-title"><div class="tc-name">' + test.label + '</div>'
+      + '<div class="tc-desc">' + test.desc + '</div></div></div>'
+      + '<div class="tc-stats-row">'
+      + '<div class="tc-stat"><div class="tc-stat-lbl">BASELINE</div><div class="tc-stat-val">' + fmtFitnessTestValue(test, info.baseline.value) + '</div></div>'
+      + '<div class="tc-stat"><div class="tc-stat-lbl">ล่าสุด</div><div class="tc-stat-val">' + fmtFitnessTestValue(test, info.latest.value) + '</div></div>'
+      + '<div class="tc-stat"><div class="tc-stat-lbl">ดีที่สุด</div><div class="tc-stat-val">' + fmtFitnessTestValue(test, info.best.value) + '</div></div>'
+      + '</div>'
+      + '<div class="tc-delta-row">' + deltaHtml + '</div>'
+      + '<button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;" onclick="openFitnessTestModal(\'' + test.key + '\')">ทดสอบอีกครั้ง</button>'
+      + '</div>';
+  }).join('');
+}
+function openFitnessTestModal(key) {
+  const test = FITNESS_TESTS.find(t => t.key === key);
+  if (!test) return;
+  const modal = document.getElementById('fitnessTestModal');
+  modal.dataset.testKey = key;
+  document.getElementById('fitnessTestTitle').textContent = test.label;
+  document.getElementById('fitnessTestDesc').textContent = test.desc;
+  document.getElementById('fitnessTestUnitLabel').textContent = test.unit;
+  const input = document.getElementById('fitnessTestInput');
+  input.value = '';
+  modal.classList.add('active');
+  setTimeout(() => input.focus(), 50);
+}
+function submitFitnessTest() {
+  const modal = document.getElementById('fitnessTestModal');
+  const key = modal.dataset.testKey;
+  const test = FITNESS_TESTS.find(t => t.key === key);
+  const input = document.getElementById('fitnessTestInput');
+  const value = Number(input.value);
+  if (!test || !Number.isFinite(value) || value < 0) { showToast('กรอกตัวเลขให้ถูกต้อง'); return; }
+  const wasFirst = !fitnessTestInfo(key);
+  recordFitnessTest(key, value);
+  closeModal('fitnessTestModal');
+  showToast(wasFirst ? 'บันทึก BASELINE แล้ว — ' + test.label : 'บันทึกผล Test แล้ว', 'target');
+  renderTrainingCamp();
+  if (document.getElementById('screen-character') && document.getElementById('screen-character').classList.contains('active')) {
+    renderCharacterSheet();
+  }
 }
 
 /* ================= MASCOT SKINS =================
@@ -3482,6 +3628,14 @@ function renderProgramHubCards() {
       const last = runSessions.reduce((m, s) => Math.max(m, s.completedAt), 0);
       runEl.textContent = 'สะสม ' + totalKm.toFixed(1) + ' กม. · ล่าสุด ' + fmtDate(last);
     }
+  }
+
+  const tcEl = document.getElementById('programTrainingCampStat');
+  if (tcEl) {
+    const testedCount = FITNESS_TESTS.filter(t => fitnessTestInfo(t.key)).length;
+    tcEl.textContent = testedCount === 0
+      ? 'ยังไม่เคยทดสอบ'
+      : 'ทดสอบแล้ว ' + testedCount + '/' + FITNESS_TESTS.length + ' รายการ';
   }
 
   const customNudge = document.getElementById('programCustomNudge');
