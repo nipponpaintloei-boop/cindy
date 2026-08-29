@@ -1287,6 +1287,17 @@ body{
 .boss-view-item-chapter{font-size:8.5px;font-weight:800;letter-spacing:1px;color:var(--text-faint);margin-bottom:2px;text-transform:uppercase;}
 .boss-view-item.worldmap-locked{opacity:.45;}
 .boss-view-modifier{font-size:10.5px;color:var(--text-dim);background:var(--bg-elev);border:1px solid var(--card-border);border-radius:8px;padding:8px 10px;margin-bottom:10px;}
+
+/* ---- boss mastery line (per-boss lifetime defeat count + tier) — the
+   part of the archive entry that never resets with the weekly fight ---- */
+.boss-view-item-mastery{font-size:10px;color:var(--text-faint);letter-spacing:.2px;}
+
+/* ---- lifetime journey summary — two always-climbing numbers above the
+   per-boss list, framing the weekly loop as one step in a longer ladder ---- */
+.boss-journey-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.boss-journey-stat{background:var(--bg-elev);border:1px solid var(--card-border);border-radius:8px;padding:10px 8px;text-align:center;}
+.boss-journey-stat .v{font-family:var(--font-display);font-size:20px;line-height:1;color:var(--warning);}
+.boss-journey-stat .l{font-size:9px;color:var(--text-faint);letter-spacing:.5px;margin-top:4px;}
 .boss-header-btns{display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
 .boss-chapter-label{font-size:8.5px;font-weight:800;letter-spacing:1px;color:var(--text-faint);text-transform:uppercase;}
 .boss-modifier-label{font-size:9.5px;font-style:italic;color:rgba(var(--boss-accent-rgb),.85);margin-top:3px;}
@@ -1865,6 +1876,34 @@ body{
   position:relative;z-index:1;font-size:13px;font-weight:600;color:var(--text-dim);
 }
 
+/* ---- rarity tag/ribbon — the "gacha reveal" premium touch: a small
+   glowing pill announcing the tier before the item name lands, with the
+   same light-sweep language as .mission-eyebrow. Empty (no rarity passed,
+   e.g. plain level-up) collapses to nothing via :empty. ---- */
+.celebration-rarity{
+  position:relative;z-index:1;display:inline-block;margin-top:8px;
+  font-family:var(--font-display);font-size:12px;letter-spacing:3px;
+  color:var(--cel-color);text-shadow:0 0 10px rgba(var(--cel-rgb),.6);
+  padding:3px 14px;border-radius:20px;overflow:hidden;
+  border:1px solid rgba(var(--cel-rgb),.5);
+  background:linear-gradient(90deg,rgba(var(--cel-rgb),.14),rgba(var(--cel-rgb),.03));
+  opacity:0;transform:translateY(-6px) scale(.9);
+}
+.celebration-rarity:empty{display:none;}
+.celebration-overlay.show .celebration-rarity{animation:celRarityIn .45s cubic-bezier(.2,.8,.3,1) .05s both;}
+@keyframes celRarityIn{
+  0%{opacity:0;transform:translateY(-6px) scale(.85);}
+  60%{opacity:1;transform:translateY(0) scale(1.06);}
+  100%{opacity:1;transform:translateY(0) scale(1);}
+}
+.celebration-rarity::after{
+  content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;
+  background:linear-gradient(115deg,transparent,rgba(255,255,255,.6),transparent);
+  transform:skewX(-20deg);
+}
+.celebration-overlay.show .celebration-rarity::after{animation:missionEyebrowSweep 1s ease .4s 1;}
+
+
 /* ---- complete screen ---- */
 /* ---- Mission Complete + Level Up polish ----
  * Additive only, layered on the existing markup/classes above. Two parts:
@@ -1971,7 +2010,8 @@ body{
   55%{transform:translateX(-50%) scale(.97);}
   100%{transform:translateX(-50%) scale(1);filter:brightness(1);}
 }
-.celebration-overlay.variant-levelup .celebration-badge{
+.celebration-overlay.variant-levelup .celebration-badge,
+.celebration-overlay.tier-premium .celebration-badge{
   animation:levelupBadgePulse 1.1s ease .1s 1;
 }
 @keyframes levelupBadgePulse{
@@ -1979,18 +2019,39 @@ body{
   60%{box-shadow:0 0 0 16px rgba(var(--cel-rgb),0);}
   100%{box-shadow:0 0 24px 3px rgba(var(--cel-rgb),.55);}
 }
-.celebration-overlay.variant-levelup .celebration-card::before{
+.celebration-overlay.variant-levelup .celebration-card::before,
+.celebration-overlay.tier-premium .celebration-card::before{
   content:"";position:absolute;inset:-40px;z-index:-1;pointer-events:none;
   background:repeating-conic-gradient(from 0deg, rgba(var(--cel-rgb),.22) 0deg 4deg, transparent 4deg 18deg);
   border-radius:50%;opacity:0;
 }
-.celebration-overlay.show.variant-levelup .celebration-card::before{
+.celebration-overlay.show.variant-levelup .celebration-card::before,
+.celebration-overlay.show.tier-premium .celebration-card::before{
   animation:levelupRaySpin 1.6s linear forwards;
 }
 @keyframes levelupRaySpin{
   0%{opacity:0;transform:rotate(0deg) scale(.7);}
   20%{opacity:.8;}
   100%{opacity:0;transform:rotate(70deg) scale(1.15);}
+}
+/* premium tier (epic/mythic loot, skin unlocks) also gets a slightly
+   bigger badge + a second, slower counter-rotating ray layer so it reads
+   as a step up from an ordinary rare drop, not just the same effect. */
+.celebration-overlay.tier-premium .celebration-badge{
+  width:84px;height:84px;font-size:38px;
+}
+.celebration-overlay.tier-premium .celebration-card::after{
+  content:"";position:absolute;inset:-56px;z-index:-1;pointer-events:none;
+  background:repeating-conic-gradient(from 0deg, rgba(var(--cel-rgb),.14) 0deg 3deg, transparent 3deg 22deg);
+  border-radius:50%;opacity:0;
+}
+.celebration-overlay.show.tier-premium .celebration-card::after{
+  animation:premiumRaySpinReverse 2s linear forwards;
+}
+@keyframes premiumRaySpinReverse{
+  0%{opacity:0;transform:rotate(0deg) scale(.75);}
+  25%{opacity:.6;}
+  100%{opacity:0;transform:rotate(-55deg) scale(1.2);}
 }
 .celebration-rankup{
   position:relative;z-index:1;margin-top:2px;font-size:11px;font-weight:800;letter-spacing:1.5px;
@@ -2000,7 +2061,12 @@ body{
 @media (prefers-reduced-motion:reduce){
   .mascot-avatar.level-up-glow #mascotImg{animation:none !important;}
   .celebration-overlay.variant-levelup .celebration-badge,
-  .celebration-overlay.show.variant-levelup .celebration-card::before{animation:none !important;}
+  .celebration-overlay.tier-premium .celebration-badge,
+  .celebration-overlay.show.variant-levelup .celebration-card::before,
+  .celebration-overlay.show.tier-premium .celebration-card::before,
+  .celebration-overlay.show.tier-premium .celebration-card::after,
+  .celebration-overlay.show .celebration-rarity,
+  .celebration-overlay.show .celebration-rarity::after{animation:none !important;opacity:1 !important;transform:none !important;}
 }
 
 .complete-wrap{flex:1;min-height:0;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
@@ -3529,6 +3595,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
           <button class="boss-view-close" type="button" data-boss-close>×</button>
         </div>
         <div id="bossViewModifier" class="boss-view-modifier"></div>
+        <div id="bossJourneySummary" class="boss-journey-summary"></div>
         <div class="section-label" style="margin-top:2px;">DAMAGE SOURCE</div>
         <div id="bossViewDmgBreakdown" class="boss-dmg-breakdown" style="margin-bottom:14px;"></div>
         <div id="bossViewList" class="boss-view-list"></div>
@@ -5077,6 +5144,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
   <div class="celebration-card">
     <div class="celebration-burst"></div>
     <div class="celebration-badge" id="celebrationBadge"></div>
+    <div class="celebration-rarity" id="celebrationRarity"></div>
     <div class="celebration-title" id="celebrationTitle"></div>
     <div class="celebration-subtitle" id="celebrationSubtitle"></div>
     <div class="celebration-rankup" id="celebrationRankup"></div>

@@ -920,6 +920,43 @@ function saveBossEverDefeated(list) {
   localStorage.setItem(KEY_BOSS_EVER_DEFEATED, JSON.stringify(list));
 }
 
+/* ---- Boss Mastery (lifetime, per boss) ----
+ * The weekly boss fight itself always resets — that's by design, it's a
+ * fresh check-in every week. But nothing about "how many times have I
+ * ever beaten GRINDER-1" resets, so this is the long-term ladder that
+ * sits underneath the weekly loop: every defeat (not just the first)
+ * bumps a per-boss lifetime counter, which climbs a fixed mastery tier
+ * list forever. No new gameplay data — same defeat event that already
+ * pushes loadBossEverDefeated(), just also tallied. */
+const KEY_BOSS_DEFEAT_COUNTS = 'cindy_boss_defeat_counts';
+function loadBossDefeatCounts() {
+  try { return JSON.parse(localStorage.getItem(KEY_BOSS_DEFEAT_COUNTS)) || {}; }
+  catch (e) { return {}; }
+}
+function saveBossDefeatCounts(counts) {
+  localStorage.setItem(KEY_BOSS_DEFEAT_COUNTS, JSON.stringify(counts));
+}
+function bumpBossDefeatCount(bossId) {
+  const counts = loadBossDefeatCounts();
+  counts[bossId] = (counts[bossId] || 0) + 1;
+  saveBossDefeatCounts(counts);
+  return counts[bossId];
+}
+const BOSS_MASTERY_TIERS = [
+  { min: 0,  label: 'ยังไม่เคยปราบ', color: 'var(--text-faint)' },
+  { min: 1,  label: 'CHALLENGER',    color: 'var(--text-dim)' },
+  { min: 3,  label: 'VETERAN',       color: 'var(--web)' },
+  { min: 7,  label: 'MASTER',        color: 'var(--warning)' },
+  { min: 15, label: 'LEGENDARY',     color: '#FFD700' }
+];
+function bossMasteryFor(count) {
+  let tier = BOSS_MASTERY_TIERS[0];
+  for (const t of BOSS_MASTERY_TIERS) { if (count >= t.min) tier = t; }
+  const idx = BOSS_MASTERY_TIERS.indexOf(tier);
+  const next = BOSS_MASTERY_TIERS[idx + 1] || null;
+  return { label: tier.label, color: tier.color, next: next ? { label: next.label, remaining: next.min - count } : null };
+}
+
 /* ================= BOSS LOOT DROPS =================
  * Every boss kill rolls one random item from a rarity-weighted table —
  * reuses the same BADGE_ICONS glyph set as the boss/skin accessories, so
@@ -1482,9 +1519,17 @@ function renderBossViewList() {
     modifierEl.innerHTML = 'สัปดาห์นี้: <strong>"' + mod.name + '"</strong> — ' + mod.desc;
   }
   renderBossDmgBreakdown('bossViewDmgBreakdown');
+  renderBossJourneySummary(state);
+  const counts = loadBossDefeatCounts();
   list.innerHTML = BOSS_ROSTER.map((boss, i) => {
     const current = boss.id === state.boss.id;
     const next = i === (idx + 1) % BOSS_ROSTER.length;
+    const count = counts[boss.id] || 0;
+    const mastery = bossMasteryFor(count);
+    const masteryLine = count > 0
+      ? ('ปราบมาแล้ว ' + count + ' ครั้ง · <span style="color:' + mastery.color + ';font-weight:800;">' + mastery.label + '</span>'
+        + (mastery.next ? ' · อีก ' + mastery.next.remaining + ' ครั้ง → ' + mastery.next.label : ''))
+      : mastery.label;
     return `<div class="boss-view-item${current ? ' current' : ''}">
       <div class="boss-view-item-top">
         <div>
@@ -1494,9 +1539,27 @@ function renderBossViewList() {
         </div>
         <div class="boss-view-item-status">${current ? 'CURRENT' : (next ? 'NEXT WEEK' : 'UPCOMING')}</div>
       </div>
+      <div class="boss-view-item-mastery">${masteryLine}</div>
       ${boss.story ? `<div class="boss-view-item-story">${boss.story}</div>` : ''}
     </div>`;
   }).join('');
+}
+
+/* ---- Lifetime journey summary — sits above the per-boss list in the
+ * Boss Archive. Two numbers that never reset with the weekly fight:
+ * which lap of the roster the player is currently on (HP target climbs
+ * every lap — see currentBossState()) and how many boss kills they've
+ * racked up in total, lifetime, across every boss. This is the actual
+ * long-term counter; the weekly HP bar above it is just this week's step
+ * toward it. */
+function renderBossJourneySummary(state) {
+  const wrap = document.getElementById('bossJourneySummary');
+  if (!wrap) return;
+  const lap = Math.floor(state.weekIndex / BOSS_ROSTER.length) + 1;
+  const counts = loadBossDefeatCounts();
+  const totalKills = Object.values(counts).reduce((a, b) => a + b, 0);
+  wrap.innerHTML = '<div class="boss-journey-stat"><div class="v">LAP ' + lap + '</div><div class="l">รอบที่กำลังเดินทาง</div></div>'
+    + '<div class="boss-journey-stat"><div class="v">' + totalKills + '</div><div class="l">ปราบบอสสะสมตลอดกาล</div></div>';
 }
 
 /* ================= WORLD MAP (product doc #10) =================
@@ -1736,10 +1799,14 @@ function renderBossCard() {
       everDefeated.push(state.boss.id);
       saveBossEverDefeated(everDefeated);
     }
+    const bossDefeatCount = bumpBossDefeatCount(state.boss.id);
+    const masteryBefore = bossMasteryFor(bossDefeatCount - 1);
+    const masteryAfter = bossMasteryFor(bossDefeatCount);
     addSeasonPoints(SEASON_POINTS_BOSS_DEFEAT); // product doc #20 — once per weekly defeat, guarded by loadBossDefeatSeenWeek() above
     const loot = rollLootDrop(state);
     const lootCount = addLootItem(loot.id);
     const lootRarity = rarityDef(loot.rarity);
+    const lootIsPremium = loot.rarity === 'epic' || loot.rarity === 'mythic';
     // Boss-kill celebration + (if new) skin-unlock celebration both queue
     // here via queueCelebration() — same queue a level-up push from
     // renderXpBar lands in, so if this kill also crosses a level threshold
@@ -1749,14 +1816,28 @@ function renderBossCard() {
       icon: 'gift',
       title: '[' + lootRarity.label + '] ' + loot.name + (lootCount > 1 ? ' x' + lootCount : ''),
       subtitle: 'ปราบ ' + state.boss.name + ' สำเร็จ!',
-      accent: lootRarity.c2
+      rarityLabel: '★ ' + lootRarity.label + ' ★',
+      accent: lootRarity.c2,
+      premium: lootIsPremium
     });
     if (firstTimeEver) {
       queueCelebration({
         icon: 'palette',
         title: 'ปลดล็อคสกินใหม่!',
         subtitle: state.boss.name,
-        accent: state.boss.accent
+        rarityLabel: '★ NEW SKIN ★',
+        accent: state.boss.accent,
+        premium: true
+      });
+    }
+    if (masteryAfter.label !== masteryBefore.label) {
+      queueCelebration({
+        icon: 'crown',
+        title: masteryAfter.label,
+        subtitle: state.boss.name + ' · ปราบมาแล้ว ' + bossDefeatCount + ' ครั้ง',
+        rarityLabel: '★ MASTERY UP ★',
+        accent: state.boss.accent,
+        premium: true
       });
     }
   }
@@ -1957,6 +2038,7 @@ function showToast(msg, icon) {
  * for level-ups) — falls back to the CSS default (warning amber) if
  * omitted. */
 const CELEBRATION_DURATION_MS = 2200;
+const CELEBRATION_DURATION_MS_PREMIUM = 3000; // epic/mythic loot + skin unlocks get a longer hold to read as a bigger moment
 const CELEBRATION_GAP_MS = 220;
 const _celebrationQueue = [];
 let _celebrationActive = false;
@@ -1974,6 +2056,7 @@ function _runCelebrationQueue() {
 function _renderCelebration(opts) {
   const overlay = document.getElementById('celebrationOverlay');
   const badge = document.getElementById('celebrationBadge');
+  const rarityEl = document.getElementById('celebrationRarity');
   const titleEl = document.getElementById('celebrationTitle');
   const subtitleEl = document.getElementById('celebrationSubtitle');
   const rankupEl = document.getElementById('celebrationRankup');
@@ -1985,7 +2068,9 @@ function _renderCelebration(opts) {
   overlay.style.setProperty('--cel-color', color);
   overlay.style.setProperty('--cel-rgb', hexToRgbTriplet(color));
   overlay.classList.toggle('variant-levelup', opts.variant === 'levelup');
+  overlay.classList.toggle('tier-premium', !!opts.premium);
   badge.innerHTML = opts.icon ? iconHtml(opts.icon) : '';
+  if (rarityEl) rarityEl.textContent = opts.rarityLabel || '';
   titleEl.textContent = opts.title || '';
   subtitleEl.textContent = opts.subtitle || '';
   if (rankupEl) {
@@ -1994,10 +2079,12 @@ function _renderCelebration(opts) {
   }
 
   // particle burst — regenerated fresh each call (evenly spaced angles with
-  // a little jitter) so repeats don't all look identical
+  // a little jitter) so repeats don't all look identical. Premium moments
+  // (epic/mythic loot, skin unlocks) get a denser burst so the reveal
+  // itself feels like a bigger deal, not just a bigger badge.
   const burst = overlay.querySelector('.celebration-burst');
   burst.querySelectorAll('.celebration-particle').forEach(p => p.remove());
-  const count = 10;
+  const count = opts.premium ? 16 : 10;
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 * i) / count + (Math.random() * 0.4 - 0.2);
     const dist = 55 + Math.random() * 35;
@@ -2010,9 +2097,17 @@ function _renderCelebration(opts) {
   }
 
   overlay.classList.add('show');
-  vibrate([50, 30, 50]);
+  if (opts.premium) {
+    vibrate([50, 30, 50, 30, 120]);
+    beep(659, 90, 0.15);
+    setTimeout(() => beep(880, 90, 0.16), 100);
+    setTimeout(() => beep(1175, 160, 0.18), 200);
+  } else {
+    vibrate([50, 30, 50]);
+  }
   clearTimeout(_celebrationTimer);
-  _celebrationTimer = setTimeout(dismissCelebration, CELEBRATION_DURATION_MS);
+  const duration = opts.premium ? CELEBRATION_DURATION_MS_PREMIUM : CELEBRATION_DURATION_MS;
+  _celebrationTimer = setTimeout(dismissCelebration, duration);
 }
 /** Ends the current celebration early (tap-to-dismiss) or via its own
  * timeout, then — after a short gap so the fade-out isn't cut off by the
@@ -3901,8 +3996,14 @@ function checkAndUnlockAchievements() {
       unlocked.push(a.id);
       changed = true;
       addSeasonPoints(SEASON_POINTS_ACHIEVEMENT); // product doc #20
-      showToast('ACHIEVEMENT UNLOCKED · ' + a.title, 'gift');
-      vibrate([50, 40, 50, 40, 120]);
+      queueCelebration({
+        icon: 'gift',
+        title: a.title,
+        subtitle: a.desc,
+        rarityLabel: '★ ACHIEVEMENT ★',
+        accent: '#FFD700',
+        premium: true
+      });
     }
   });
   if (changed) saveAchievementUnlocked(unlocked);
@@ -6532,6 +6633,7 @@ function exportData() {
         lastSeenLevel: loadLastSeenLevel(),
         streakChestsOpened,
         bossEverDefeated,
+        bossDefeatCounts: loadBossDefeatCounts(),
         activeSkin: loadActiveSkin(),
         lootInventory,
         equippedLootId: loadEquippedLootId(),
@@ -6882,6 +6984,14 @@ function importDataImpl(event) {
         if (Array.isArray(incomingProgression.bossEverDefeated)) {
           const merged = Array.from(new Set([...loadBossEverDefeated(), ...incomingProgression.bossEverDefeated]));
           saveBossEverDefeated(merged);
+        }
+        if (incomingProgression.bossDefeatCounts && typeof incomingProgression.bossDefeatCounts === 'object') {
+          const counts = loadBossDefeatCounts();
+          Object.keys(incomingProgression.bossDefeatCounts).forEach(bossId => {
+            const incomingCount = incomingProgression.bossDefeatCounts[bossId];
+            if (Number.isFinite(incomingCount)) counts[bossId] = Math.max(counts[bossId] || 0, incomingCount);
+          });
+          saveBossDefeatCounts(counts);
         }
         if (Number.isFinite(incomingProgression.lastSeenLevel)) {
           saveLastSeenLevel(Math.max(loadLastSeenLevel(), incomingProgression.lastSeenLevel));
