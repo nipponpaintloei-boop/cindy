@@ -5052,11 +5052,46 @@ function saveRound() {
   active.combo = (active.combo || 0) + 1;
   active.maxCombo = Math.max(active.maxCombo || 0, active.combo);
   saveActive(active);
-  vibrate(40);
-  beep(880, 90, 0.15);
-  flashPerfectRound();
-  showToast('บันทึกรอบที่ ' + active.roundsSaved + ' แล้ว');
+
+  // a new best mid-workout is a bigger moment than an ordinary round —
+  // gated on currentPB > 0 so a player's very first-ever session (no
+  // prior record to beat) just gets the normal Perfect Round flash below
+  const brokeLivePB = currentPB > 0 && active.roundsSaved > currentPB;
+  if (brokeLivePB) currentPB = active.roundsSaved;
+
+  vibrate(brokeLivePB ? [40, 30, 40, 30, 90] : 40);
+  if (brokeLivePB) {
+    beep(784, 90, 0.16);
+    setTimeout(() => beep(1046, 140, 0.18), 90);
+  } else {
+    beep(880, 90, 0.15);
+  }
+  bumpSaveRoundBtn();
+  bumpRoundsCounter(brokeLivePB);
+  flashPerfectRound(brokeLivePB);
+  showToast(brokeLivePB ? ('NEW PB! ทำลายสถิติเดิม — ' + active.roundsSaved + ' รอบแล้ว') : ('บันทึกรอบที่ ' + active.roundsSaved + ' แล้ว'));
   refreshWorkoutUI();
+}
+
+/* quick squash-and-spring on the save button itself, so every tap reads
+ * as registered the instant it's pressed, independent of the flash/toast
+ * above it which take a beat longer to appear */
+function bumpSaveRoundBtn() {
+  const btn = document.getElementById('saveRoundBtn');
+  if (!btn) return;
+  btn.classList.remove('tap-bump');
+  void btn.offsetWidth;
+  btn.classList.add('tap-bump');
+}
+
+/* rounds counter pops on every save, bigger + gold when it's a live PB */
+function bumpRoundsCounter(isPb) {
+  const el = document.getElementById('roundsBig');
+  if (!el) return;
+  el.classList.remove('bump', 'pb');
+  void el.offsetWidth;
+  el.classList.add('bump');
+  if (isPb) el.classList.add('pb');
 }
 
 /* ---- Perfect Round flourish ----
@@ -5064,14 +5099,28 @@ function saveRound() {
  * with no skip for that round (skipRound() is the only other path, and it
  * doesn't log a round at all) — so there's no new "was it perfect" check
  * to add, just a quick moment to mark it. Kept as a short flash rather
- * than a loud interrupt so it doesn't get old by round 10. */
-function flashPerfectRound() {
+ * than a loud interrupt so it doesn't get old by round 10.
+ *
+ * isPb swaps this into the bigger "NEW PB" gold variant (see .perfect-flash.pb
+ * in CSS) and glows the timer ring gold in sync, for the round that
+ * actually beats the player's prior best. */
+function flashPerfectRound(isPb) {
   const el = document.getElementById('perfectFlash');
   if (!el) return;
-  el.innerHTML = iconHtml('check') + '<span>PERFECT ROUND</span>';
+  el.classList.toggle('pb', !!isPb);
+  el.innerHTML = isPb
+    ? (iconHtml('bolt') + '<span>NEW PB!</span>')
+    : (iconHtml('check') + '<span>PERFECT ROUND</span>');
   el.classList.remove('flash');
   void el.offsetWidth;
   el.classList.add('flash');
+
+  const ringWrap = document.querySelector('#screen-workout .timer-wrap');
+  if (isPb && ringWrap) {
+    ringWrap.classList.remove('pb-glow');
+    void ringWrap.offsetWidth;
+    ringWrap.classList.add('pb-glow');
+  }
 }
 
 function skipRound() {
@@ -5083,6 +5132,14 @@ function skipRound() {
   active.skipLog.push({ time: Math.round(elapsedSec) });
   active.combo = 0;
   saveActive(active);
+  vibrate(20);
+  beep(300, 80, 0.08);
+  const skipBtn = document.getElementById('skipRoundBtn');
+  if (skipBtn) {
+    skipBtn.classList.remove('skip-bump');
+    void skipBtn.offsetWidth;
+    skipBtn.classList.add('skip-bump');
+  }
   showToast('ข้ามรอบนี้แล้ว (ไม่นับเป็น Round)');
   refreshWorkoutUI();
 }
@@ -5560,6 +5617,7 @@ function renderProgress() {
   renderPlanStreak('progPlanStreak');
   renderStatBars();
   renderProgressRecords();
+  renderBodyGrowth();
 
   if (currentMetric === 'xp') {
     renderCombinedXpChart();
@@ -5677,6 +5735,138 @@ function renderProgressRecords() {
       <div class="rounds tabular" style="color:var(--warning);"><span class="icon-inline">${BADGE_ICONS.trophy}</span></div>
     </div>`;
   }).join('');
+}
+
+/* ---- BODY GROWTH ----
+ * "Then vs now" view of the same 5 stats already shown in STATS above,
+ * plus a Fitness Power sparkline across the player's whole history —
+ * answers "how has my body actually developed" instead of only showing
+ * a snapshot of current levels.
+ *
+ * collectStatEvents() replays every rep-earning event (Cindy rounds,
+ * Custom Workout sets, Runs) in chronological order as {ts, delta}
+ * pairs, using the exact same per-category mapping as loadStatTotals()
+ * so the two never drift apart. Fitness test bests are treated as a
+ * constant floor added equally to every snapshot (baseline and current
+ * alike) since there's no logged history of when each test PR
+ * happened — this keeps the *delta* honest even though the absolute
+ * level at each point includes today's best-ever test result. */
+function collectStatEvents() {
+  const events = [];
+  loadSessions().forEach(s => {
+    if (!s.total) return;
+    events.push({ ts: s.finished, delta: { pull: s.total.pull || 0, push: s.total.push || 0, legs: s.total.squat || 0, core: 0, cardio: 0 } });
+  });
+  loadCustomWorkoutSessions().forEach(s => {
+    const delta = { pull: 0, push: 0, legs: 0, core: 0, cardio: 0 };
+    (s.exerciseLog || []).forEach(e => {
+      const cat = exerciseCategoryOrGuess(e);
+      delta[cat] = (delta[cat] || 0) + (e.repsOrSecDone || 0);
+    });
+    events.push({ ts: s.completedAt, delta });
+  });
+  loadRunSessions().forEach(s => {
+    events.push({ ts: s.completedAt, delta: { pull: 0, push: 0, legs: 0, core: 0, cardio: s.movingSec || 0 } });
+  });
+  events.sort((a, b) => a.ts - b.ts);
+  return events;
+}
+
+function renderBodyGrowth() {
+  const wrap = document.getElementById('bodyGrowthStats');
+  const sparkWrap = document.getElementById('bodyGrowthSpark');
+  const summaryEl = document.getElementById('bodyGrowthSummary');
+  if (!wrap) return;
+
+  const events = collectStatEvents();
+  if (events.length === 0) {
+    wrap.innerHTML = '<div class="empty-hint">เริ่มออกกำลังกายครั้งแรก แล้วกลับมาดูว่าร่างกายพัฒนาไปแค่ไหน</div>';
+    if (sparkWrap) sparkWrap.innerHTML = '';
+    if (summaryEl) summaryEl.textContent = '';
+    return;
+  }
+
+  const testFloor = {};
+  STAT_DEFS.forEach(def => { testFloor[def.key] = fitnessTestBestValue(def.key); });
+
+  const running = { pull: 0, push: 0, legs: 0, core: 0, cardio: 0 };
+  const fpPoints = [];
+  let baselineTotals = null;
+  events.forEach((ev, i) => {
+    running.pull += ev.delta.pull; running.push += ev.delta.push;
+    running.legs += ev.delta.legs; running.core += ev.delta.core; running.cardio += ev.delta.cardio;
+    if (i === 0) baselineTotals = Object.assign({}, running);
+    const withFloor = {};
+    STAT_DEFS.forEach(def => { withFloor[def.key] = running[def.key] + testFloor[def.key]; });
+    const fp = STAT_DEFS.reduce((sum, def) => sum + computeStatInfo(withFloor[def.key]).level, 0);
+    fpPoints.push({ ts: ev.ts, fp });
+  });
+
+  const currentTotals = {};
+  const baselineWithFloor = {};
+  STAT_DEFS.forEach(def => {
+    currentTotals[def.key] = running[def.key] + testFloor[def.key];
+    baselineWithFloor[def.key] = baselineTotals[def.key] + testFloor[def.key];
+  });
+
+  const days = Math.max(1, Math.floor((Date.now() - events[0].ts) / 86400000));
+
+  wrap.innerHTML = STAT_DEFS.map(def => {
+    const startInfo = computeStatInfo(baselineWithFloor[def.key]);
+    const nowInfo = computeStatInfo(currentTotals[def.key]);
+    const delta = nowInfo.level - startInfo.level;
+    const deltaLabel = delta > 0 ? ('+' + delta + ' LV') : (delta === 0 ? 'เท่าเดิม' : (delta + ' LV'));
+    const deltaColor = delta > 0 ? 'var(--success)' : 'var(--text-faint)';
+    const maxLevel = Math.max(nowInfo.level, startInfo.level, 1) + 1;
+    const startPct = Math.min(100, (startInfo.level / maxLevel) * 100);
+    const nowPct = Math.min(100, (nowInfo.level / maxLevel) * 100);
+    return '<div class="growth-row">'
+      + '<div class="growth-row-top"><span class="growth-label">' + def.short + ' · ' + def.label + '</span>'
+      + '<span class="growth-delta" style="color:' + deltaColor + ';">' + deltaLabel + '</span></div>'
+      + '<div class="growth-track">'
+      + '<div class="growth-fill-now" style="width:' + nowPct + '%;background:' + def.color + ';"></div>'
+      + '<div class="growth-marker" style="left:' + startPct + '%;" title="เริ่มต้น LV.' + startInfo.level + '"></div>'
+      + '</div>'
+      + '<div class="growth-row-bottom"><span>เริ่ม LV.' + startInfo.level + '</span><span>ตอนนี้ LV.' + nowInfo.level + '</span></div>'
+      + '</div>';
+  }).join('');
+
+  const fpStart = fpPoints[0].fp;
+  const fpNow = fpPoints[fpPoints.length - 1].fp;
+  const fpDelta = fpNow - fpStart;
+  if (summaryEl) {
+    const deltaTxt = fpDelta > 0 ? ('+' + fpDelta) : String(fpDelta);
+    summaryEl.innerHTML = 'ตั้งแต่เริ่มเล่นเมื่อ ' + days + ' วันก่อน Fitness Power โตขึ้น '
+      + '<span style="color:var(--success);font-weight:800;">' + deltaTxt + '</span>'
+      + ' (จาก ' + fpStart + ' → ' + fpNow + ')';
+  }
+
+  if (sparkWrap) {
+    const maxPts = 24;
+    let sampled = fpPoints;
+    if (fpPoints.length > maxPts) {
+      sampled = [];
+      const step = fpPoints.length / maxPts;
+      for (let i = 0; i < maxPts; i++) sampled.push(fpPoints[Math.min(fpPoints.length - 1, Math.floor(i * step))]);
+      sampled.push(fpPoints[fpPoints.length - 1]);
+    }
+    const w = 300, h = 70, pad = 4;
+    const minFp = Math.min(...sampled.map(p => p.fp));
+    const maxFp = Math.max(...sampled.map(p => p.fp), minFp + 1);
+    const stepX = sampled.length > 1 ? (w - pad * 2) / (sampled.length - 1) : 0;
+    const coords = sampled.map((p, i) => {
+      const x = pad + i * stepX;
+      const y = h - pad - ((p.fp - minFp) / (maxFp - minFp)) * (h - pad * 2);
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    const last = coords[coords.length - 1].split(',');
+    const areaPath = 'M' + coords[0] + ' L' + coords.join(' L') + ' L' + (w - pad) + ',' + (h - pad) + ' L' + pad + ',' + (h - pad) + ' Z';
+    sparkWrap.innerHTML = '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:70px;display:block;">'
+      + '<path d="' + areaPath + '" fill="var(--success)" opacity="0.12"></path>'
+      + '<polyline points="' + coords.join(' ') + '" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>'
+      + '<circle cx="' + last[0] + '" cy="' + last[1] + '" r="4" fill="var(--success)"></circle>'
+      + '</svg>';
+  }
 }
 
 /* ---------- daily reminder ---------- */

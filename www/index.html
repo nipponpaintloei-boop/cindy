@@ -258,6 +258,21 @@ body{
 .stat-bar-track{height:8px;border-radius:5px;overflow:hidden;background:var(--bg-elev);border:1px solid var(--card-border);}
 .stat-bar-fill{height:100%;border-radius:5px;transition:width .5s ease;}
 
+/* ---- Body Growth (Progress screen): "then vs now" stat comparison +
+   Fitness Power sparkline, so the player can see how their body has
+   actually developed instead of only a snapshot of current stats. ---- */
+.growth-summary{font-size:12.5px;color:var(--text-dim);line-height:1.6;text-align:center;margin-top:8px;}
+.growth-row{margin-bottom:18px;}
+.growth-row:last-child{margin-bottom:0;}
+.growth-row-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.growth-label{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text);}
+.growth-delta{font-family:var(--font-display);font-size:15px;letter-spacing:.5px;}
+.growth-track{position:relative;height:10px;border-radius:6px;background:var(--bg-elev);border:1px solid var(--card-border);}
+.growth-fill-now{position:absolute;top:0;left:0;height:100%;border-radius:6px;transition:width .6s ease;}
+.growth-marker{position:absolute;top:-3px;bottom:-3px;width:2px;background:rgba(255,255,255,.55);transform:translateX(-1px);}
+.growth-marker::after{content:"";position:absolute;top:-4px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.9);}
+.growth-row-bottom{display:flex;justify-content:space-between;font-size:10px;color:var(--text-faint);margin-top:5px;letter-spacing:.5px;}
+
 .section-label{font-size:12px;font-weight:700;letter-spacing:1.5px;color:var(--text-dim);margin:24px 0 10px;}
 .last-workout{
   background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);
@@ -1680,9 +1695,47 @@ body{
   100%{opacity:0;transform:translateX(-50%) translateY(-44px) scale(.9);}
 }
 
+/* ---- NEW PB flourish — reuses .perfect-flash's slot/shape but in gold,
+   bigger and held longer, for the moment a round actually beats the
+   player's prior best. Fires on #perfectFlash instead of a second
+   element so the two never physically overlap. ---- */
+.perfect-flash.pb{
+  background:linear-gradient(90deg,var(--warning),#ffe066);
+  box-shadow:0 3px 18px rgba(255,210,61,.65);
+  font-size:14px;
+}
+.perfect-flash.pb.flash{animation:pbFlashPop 1.5s cubic-bezier(.3,1.4,.4,1);}
+@keyframes pbFlashPop{
+  0%{opacity:0;transform:translateX(-50%) translateY(6px) scale(.8);}
+  14%{opacity:1;transform:translateX(-50%) translateY(-36px) scale(1.18);}
+  30%{transform:translateX(-50%) translateY(-36px) scale(1.05);}
+  80%{opacity:1;transform:translateX(-50%) translateY(-36px) scale(1.08);}
+  100%{opacity:0;transform:translateX(-50%) translateY(-48px) scale(.94);}
+}
+/* the timer ring itself glows gold in sync with the flash above, so a
+   new PB reads across the whole dial, not just the little pill */
+.timer-wrap.pb-glow .ring{animation:pbRingGlow 1.5s ease;}
+@keyframes pbRingGlow{
+  0%{filter:drop-shadow(0 0 0 rgba(255,210,61,0));}
+  20%{filter:drop-shadow(0 0 10px rgba(255,210,61,.9));}
+  100%{filter:drop-shadow(0 0 0 rgba(255,210,61,0));}
+}
+
 .rounds-banner{text-align:center;margin:6px 0 18px;}
 .rounds-banner .num{font-family:var(--font-display);font-size:20px;letter-spacing:1px;}
 .rounds-banner .lbl{font-size:10px;color:var(--text-dim);letter-spacing:2px;}
+.rounds-banner .num.bump{animation:roundBump .45s cubic-bezier(.3,1.4,.4,1);}
+@keyframes roundBump{
+  0%{transform:scale(1);color:var(--text);}
+  30%{transform:scale(1.45);color:var(--success);}
+  100%{transform:scale(1);color:var(--text);}
+}
+.rounds-banner .num.bump.pb{animation:roundBumpPb .55s cubic-bezier(.3,1.4,.4,1);}
+@keyframes roundBumpPb{
+  0%{transform:scale(1);color:var(--text);}
+  30%{transform:scale(1.6);color:var(--warning);}
+  100%{transform:scale(1);color:var(--text);}
+}
 .pb-hint{font-size:11px;color:var(--text-faint);margin-top:4px;font-weight:600;letter-spacing:.5px;}
 
 .exercise-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px;}
@@ -1701,6 +1754,23 @@ body{
 .ex-box.squat svg{color:var(--squat)}
 
 .save-round-btn{margin-bottom:12px;}
+/* per-tap juice — a quick squash-and-spring on the button itself, fired by
+   JS on every saveRound()/skipRound() call so the press always reads as
+   registered even before the toast/flash above it finishes appearing */
+.save-round-btn.tap-bump{animation:saveBtnBump .3s cubic-bezier(.3,1.4,.4,1);}
+@keyframes saveBtnBump{
+  0%{transform:scale(1);}
+  35%{transform:scale(.93);}
+  100%{transform:scale(1);}
+}
+#skipRoundBtn.skip-bump{animation:skipBtnShake .32s ease;border-color:var(--danger) !important;color:var(--danger) !important;}
+@keyframes skipBtnShake{
+  0%,100%{transform:translateX(0);}
+  25%{transform:translateX(-4px);}
+  50%{transform:translateX(3px);}
+  75%{transform:translateX(-2px);}
+}
+
 .control-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
 .workout-spacer{flex:1;}
 
@@ -3991,6 +4061,15 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       <div class="section-label">STATS</div>
       <div class="metric-card" style="padding:16px;">
         <div id="statBarList"></div>
+      </div>
+
+      <div class="section-label"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg></span> ร่างกายของฉันพัฒนาขึ้นแค่ไหน</div>
+      <div class="chart-card">
+        <div id="bodyGrowthSpark"></div>
+        <div id="bodyGrowthSummary" class="growth-summary"></div>
+      </div>
+      <div class="metric-card" style="padding:16px;margin-top:10px;">
+        <div id="bodyGrowthStats"></div>
       </div>
 
       <div class="section-label">STREAK</div>
