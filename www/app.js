@@ -1670,6 +1670,51 @@ function renderBossCard() {
   renderBossAttackLog();
 }
 
+/* ---- Home boss teaser — compact always-visible status row that replaced
+ * the full boss-card on Home (see product doc: "แยกบอสออกจาก Home"). Full
+ * fight detail (phase art, damage breakdown, modifier, chapter/story,
+ * attack log) now lives on screen-bossfight, rendered by renderBossCard()
+ * above — that function still owns every side effect (phase-change toast,
+ * defeat/loot roll) since it runs every Home render regardless of whether
+ * the player ever opens the full screen. This function only paints the
+ * small summary row: name, phase tag, thin HP bar. Reads the exact same
+ * currentBossState()/bossPhaseFor() the full card uses, so the two never
+ * drift out of sync with each other. */
+function renderBossTeaser() {
+  const card = document.getElementById('bossTeaserCard');
+  const nameEl = document.getElementById('bossTeaserName');
+  const phaseEl = document.getElementById('bossTeaserPhase');
+  const hpFill = document.getElementById('bossTeaserHpFill');
+  const hpLabel = document.getElementById('bossTeaserHpLabel');
+  const thumb = document.getElementById('bossTeaserThumb');
+  if (!card || !nameEl || !hpFill) return;
+
+  const state = currentBossState();
+  nameEl.textContent = state.boss.name;
+  card.style.setProperty('--boss-accent-rgb', hexToRgbTriplet(state.boss.accent));
+
+  if (thumb && thumb.dataset.bossId !== state.boss.id) {
+    thumb.dataset.bossId = state.boss.id;
+    thumb.innerHTML = bossSilhouetteMarkup(state.boss.id);
+  }
+
+  const pct = state.targetHp > 0 ? Math.max(0, Math.min(1, state.hp / state.targetHp)) : 0;
+  hpFill.style.width = Math.round(pct * 100) + '%';
+  if (hpLabel) hpLabel.textContent = Math.round(state.hp) + ' / ' + state.targetHp + ' HP';
+
+  const phase = state.defeated ? null : bossPhaseFor(pct);
+  if (phaseEl) {
+    BOSS_PHASES.forEach(p => phaseEl.classList.remove('phase-' + p.key));
+    if (phase) {
+      phaseEl.textContent = phase.label;
+      phaseEl.classList.add('phase-' + phase.key);
+    } else {
+      phaseEl.textContent = 'CLEARED';
+    }
+  }
+  card.classList.toggle('boss-teaser-defeated', state.defeated);
+}
+
 /* ---- boss attack log (Home boss card) — replaces the always-visible
  * PULL/PUSH/SQUAT/CUSTOM breakdown that used to sit in this spot. That
  * view read as a static weekly stat table and looked broken whenever a
@@ -1821,6 +1866,7 @@ function go(name) {
   if (name === 'character') renderCharacterSheet();
   if (name === 'run') renderRunHome();
   if (name === 'trainingcamp') renderTrainingCamp();
+  if (name === 'bossfight') renderBossCard(); // Home already keeps this fresh, but re-render on entry too
 }
 
 /* ================= mobile back-button / nav-gesture trap =================
@@ -1927,6 +1973,7 @@ function renderHome() {
   renderMascotCard();
   renderHomeWeeklyPlanCard();
   renderBossCard();
+  renderBossTeaser();
   renderWeekRing();
   renderHomeLastWorkout();
   renderTreasureChest();

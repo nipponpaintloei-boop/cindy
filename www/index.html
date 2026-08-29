@@ -1015,7 +1015,7 @@ body{
    mascot-card's side-anchored fade. */
 .boss-card.has-backdrop{
   background-image:
-    linear-gradient(180deg, rgba(6,7,10,.64) 0%, rgba(6,7,10,.38) 36%, rgba(6,7,10,.42) 64%, rgba(6,7,10,.8) 100%),
+    linear-gradient(180deg, rgba(6,7,10,.82) 0%, rgba(6,7,10,.42) 30%, rgba(6,7,10,.46) 62%, rgba(6,7,10,.9) 100%),
     var(--boss-backdrop-img, none),
     linear-gradient(155deg,var(--card) 0%,#0d0e14 100%);
   background-size:auto, cover, cover;
@@ -1033,6 +1033,42 @@ body{
   background:radial-gradient(ellipse 140% 90% at 50% -10%,rgba(var(--boss-accent-rgb),.16),transparent 60%);
 }
 .boss-name{color:rgb(var(--boss-accent-rgb));text-shadow:0 0 14px rgba(var(--boss-accent-rgb),.5);transition:color .4s ease,text-shadow .4s ease;}
+
+/* ---- Home boss teaser (compact status row, replaces the full boss-card
+   that used to live on Home — full detail moved to screen-bossfight).
+   Small round thumb + name/phase + thin HP bar, tap-through to the fight
+   screen. Uses the same --boss-accent-rgb variable renderBossTeaser() sets,
+   same convention as the full card. */
+.boss-teaser-card{
+  display:flex;align-items:center;gap:12px;
+  background:linear-gradient(155deg,var(--card) 0%,#0d0e14 100%);
+  border:1px solid var(--card-border);border-radius:var(--radius);
+  padding:11px 12px;margin-top:12px;cursor:pointer;
+  position:relative;overflow:hidden;
+}
+.boss-teaser-card::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 140% 90% at 0% 0%,rgba(var(--boss-accent-rgb,232,35,42),.14),transparent 65%);
+}
+.boss-teaser-card:active{transform:scale(.98);}
+.boss-teaser-thumb{
+  flex-shrink:0;width:40px;height:40px;border-radius:10px;position:relative;z-index:1;
+  background:radial-gradient(circle,rgba(var(--boss-accent-rgb,232,35,42),.22),transparent 70%);
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid rgba(var(--boss-accent-rgb,232,35,42),.35);
+}
+.boss-teaser-thumb img{width:34px;height:34px;object-fit:contain;}
+.boss-teaser-mid{flex:1;min-width:0;position:relative;z-index:1;}
+.boss-teaser-toprow{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:5px;}
+.boss-teaser-name{font-family:var(--font-display);font-size:14px;letter-spacing:.5px;color:rgb(var(--boss-accent-rgb,232,35,42));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.boss-teaser-phase{flex-shrink:0;font-size:8.5px;font-weight:800;letter-spacing:1px;color:var(--text-faint);}
+.boss-teaser-phase.phase-armorbreak{color:#ffb020;}
+.boss-teaser-phase.phase-rage{color:#ff6a3d;}
+.boss-teaser-phase.phase-critical{color:#e8232a;}
+.boss-teaser-hp-track{height:6px;}
+.boss-teaser-hp-label{font-size:9px;color:var(--text-faint);margin-top:4px;letter-spacing:.2px;}
+.boss-teaser-arrow{flex-shrink:0;color:var(--text-faint);display:flex;position:relative;z-index:1;}
+.boss-teaser-card.boss-teaser-defeated .boss-teaser-thumb{opacity:.5;filter:grayscale(1);}
 /* ---- daily quest board ---- */
 .quest-card{
   background:linear-gradient(155deg,var(--card) 0%,var(--bg-elev) 100%);
@@ -1115,6 +1151,16 @@ body{
 .boss-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
 .boss-name{font-family:var(--font-display);font-size:20px;letter-spacing:1px;}
 .boss-tag{font-size:10px;color:rgba(var(--boss-accent-rgb),.75);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;font-weight:700;}
+/* Dark drop-shadow safety net on top of the gradient overlay above — the
+   overlay alone can still thin out over a bright patch of a given boss's
+   backdrop photo, so every header text node gets its own shadow too. */
+.boss-card.has-backdrop .boss-tag,
+.boss-card.has-backdrop .boss-chapter-label,
+.boss-card.has-backdrop .boss-modifier-label,
+.boss-card.has-backdrop .boss-countdown,
+.boss-card.has-backdrop .boss-hp-label,
+.boss-card.has-backdrop .boss-phase-label{text-shadow:0 1px 3px rgba(0,0,0,.85);}
+.boss-card.has-backdrop .boss-name{text-shadow:0 0 14px rgba(var(--boss-accent-rgb),.5),0 1px 4px rgba(0,0,0,.9);}
 .boss-stage{
   position:relative;width:158px;height:158px;margin:6px auto 12px;
   display:flex;align-items:center;justify-content:center;
@@ -2661,59 +2707,22 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <div id="stepsCardBody"></div>
       </div>
 
-      <div class="boss-card">
-        <div class="boss-header">
-          <div>
-            <div id="bossChapterLabel" class="boss-chapter-label"></div>
-            <div id="bossName" class="boss-name">GRINDER-1</div>
-            <div id="bossTag" class="boss-tag">SCRAP BRAWLER</div>
-            <div id="bossModifierLabel" class="boss-modifier-label"></div>
-            <div id="bossCountdown" class="boss-countdown">เหลือเวลา —</div>
+      <!-- Compact boss status teaser — full fight detail lives on its own
+           screen now (screen-bossfight); this stays on Home just to show
+           "is the boss in trouble" at a glance without navigating away. -->
+      <div class="boss-teaser-card" id="bossTeaserCard" onclick="go('bossfight')" role="button" tabindex="0">
+        <div id="bossTeaserThumb" class="boss-teaser-thumb"></div>
+        <div class="boss-teaser-mid">
+          <div class="boss-teaser-toprow">
+            <div id="bossTeaserName" class="boss-teaser-name">GRINDER-1</div>
+            <div id="bossTeaserPhase" class="boss-teaser-phase"></div>
           </div>
-          <div class="boss-header-btns">
-            <button id="worldMapBtn" class="boss-view-btn" type="button">MAP</button>
-            <button id="bossViewBtn" class="boss-view-btn" type="button">VIEW</button>
-          </div>
+          <div class="boss-hp-track boss-teaser-hp-track"><div id="bossTeaserHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
+          <div id="bossTeaserHpLabel" class="boss-teaser-hp-label">0 / 0 HP</div>
         </div>
-        <div id="bossStage" class="boss-stage">
-          <div class="boss-art"></div>
-          <div class="boss-boom"></div>
-        </div>
-        <div class="boss-hp-track"><div id="bossHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
-        <div id="bossHpLabel" class="boss-hp-label">0 / 0 HP</div>
-        <div id="bossPhaseLabel" class="boss-phase-label"></div>
-        <div id="bossAttackLog" class="boss-attack-log"></div>
-      </div>
-
-      <div id="bossViewModal" class="boss-view-modal" aria-hidden="true">
-        <div class="boss-view-backdrop" data-boss-close></div>
-        <div class="boss-view-panel" role="dialog" aria-modal="true" aria-label="Boss Archive">
-          <div class="boss-view-panel-head">
-            <div>
-              <div class="boss-view-eyebrow">BOSS ARCHIVE</div>
-              <div id="bossViewTitle" class="boss-view-title">บอสประจำสัปดาห์</div>
-            </div>
-            <button class="boss-view-close" type="button" data-boss-close>×</button>
-          </div>
-          <div id="bossViewModifier" class="boss-view-modifier"></div>
-          <div class="section-label" style="margin-top:2px;">DAMAGE SOURCE</div>
-          <div id="bossViewDmgBreakdown" class="boss-dmg-breakdown" style="margin-bottom:14px;"></div>
-          <div id="bossViewList" class="boss-view-list"></div>
-        </div>
-      </div>
-
-      <div id="worldMapModal" class="boss-view-modal" aria-hidden="true">
-        <div class="boss-view-backdrop" data-worldmap-close></div>
-        <div class="boss-view-panel" role="dialog" aria-modal="true" aria-label="World Map">
-          <div class="boss-view-panel-head">
-            <div>
-              <div class="boss-view-eyebrow">WORLD MAP</div>
-              <div class="boss-view-title">เส้นทางการเดินทาง</div>
-            </div>
-            <button class="boss-view-close" type="button" data-worldmap-close>×</button>
-          </div>
-          <div id="worldMapList" class="boss-view-list"></div>
-        </div>
+        <span class="boss-teaser-arrow" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+        </span>
       </div>
 
       <div id="homeWeeklyPlanWrap"></div>
@@ -2742,6 +2751,74 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       <div class="tab" onclick="go('program')"><div class="dot"></div>PROGRAM</div>
       <div class="tab" onclick="go('history')"><div class="dot"></div>HISTORY</div>
       <div class="tab" onclick="go('progress')"><div class="dot"></div>PROGRESS</div>
+    </div>
+  </section>
+
+  <!-- BOSS FIGHT (full detail — phase art, damage breakdown, chapter/story,
+       modifier, loot on defeat). Reached only via the Home teaser card. -->
+  <section id="screen-bossfight" class="screen">
+    <div class="topbar">
+      <button class="iconbtn" onclick="go('home')" aria-label="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" style="font-size:16px;">BOSS FIGHT</div>
+      <div style="width:38px;"></div>
+    </div>
+    <div class="list-wrap">
+      <div class="boss-card">
+        <div class="boss-header">
+          <div>
+            <div id="bossChapterLabel" class="boss-chapter-label"></div>
+            <div id="bossName" class="boss-name">GRINDER-1</div>
+            <div id="bossTag" class="boss-tag">SCRAP BRAWLER</div>
+            <div id="bossModifierLabel" class="boss-modifier-label"></div>
+            <div id="bossCountdown" class="boss-countdown">เหลือเวลา —</div>
+          </div>
+          <div class="boss-header-btns">
+            <button id="worldMapBtn" class="boss-view-btn" type="button">MAP</button>
+            <button id="bossViewBtn" class="boss-view-btn" type="button">VIEW</button>
+          </div>
+        </div>
+        <div id="bossStage" class="boss-stage">
+          <div class="boss-art"></div>
+          <div class="boss-boom"></div>
+        </div>
+        <div class="boss-hp-track"><div id="bossHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
+        <div id="bossHpLabel" class="boss-hp-label">0 / 0 HP</div>
+        <div id="bossPhaseLabel" class="boss-phase-label"></div>
+        <div id="bossAttackLog" class="boss-attack-log"></div>
+      </div>
+    </div>
+
+    <div id="bossViewModal" class="boss-view-modal" aria-hidden="true">
+      <div class="boss-view-backdrop" data-boss-close></div>
+      <div class="boss-view-panel" role="dialog" aria-modal="true" aria-label="Boss Archive">
+        <div class="boss-view-panel-head">
+          <div>
+            <div class="boss-view-eyebrow">BOSS ARCHIVE</div>
+            <div id="bossViewTitle" class="boss-view-title">บอสประจำสัปดาห์</div>
+          </div>
+          <button class="boss-view-close" type="button" data-boss-close>×</button>
+        </div>
+        <div id="bossViewModifier" class="boss-view-modifier"></div>
+        <div class="section-label" style="margin-top:2px;">DAMAGE SOURCE</div>
+        <div id="bossViewDmgBreakdown" class="boss-dmg-breakdown" style="margin-bottom:14px;"></div>
+        <div id="bossViewList" class="boss-view-list"></div>
+      </div>
+    </div>
+
+    <div id="worldMapModal" class="boss-view-modal" aria-hidden="true">
+      <div class="boss-view-backdrop" data-worldmap-close></div>
+      <div class="boss-view-panel" role="dialog" aria-modal="true" aria-label="World Map">
+        <div class="boss-view-panel-head">
+          <div>
+            <div class="boss-view-eyebrow">WORLD MAP</div>
+            <div class="boss-view-title">เส้นทางการเดินทาง</div>
+          </div>
+          <button class="boss-view-close" type="button" data-worldmap-close>×</button>
+        </div>
+        <div id="worldMapList" class="boss-view-list"></div>
+      </div>
     </div>
   </section>
 
