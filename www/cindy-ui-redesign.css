@@ -60,6 +60,26 @@
   overflow:hidden;
 }
 .boss-name{font-family:var(--font-display) !important;letter-spacing:1.8px !important;}
+
+/* ---- Zone separation on the full Boss Fight screen (#screen-bossfight) ----
+   Existing markup is: header (name/rank) -> boss-stage (art) -> hp-track ->
+   hp-label -> phase-label -> attack-log, all sitting flush together with no
+   visual break. Splitting into "portrait zone / hp+phase zone / log zone"
+   with a divider + its own panel background, matching the reference image's
+   separation, without adding any new HTML sections. */
+#screen-bossfight .boss-header{padding-bottom:12px !important;}
+#screen-bossfight .boss-stage{
+  margin-bottom:16px !important;padding-bottom:16px !important;
+  border-bottom:1px solid var(--card-border) !important;
+}
+#screen-bossfight .boss-hp-track{margin-top:2px !important;}
+#screen-bossfight .boss-hp-label{margin-bottom:14px !important;padding-bottom:14px !important;border-bottom:1px solid var(--card-border) !important;}
+#screen-bossfight .boss-phase-label{
+  margin-bottom:14px !important;padding:10px 12px !important;
+  border-radius:var(--radius-sm) !important;border:1px solid var(--card-border) !important;
+  background:rgba(0,0,0,.22) !important;text-align:center !important;
+}
+#screen-bossfight .boss-attack-log{margin-top:2px !important;}
 .boss-tag,.boss-phase-label{letter-spacing:1.5px !important;}
 .boss-hp-track{height:9px !important;border-radius:99px !important;}
 .boss-view-btn,.boss-header-btns button{border-radius:11px !important;}
