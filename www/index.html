@@ -1092,6 +1092,9 @@ body{
 .fitness-rank-row{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg-elev);border:1px solid var(--card-border);border-radius:7px;}
 .fitness-rank-row-label{font-size:10px;font-weight:800;letter-spacing:.6px;color:var(--text-dim);}
 .fitness-rank-row-grade{font-size:13px;font-weight:800;color:var(--text);}
+.lootset-pieces{display:flex;flex-wrap:wrap;gap:6px;}
+.lootset-piece{font-size:9px;font-weight:700;letter-spacing:.3px;padding:4px 8px;border-radius:6px;background:var(--card);border:1px solid var(--card-border);color:var(--text-faint);}
+.lootset-piece.owned{color:var(--success);border-color:var(--success);}
 
 /* ---- achievement list (reuses .boss-view-* modal/list shell above) ---- */
 .ach-item{opacity:.45;}
@@ -3332,6 +3335,10 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       </div>
       <div class="empty-hint" style="text-align:left;padding:0 0 8px;">แตะไอเทมที่มีเพื่อสวมใส่เป็นแบดจ์ข้าง mascot (แตะซ้ำเพื่อถอด)</div>
       <div id="collectionLootGrid" class="skin-grid" style="max-height:none;overflow:visible;"></div>
+
+      <div class="section-label">EQUIPMENT SETS</div>
+      <div class="empty-hint" style="text-align:left;padding:0 0 8px;">เก็บของครบเซ็ตในคลัง (ไม่ต้องสวม) เพื่อรับโบนัส Combat Power</div>
+      <div id="collectionLootSets" class="boss-view-list"></div>
     </div>
   </section>
 

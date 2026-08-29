@@ -1001,6 +1001,82 @@ function lootStatBonusLabel(item) {
     })
     .join('  ');
 }
+
+/* ================= EQUIPMENT SETS (product doc #4) =================
+ * Per the team decision: set bonuses come from what's OWNED in the loot
+ * inventory, not what's currently equipped. This deliberately keeps the
+ * existing single-slot equip system (equippedLootItem/toggleEquipLoot)
+ * completely untouched — no new UI, no multi-slot rework — while still
+ * giving a real reason to keep farming a boss for its full drop table,
+ * per the doc's "Boss → Loot → Equip → Character Development" loop.
+ *
+ * Same Phase 2C guardrail as individual equipment: set bonuses are flat
+ * Combat-Power-only points (see computeSetBonusPower below, folded into
+ * computeCombatPower next to computeEquipmentPower). They NEVER touch
+ * loadStatTotals()/computeFitnessPower() and NEVER touch Boss Damage.
+ *
+ * Only one set ships for now — GRINDER SET — because it's the one example
+ * in the product doc whose 3 named pieces (Grinder Cog / Scrap Plate /
+ * Worn Grip) already exist in LOOT_ITEMS with matching lore. Doc also
+ * proposes a cardio/agility "WING REAPER SET", but no matching 3-item
+ * lineup exists yet — rather than force mismatched items into a fake set,
+ * this waits for that item design pass. Adding a new set later is just
+ * one more entry in this array; nothing else needs to change. */
+const LOOT_SETS = [
+  { id: 'grinderset', name: 'GRINDER SET', itemIds: ['grinderCog', 'scrapPlate', 'wornGrip'],
+    bonus2: 3, bonus3: 8, bonusName: 'GRINDER OVERDRIVE',
+    desc2: 'มี 2/3 ชิ้น — โบนัสเล็กน้อยต่อ Combat Power', desc3: 'ครบเซ็ต — ปลดล็อก GRINDER OVERDRIVE' }
+];
+/** How many distinct pieces of this set the player currently owns
+ * (count > 0 in the loot inventory) — ownership only, equip status is
+ * irrelevant here by design (see comment above). */
+function ownedSetPieceCount(set, inv) {
+  inv = inv || loadLootInventory();
+  return set.itemIds.reduce((n, id) => n + ((inv[id] || 0) > 0 ? 1 : 0), 0);
+}
+/** Flat Combat-Power bonus this set currently grants: 0 below 2 pieces,
+ * bonus2 at 2 pieces, bonus3 once every piece is owned. */
+function setBonusValue(set, owned) {
+  if (owned >= set.itemIds.length) return set.bonus3;
+  if (owned >= 2) return set.bonus2;
+  return 0;
+}
+function computeSetBonusPower() {
+  const inv = loadLootInventory();
+  return LOOT_SETS.reduce((sum, set) => sum + setBonusValue(set, ownedSetPieceCount(set, inv)), 0);
+}
+/** Render the "EQUIPMENT SETS" progress list — shared by the Collection
+ * screen and (optionally) the Character sheet. Purely a read of owned
+ * counts; nothing here changes any state. */
+function renderLootSets(containerId) {
+  const wrap = document.getElementById(containerId || 'lootSetList');
+  if (!wrap) return;
+  const inv = loadLootInventory();
+  wrap.innerHTML = LOOT_SETS.map(set => {
+    const owned = ownedSetPieceCount(set, inv);
+    const total = set.itemIds.length;
+    const complete = owned >= total;
+    const bonus = setBonusValue(set, owned);
+    const piecesHtml = set.itemIds.map(id => {
+      const item = LOOT_ITEMS.find(it => it.id === id);
+      const has = (inv[id] || 0) > 0;
+      return '<span class="lootset-piece' + (has ? ' owned' : '') + '">' + (item ? item.name : id) + '</span>';
+    }).join('');
+    let statusHtml;
+    if (complete) statusHtml = '+' + bonus + ' CP · ' + set.bonusName;
+    else if (owned >= 2) statusHtml = '+' + bonus + ' CP';
+    else statusHtml = owned + '/' + total;
+    return '<div class="boss-view-item' + (complete ? ' current' : '') + '">'
+      + '<div class="boss-view-item-top">'
+      + '<div><div class="boss-view-item-name">' + set.name + '</div>'
+      + '<div class="boss-view-item-tag">' + owned + '/' + total + ' ชิ้น' + (complete ? ' · ครบเซ็ต' : '') + '</div></div>'
+      + '<div class="boss-view-item-status">' + statusHtml + '</div>'
+      + '</div>'
+      + '<div class="lootset-pieces">' + piecesHtml + '</div>'
+      + '<div class="boss-view-item-story">' + (complete ? set.desc3 : set.desc2) + '</div>'
+      + '</div>';
+  }).join('');
+}
 function toggleEquipLoot(itemId) {
   const inv = loadLootInventory();
   if (!(inv[itemId] > 0)) return;
@@ -2966,9 +3042,10 @@ function computeFitnessPower() {
 }
 function computeCombatPower() {
   const bonusXp = loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP() + loadStepsBonusXP();
-  // Equipment (Phase 2C) adds here only — see computeEquipmentPower's
-  // comment for why it never reaches Fitness Power or Boss Damage.
-  return Math.round(computeFitnessPower() + bonusXp + computeEquipmentPower());
+  // Equipment (Phase 2C) and Equipment Sets (product doc #4) add here
+  // only — see computeEquipmentPower's and computeSetBonusPower's
+  // comments for why neither ever reaches Fitness Power or Boss Damage.
+  return Math.round(computeFitnessPower() + bonusXp + computeEquipmentPower() + computeSetBonusPower());
 }
 
 /* ---- Fitness Rank (product doc #13) ----
@@ -3690,6 +3767,7 @@ function renderCollection() {
   renderCollectionSkins();
   renderCollectionTitles();
   renderLootGrid('collectionLootGrid');
+  renderLootSets('collectionLootSets');
   const badgeCount = STREAK_MILESTONES.filter(m => loadOpenedChests().indexOf(m) !== -1).length;
   const skinCount = MASCOT_SKINS.filter(isSkinUnlocked).length;
   const titleCount = RANK_TIERS.filter(r => loadLastSeenLevel() >= r.min).length;
