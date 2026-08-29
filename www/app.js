@@ -801,20 +801,61 @@ function fmtTime(totalSeconds) {
 const BOSS_ROSTER = [
   { id: 'grinder1', name: 'GRINDER-1', tag: 'SCRAP BRAWLER', baseHp: 250, accent: '#ff6a3d',
     bg: 'assets/boss-backgrounds/bg-grinder1.png',
+    chapter: { num: 1, title: 'AWAKENING' },
     story: 'ต่อขึ้นจากเศษเหล็กที่ทิ้งไว้ตอนเลิกกลางคัน มันคือด่านแรกที่ทุกคนต้องเจอ — แค่ลุกมาเริ่มในวันที่ไม่อยากขยับตัวเลย GRINDER-1 ไม่ได้แข็งแกร่ง มันแค่รอให้คุณยอมแพ้ก่อนยกแรก' },
   { id: 'ironmaw', name: 'IRON MAW', tag: 'SPLIT JAW', baseHp: 350, accent: '#8aa0b8',
     bg: 'assets/boss-backgrounds/bg-ironmaw.png',
+    chapter: { num: 2, title: 'IRON FORTRESS' },
     story: 'ขากรรไกรเหล็กที่งับกลืนแรงจูงใจของนักสู้ที่เริ่มชินชากับกิจวัตรเดิม ๆ มันคือกำแพงเมื่อทุกอย่างเริ่ม "ง่ายเกินไป" จนลืมไปว่าความชินชาคือจุดที่คนส่วนใหญ่หยุดพัฒนา' },
   { id: 'void9', name: 'VOID-9', tag: 'FORMLESS THREAT', baseHp: 450, accent: '#a855f7',
     bg: 'assets/boss-backgrounds/bg-void9.png',
+    chapter: { num: 3, title: 'VOID ZONE' },
     story: 'ไม่มีรูปร่างตายตัว เปลี่ยนหน้ากากไปเรื่อยตามข้ออ้างของแต่ละวัน — งานยุ่ง นอนไม่พอ ไม่มีอารมณ์ VOID-9 คือความไม่สม่ำเสมอที่กัดกร่อน streak จากข้างในโดยไม่ทันรู้ตัว' },
   { id: 'wingreaper', name: 'WING REAPER', tag: 'SKY HUNTER', baseHp: 550, accent: '#38bdf8',
     bg: 'assets/boss-backgrounds/bg-wingreaper.png',
+    chapter: { num: 4, title: 'SKY CITADEL' },
     story: 'โฉบลงมาตอนที่มั่นใจที่สุด เมื่อเริ่มฝืนหักโหมเกินร่างกายจะรับไหว WING REAPER คือเงาของอาการบาดเจ็บและ burnout ที่คอยจับตาอยู่บนฟ้า รอจังหวะที่ความทะเยอทะยานมาเกินความอดทน' },
   { id: 'corezero', name: 'CORE-ZERO', tag: 'FINAL REACTOR', baseHp: 700, accent: '#fbbf24',
     bg: 'assets/boss-backgrounds/bg-corezero.png',
+    chapter: { num: 5, title: 'CORE REACTOR' },
     story: 'แกนปฏิกรณ์ที่หลอมจากทุกวันที่เคยเลิกล้ม มันคือภาพของตัวเองในเวอร์ชันก่อนเริ่มฝึก ยังคงยืนรอเป็นด่านสุดท้ายเสมอ เพราะบอสตัวจริงไม่เคยเป็นใครอื่นนอกจากคนที่คุณเคยเป็น' }
 ];
+/** "CHAPTER 0X — TITLE" formatter — content-only addition (product doc #9),
+ * no new storage: chapter is just a label carried on the existing
+ * BOSS_ROSTER entries, in the same fixed order the roster already cycles
+ * through. Falls back to '' for any boss missing a chapter (defensive only —
+ * every current entry has one). */
+function bossChapterLabel(boss) {
+  if (!boss || !boss.chapter) return '';
+  return 'CHAPTER ' + String(boss.chapter.num).padStart(2, '0') + ' — ' + boss.chapter.title;
+}
+
+/* ---- Boss Modifier (product doc #8) — presentation-only ----
+ * A themed tagline that rotates weekly, independent of which boss is up
+ * (so a repeat lap around BOSS_ROSTER still feels different the second
+ * time around). Deterministic from absoluteWeekIndex() — same "everyone
+ * on the same week sees the same thing, nothing server-side needed" trick
+ * currentBossState() already uses for the boss rotation itself.
+ * Per the Phase-3 plan this ships presentation-only first: it does NOT
+ * change Boss Damage, XP, or targetHp. A future pass could key real
+ * bonuses off MODIFIER.id, but that's a balance discussion for later. */
+const BOSS_MODIFIERS = [
+  { id: 'ironbody', name: 'IRON BODY', desc: 'สัปดาห์นี้เน้นความแข็งแกร่งของร่างกาย' },
+  { id: 'unstablecore', name: 'UNSTABLE CORE', desc: 'พลังงานไม่แน่นอน อะไรก็เกิดขึ้นได้' },
+  { id: 'overdriveweek', name: 'OVERDRIVE WEEK', desc: 'สัปดาห์นี้ Combo คือกุญแจสำคัญ' },
+  { id: 'enduranceshift', name: 'ENDURANCE SHIFT', desc: 'สัปดาห์นี้สนับสนุน Workout ที่ใช้เวลานาน' },
+  { id: 'cardiosurge', name: 'CARDIO SURGE', desc: 'สัปดาห์นี้สนับสนุนสาย Cardio' },
+  { id: 'silentwatch', name: 'SILENT WATCH', desc: 'ไม่มีสัญญาณเตือนล่วงหน้า ต้องพร้อมทุกวัน' },
+  { id: 'reinforcedplating', name: 'REINFORCED PLATING', desc: 'เกราะหนาขึ้น แต่ก็ยังปราบได้ด้วยความสม่ำเสมอ' }
+];
+function currentBossModifier() {
+  const idx = absoluteWeekIndex(Date.now());
+  // *7+3 just to avoid the modifier lining up 1:1 with the roster cycle
+  // (BOSS_ROSTER.length === 5) so the same boss doesn't always draw the
+  // same modifier every lap.
+  const pos = ((idx * 7 + 3) % BOSS_MODIFIERS.length + BOSS_MODIFIERS.length) % BOSS_MODIFIERS.length;
+  return BOSS_MODIFIERS[pos];
+}
 /** '#rrggbb' -> 'r,g,b' so CSS can build rgba() at any alpha via var(). */
 function hexToRgbTriplet(hex) {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
@@ -1311,12 +1352,18 @@ function renderBossViewList() {
   if (!list) return;
   const state = currentBossState();
   const idx = BOSS_ROSTER.findIndex(b => b.id === state.boss.id);
+  const modifierEl = document.getElementById('bossViewModifier');
+  if (modifierEl) {
+    const mod = currentBossModifier();
+    modifierEl.innerHTML = 'สัปดาห์นี้: <strong>"' + mod.name + '"</strong> — ' + mod.desc;
+  }
   list.innerHTML = BOSS_ROSTER.map((boss, i) => {
     const current = boss.id === state.boss.id;
     const next = i === (idx + 1) % BOSS_ROSTER.length;
     return `<div class="boss-view-item${current ? ' current' : ''}">
       <div class="boss-view-item-top">
         <div>
+          ${boss.chapter ? `<div class="boss-view-item-chapter">${bossChapterLabel(boss)}</div>` : ''}
           <div class="boss-view-item-name">${boss.name}</div>
           <div class="boss-view-item-tag">${boss.tag}</div>
         </div>
@@ -1325,6 +1372,80 @@ function renderBossViewList() {
       ${boss.story ? `<div class="boss-view-item-story">${boss.story}</div>` : ''}
     </div>`;
   }).join('');
+}
+
+/* ================= WORLD MAP (product doc #10) =================
+ * Content-layer visualization of the Chapter progression above — a fixed
+ * path of areas from Training Camp through each boss's territory, in the
+ * same order BOSS_ROSTER already cycles. No new gameplay data: "unlocked"
+ * is derived purely from currentBossState() (which boss is live right now)
+ * and loadBossEverDefeated() (has this boss ever fallen), so it can never
+ * drift out of sync with the Boss Fight card or Boss Archive above. */
+const WORLD_MAP_NODES = [
+  { id: 'campsite', name: 'TRAINING CAMP', kind: 'hub', desc: 'จุดเริ่มต้นของทุกการเดินทาง — ทดสอบร่างกายจริงของคุณที่นี่' },
+  { id: 'grinder1', name: 'SCRAP YARD', bossId: 'grinder1' },
+  { id: 'ironmaw', name: 'IRON FORTRESS', bossId: 'ironmaw' },
+  { id: 'void9', name: 'VOID ZONE', bossId: 'void9' },
+  { id: 'wingreaper', name: 'SKY CITADEL', bossId: 'wingreaper' },
+  { id: 'corezero', name: 'CORE REACTOR', bossId: 'corezero' }
+];
+/** true once the player has reached-or-passed this area at least once —
+ * either by lapping the whole roster already (lap >= 1, meaning every
+ * boss has appeared at least once), by currently being at-or-past this
+ * boss's roster position this lap, or by having defeated it in any past
+ * lap. Mirrors the same idx/lap math currentBossState() already computes. */
+function worldMapNodeUnlocked(node, state) {
+  if (node.kind === 'hub') return true;
+  const idx = BOSS_ROSTER.findIndex(b => b.id === node.bossId);
+  const currentIdx = BOSS_ROSTER.findIndex(b => b.id === state.boss.id);
+  const lap = Math.floor(state.weekIndex / BOSS_ROSTER.length);
+  if (lap >= 1) return true;
+  if (idx <= currentIdx) return true;
+  return loadBossEverDefeated().indexOf(node.bossId) !== -1;
+}
+function renderWorldMapList() {
+  const wrap = document.getElementById('worldMapList');
+  if (!wrap) return;
+  const state = currentBossState();
+  wrap.innerHTML = WORLD_MAP_NODES.map(node => {
+    const boss = node.bossId ? BOSS_ROSTER.find(b => b.id === node.bossId) : null;
+    const isCurrent = boss && boss.id === state.boss.id;
+    const unlocked = worldMapNodeUnlocked(node, state);
+    const defeatedEver = boss && loadBossEverDefeated().indexOf(boss.id) !== -1;
+    let statusHtml;
+    if (isCurrent) statusHtml = 'CURRENT';
+    else if (!unlocked) statusHtml = 'LOCKED';
+    else if (defeatedEver) statusHtml = 'CLEARED';
+    else statusHtml = 'VISITED';
+    return `<div class="boss-view-item${isCurrent ? ' current' : ''}${!unlocked ? ' worldmap-locked' : ''}">
+      <div class="boss-view-item-top">
+        <div>
+          ${boss ? `<div class="boss-view-item-chapter">${bossChapterLabel(boss)}</div>` : ''}
+          <div class="boss-view-item-name">${node.name}</div>
+          ${boss ? `<div class="boss-view-item-tag">${boss.tag}</div>` : (node.desc ? `<div class="boss-view-item-tag">${node.desc}</div>` : '')}
+        </div>
+        <div class="boss-view-item-status">${statusHtml}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function openWorldMap() {
+  const modal = document.getElementById('worldMapModal');
+  if (!modal) return;
+  renderWorldMapList();
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+}
+function closeWorldMap() {
+  const modal = document.getElementById('worldMapModal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+function initWorldMap() {
+  const btn = document.getElementById('worldMapBtn');
+  if (btn) btn.addEventListener('click', openWorldMap);
+  document.querySelectorAll('[data-worldmap-close]').forEach(el => el.addEventListener('click', closeWorldMap));
 }
 
 function openBossView() {
@@ -1373,6 +1494,14 @@ function renderBossCard() {
   renderBossCountdown();
   nameEl.textContent = state.boss.name;
   if (tagEl) tagEl.textContent = state.boss.tag;
+  const chapterEl = document.getElementById('bossChapterLabel');
+  if (chapterEl) chapterEl.textContent = bossChapterLabel(state.boss);
+  const modifierEl = document.getElementById('bossModifierLabel');
+  if (modifierEl) {
+    const mod = currentBossModifier();
+    modifierEl.innerHTML = '&ldquo;' + mod.name + '&rdquo;';
+    modifierEl.title = mod.desc;
+  }
   if (stage.dataset.bossId !== state.boss.id) {
     stage.dataset.bossId = state.boss.id;
     const art = stage.querySelector('.boss-art');
@@ -2842,6 +2971,67 @@ function computeCombatPower() {
   return Math.round(computeFitnessPower() + bonusXp + computeEquipmentPower());
 }
 
+/* ---- Fitness Rank (product doc #13) ----
+ * A letter-grade skin over data that already exists: per-stat level from
+ * computeStatInfo() (via loadStatTotals()) and the overall grade from the
+ * same average that already drives computeFitnessPower(). Nothing new is
+ * stored or computed here — this is purely a mapping layer, per the
+ * Phase-3 plan's note that this item needs no new balance work, just a
+ * level->grade lookup.
+ *
+ * Tier width is 5 stat levels per letter (F..S, 7 letters = levels 1-35,
+ * then capped at S for anything beyond). Within a tier, the bottom two
+ * levels get a '-' modifier, the middle two are plain, and the top level
+ * gets a '+' — e.g. level 9 (tier E, position 3 of 5) = "E", level 10
+ * (position 4) = "E+". These thresholds aren't specified in the original
+ * product doc — flagged there as needing a team balance pass — so treat
+ * this as a placeholder curve, easy to retune by editing FITNESS_RANK_TIERS
+ * and FITNESS_RANK_TIER_SIZE alone; nothing else depends on the numbers. */
+const FITNESS_RANK_TIERS = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];
+const FITNESS_RANK_TIER_SIZE = 5;
+function fitnessGradeForLevel(level) {
+  const lvl = Math.max(1, Math.floor(level));
+  const tierIdx = Math.min(FITNESS_RANK_TIERS.length - 1, Math.floor((lvl - 1) / FITNESS_RANK_TIER_SIZE));
+  const posInTier = (lvl - 1) % FITNESS_RANK_TIER_SIZE; // 0..4
+  let suffix = '';
+  if (tierIdx < FITNESS_RANK_TIERS.length - 1 || lvl <= FITNESS_RANK_TIER_SIZE * FITNESS_RANK_TIERS.length) {
+    if (posInTier <= 1) suffix = '-';
+    else if (posInTier >= 4) suffix = '+';
+  }
+  const tier = FITNESS_RANK_TIERS[tierIdx];
+  return { tier, suffix, label: tier + suffix, level: lvl };
+}
+/** Per-stat grades plus one overall grade averaged across all 5 stat
+ * levels (rounded down) — mirrors how computeFitnessPower() already sums
+ * the same per-stat levels, just averaged instead of summed so the grade
+ * scale doesn't depend on how many stats exist. */
+function computeFitnessRankInfo() {
+  const totals = loadStatTotals();
+  const perStat = STAT_DEFS.map(def => {
+    const info = computeStatInfo(totals[def.key]);
+    return Object.assign({ def }, fitnessGradeForLevel(info.level));
+  });
+  const avgLevel = perStat.reduce((sum, s) => sum + s.level, 0) / (perStat.length || 1);
+  const overall = fitnessGradeForLevel(avgLevel);
+  return { overall, perStat };
+}
+function renderFitnessRank(containerId) {
+  const wrap = document.getElementById(containerId || 'characterFitnessRank');
+  if (!wrap) return;
+  const info = computeFitnessRankInfo();
+  const rowsHtml = info.perStat.map(s =>
+    '<div class="fitness-rank-row">'
+    + '<span class="fitness-rank-row-label">' + s.def.short + '</span>'
+    + '<span class="fitness-rank-row-grade">' + s.label + '</span>'
+    + '</div>'
+  ).join('');
+  wrap.innerHTML = '<div class="fitness-rank-overall">'
+    + '<span class="fitness-rank-overall-lbl">FITNESS RANK</span>'
+    + '<span class="fitness-rank-overall-grade">' + info.overall.label + '</span>'
+    + '</div>'
+    + '<div class="fitness-rank-rows">' + rowsHtml + '</div>';
+}
+
 /* ---- boss trophy wall — reuses loadBossEverDefeated() (already tracked
  * for skin unlocks) and the icon/colors already defined per-boss on each
  * "ผู้พิชิต ..." skin in MASCOT_SKINS, so no new art or storage. */
@@ -2890,7 +3080,9 @@ const ACHIEVEMENTS = [
   { id: 'overdrive', title: 'OVERDRIVE', desc: 'ทำ Combo ถึง x20 ในหนึ่งเซสชัน', titleText: 'OVERDRIVE',
     check: (ctx) => ctx.bestCombo >= 20 },
   { id: 'boss_slayer', title: 'BOSS SLAYER', desc: 'ปราบบอสให้ครบทุกตัว', titleText: 'BOSS SLAYER',
-    check: (ctx) => ctx.allBosses > 0 && ctx.bossesDefeated >= ctx.allBosses }
+    check: (ctx) => ctx.allBosses > 0 && ctx.bossesDefeated >= ctx.allBosses },
+  { id: 'disciplined', title: 'DISCIPLINED', desc: 'ทำตาม Weekly Plan ต่อเนื่อง 4 สัปดาห์', titleText: 'DISCIPLINED',
+    check: (ctx) => ctx.planStreak >= 4 }
 ];
 
 function loadAchievementUnlocked() {
@@ -2915,6 +3107,7 @@ function achievementContext() {
     totalWorkouts: cindy.length + custom.length + run.length,
     totalReps: cindyReps + customReps,
     streak: computeCombinedStreak(),
+    planStreak: computePlanStreak(),
     bossesDefeated: loadBossEverDefeated().length,
     allBosses: BOSS_ROSTER.length,
     bestCombo
@@ -3151,6 +3344,7 @@ function renderCharacterSheet() {
   renderMascotTitle('characterSkinTitle', skin, unlocked);
   applyEquippedLootBadge('characterLootBadge');
   renderStatBars('characterStatBarList');
+  renderFitnessRank('characterFitnessRank');
 
   const cpEl = document.getElementById('characterCP');
   if (cpEl) {
@@ -4513,6 +4707,7 @@ function renderProgress() {
   document.getElementById('pSessions').textContent = combinedSessions;
   document.getElementById('pTotalReps').textContent = combinedTotalXP.toLocaleString();
   document.getElementById('progStreak').textContent = computeCombinedStreak() + ' DAYS';
+  renderPlanStreak('progPlanStreak');
   renderStatBars();
   renderProgressRecords();
 
@@ -7480,6 +7675,69 @@ function setWeeklyPlanDay(dayIdx, value) {
   saveWeeklyPlan(plan);
   renderHomeWeeklyPlanCard();
 }
+
+/* ================= PLAN STREAK (product doc #17) =================
+ * Counts consecutive Monday-Sunday weeks where every day the player
+ * scheduled in the Weekly Plan (loadWeeklyPlan) actually happened — a
+ * "did I follow my own plan" streak, distinct from computeCombinedStreak's
+ * "did I do *something* today" streak. Rest days (null entries) and days
+ * that were never configured in the plan at all trivially count as
+ * satisfied — this is about discipline against a self-set schedule, not
+ * about forcing daily activity.
+ *
+ * Reuses weekStart()/dayKey() already defined for the Boss/Weekly Mission
+ * systems, so "a week" and "a day" mean exactly the same thing everywhere
+ * in the app — no second calendar definition to keep in sync. */
+/** true if the scheduled entry for this specific calendar day was
+ * actually completed — rest days (null) and days in the future (haven't
+ * happened yet, so can't be judged) both count as satisfied so an
+ * in-progress week isn't unfairly broken before it's over. Cardio presets
+ * are stored in the same Custom Workout session log as regular Custom
+ * Workouts (see currentBossDamageBreakdown's comment on this), so both
+ * 'custom' and 'cardio' plan entries check the same session list, keyed
+ * only by workoutId. */
+function planDaySatisfied(dateTs, entry) {
+  if (!entry) return true;
+  if (dateTs > Date.now()) return true;
+  const key = dayKey(dateTs);
+  if (entry.type === 'cindy') {
+    return loadSessions().some(s => s.completed !== false && dayKey(s.finished) === key && s.protocolId === entry.id);
+  }
+  return loadCustomWorkoutSessions().some(s => dayKey(s.completedAt) === key && s.workoutId === entry.id);
+}
+/** Number of consecutive weeks (walking backward from the current week)
+ * where every scheduled day was satisfied. Caps at ~10 years as a safety
+ * net against an unbounded loop; in practice the loop stops naturally the
+ * moment it reaches a week before any matching session existed. */
+function computePlanStreak() {
+  const plan = loadWeeklyPlan();
+  const hasAnyScheduledDay = Object.keys(plan).some(k => plan[k]);
+  if (!hasAnyScheduledDay) return 0;
+
+  const now = Date.now();
+  let cursor = weekStart(now);
+  let streak = 0;
+  const SAFETY_CAP_WEEKS = 520;
+  while (streak < SAFETY_CAP_WEEKS) {
+    const mondayTs = cursor.getTime();
+    let weekOk = true;
+    for (let d = 0; d < 7; d++) {
+      const dayTs = mondayTs + d * 24 * 60 * 60 * 1000;
+      const dayOfWeekIdx = (d + 1) % 7; // Monday(d=0)->1 ... Sunday(d=6)->0, matches getDay()
+      if (!planDaySatisfied(dayTs, plan[dayOfWeekIdx])) { weekOk = false; break; }
+    }
+    if (!weekOk) break;
+    streak++;
+    cursor.setDate(cursor.getDate() - 7);
+  }
+  return streak;
+}
+function renderPlanStreak(elId) {
+  const el = document.getElementById(elId || 'progPlanStreak');
+  if (!el) return;
+  el.textContent = computePlanStreak() + ' WEEKS';
+}
+
 function renderCustomSchedule() {
   const wrap = document.getElementById('customScheduleList');
   if (!wrap) return;
@@ -7721,4 +7979,5 @@ function deleteCustomHistorySessionExecute() {
 
 
 document.addEventListener('DOMContentLoaded', initBossView);
+document.addEventListener('DOMContentLoaded', initWorldMap);
 document.addEventListener('DOMContentLoaded', initAchModal);
