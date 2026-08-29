@@ -1,0 +1,271 @@
+/* ============================================================
+   CINDY — FANTASY RPG × FITNESS THEME  (v2, fixed)
+   Visual layer only — no gameplay/state selectors touched.
+
+   WHAT WAS WRONG WITH THE PREVIOUS VERSION AND WHY:
+   1) --primary was recolored to cyan/blue (#35bff3), which is
+      nearly identical to the app's existing --pull / --web blue
+      (#3D6FE0). That collapsed two meaningfully different colors
+      into one, so "brand chrome" and "pull-exercise" cards became
+      visually the same thing. Fixed below by making the RPG
+      accent a warm gold instead — it reads as "fantasy loot/XP"
+      and stays far away from every existing exercise-type color.
+   2) The brief asked for font + color + UI. The previous file
+      only ever changed color. Every heading/number that uses
+      var(--font-display) (51 places across the app: brand mark,
+      boss name, character sheet, combo counters, celebration
+      titles...) was still plain Bebas Neue — that's most of why
+      it read as "reskinned dashboard" instead of "RPG". Fixed by
+      swapping the display font to Cinzel (a carved/engraved
+      serif used across the RPG genre) while leaving the body/
+      numeric font (Inter) untouched on purpose — mid-set you need
+      to read rep counts instantly, not admire calligraphy.
+   3) The splash screen and login screen logos were never touched
+      — they still hardcode the OLD red/blue mark. That's the
+      literal first thing a user sees, so the app opens on the old
+      brand and then jump-cuts into the new one. Fixed below.
+   4) Semantic reds (danger, "critical" boss phase, cardio tag)
+      were left red in the old file too — that part was correct
+      and is kept: alarm/danger states should stay red no matter
+      what the accent color is. Don't "fix" those.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;900&display=swap');
+
+:root{
+  /* base surfaces — warm near-black instead of cold navy-black,
+     closer to "torchlit dungeon" than "sci-fi terminal" */
+  --bg:#0B0805 !important;
+  --bg-elev:#120D08 !important;
+  --card:#181209 !important;
+  --card-border:rgba(196,150,74,.30) !important;
+
+  /* RPG accent: antique gold/bronze, not blue — keeps clear of
+     the existing --pull/--web blue so color-coding still works */
+  --primary:#D6A63B !important;
+  --primary-text:#FBF3E2 !important;
+  --primary-dim:#4A3818 !important;
+
+  --success:#3ED598 !important;
+  --warning:#FFB020 !important;
+  --danger:#E8232A !important;   /* unchanged on purpose, see note 4 */
+
+  --text:#F5EEDD !important;
+  --text-dim:#A69574 !important;
+  --text-faint:#5C5138 !important;
+
+  --radius:16px !important;
+  --radius-sm:11px !important;
+
+  --font-display:"Cinzel","Bebas Neue",Impact,"Arial Narrow",serif !important;
+
+  /* extra tokens used only in this file, for the engraved-frame look */
+  --rpg-gold-hi:#F2CE6E;
+  --rpg-gold-lo:#8A651F;
+}
+
+html,body{background:#0B0805 !important;}
+body{
+  background:
+    radial-gradient(ellipse at 50% -8%, rgba(214,166,59,.14), transparent 46%),
+    radial-gradient(ellipse at 10% 65%, rgba(120,80,20,.08), transparent 35%),
+    linear-gradient(180deg,#0C0906 0%,#080604 100%) !important;
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;z-index:0;
+  background:
+    repeating-radial-gradient(circle at 50% -5%, rgba(196,150,74,.06) 0 1px, transparent 1px 42px),
+    linear-gradient(90deg,transparent 0 49.8%, rgba(196,150,74,.035) 50%, transparent 50.2%);
+}
+#app{position:relative;z-index:1;max-width:480px;background:transparent;}
+.screen{animation:cindFade .22s ease;}
+@keyframes cindFade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ---- splash / login logo — was still hardcoded old red+blue,
+   now matches the gold theme so first paint isn't a different
+   brand than the rest of the app ---- */
+.splash .spokes, .login-mark .spokes{stroke:var(--primary) !important;}
+.splash .rings, .login-mark .rings{stroke:rgba(214,166,59,.55) !important;}
+.splash-word, .login-mark + .splash-word{font-family:var(--font-display) !important;letter-spacing:3px !important;}
+
+/* Global header */
+.topbar{
+  padding:17px 18px 11px !important;
+  border-bottom:1px solid rgba(196,150,74,.14);
+  background:linear-gradient(180deg,rgba(11,8,5,.94),rgba(11,8,5,.55),transparent);
+}
+.brand{
+  font-family:var(--font-display) !important;
+  font-size:28px !important;letter-spacing:3px !important;font-weight:700 !important;
+  text-shadow:0 0 18px rgba(214,166,59,.30) !important;
+}
+.brand::after{height:3px !important;width:42px !important;background:linear-gradient(90deg,var(--primary) 0 55%,var(--danger) 55%) !important;}
+.iconbtn{
+  width:42px !important;height:42px !important;border-radius:13px !important;
+  background:rgba(24,18,9,.88) !important;border-color:rgba(196,150,74,.34) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.05),0 8px 24px rgba(0,0,0,.30);
+}
+.iconbtn:hover{color:var(--rpg-gold-hi);}
+
+/* Scroll surfaces */
+.home-content,.list-wrap{padding-left:16px !important;padding-right:16px !important;padding-bottom:34px !important;}
+.section-label{
+  margin:20px 2px 9px !important;font-size:10px !important;letter-spacing:2px !important;
+  color:#B79E6E !important;position:relative;padding-left:11px;
+}
+.section-label::before{content:"";position:absolute;left:0;top:2px;bottom:2px;width:3px;border-radius:3px;background:var(--primary);box-shadow:0 0 8px rgba(214,166,59,.55);}
+.metric-card,.stat-card,.week-card,.chart-card,.reminder-card,.quest-card,.character-sheet-card,.modal-card{
+  background:linear-gradient(145deg,rgba(24,18,9,.96),rgba(13,10,6,.96)) !important;
+  border:1px solid rgba(150,120,66,.28) !important;border-radius:16px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.03),0 12px 34px rgba(0,0,0,.28) !important;
+}
+
+/* ---- "engraved frame" corner accents — the one purely
+   ornamental RPG touch, applied only to the hero/boss panels so
+   it reads as a feature, not wallpaper repeated everywhere ---- */
+.mascot-card,.hero-card,.boss-teaser-card,.boss-card,.character-sheet-hero{position:relative;}
+.mascot-card::after,.hero-card::after,.boss-teaser-card::after,.boss-card::after,.character-sheet-hero::after{
+  content:"";position:absolute;inset:6px;border-radius:inherit;pointer-events:none;
+  border:1px solid rgba(214,166,59,.18);
+}
+
+/* HOME hero */
+.mascot-card,.hero-card{
+  background:
+    radial-gradient(circle at 50% 22%, rgba(214,166,59,.14), transparent 40%),
+    linear-gradient(155deg,rgba(26,19,9,.98),rgba(11,8,5,.98)) !important;
+  border:1px solid rgba(196,150,74,.35) !important;border-radius:22px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.05),0 20px 50px rgba(0,0,0,.38),0 0 38px rgba(214,166,59,.06) !important;
+  overflow:hidden;
+}
+.mascot-card::before,.hero-card::before{background:linear-gradient(135deg,rgba(214,166,59,.10),transparent 50%) !important;}
+.mascot-avatar{filter:drop-shadow(0 0 18px rgba(214,166,59,.18));}
+.mascot-level-badge,.status-pill,.mascot-rank{
+  font-family:var(--font-display) !important;letter-spacing:.5px !important;
+  border-radius:8px !important;border:1px solid rgba(214,166,59,.45) !important;
+  background:rgba(24,16,6,.86) !important;color:var(--rpg-gold-hi) !important;
+}
+.xp-bar-track{background:#0E0A05 !important;border-color:rgba(150,120,66,.25) !important;height:8px !important;}
+.xp-bar-fill{background:linear-gradient(90deg,#8A651F,#F2CE6E) !important;box-shadow:0 0 12px rgba(214,166,59,.35);}
+
+/* Boss teaser */
+.boss-teaser-card,.boss-card{
+  background:
+    linear-gradient(180deg,rgba(14,10,6,.30),rgba(11,8,5,.94)),
+    radial-gradient(circle at 50% 25%, rgba(214,166,59,.10), transparent 48%),
+    var(--card) !important;
+  border:1px solid rgba(150,120,66,.38) !important;border-radius:20px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.05),0 16px 40px rgba(0,0,0,.35) !important;
+  overflow:hidden;
+}
+.boss-name{font-family:var(--font-display) !important;letter-spacing:1.8px !important;color:var(--rpg-gold-hi) !important;text-shadow:0 0 16px rgba(214,166,59,.20);}
+.boss-tag,.boss-phase-label{letter-spacing:1.5px !important;color:#A28D64 !important;}
+.boss-teaser-phase.phase-critical,.boss-phase-label.phase-critical{color:var(--danger) !important;} /* alarm state — stays red, see note 4 */
+.boss-hp-track{height:9px !important;border-radius:99px !important;background:#0E0A05 !important;border:1px solid rgba(150,120,66,.25) !important;}
+.boss-hp-fill{background:linear-gradient(90deg,#8A651F,var(--danger)) !important;box-shadow:0 0 12px rgba(214,166,59,.20);}
+.boss-stage{min-height:245px !important;background:radial-gradient(circle at 50% 55%, rgba(150,110,30,.16), transparent 48%) !important;}
+.boss-stage .boss-art{filter:drop-shadow(0 0 14px rgba(214,166,59,.16));}
+.boss-view-btn,.boss-header-btns button{background:rgba(20,14,7,.86) !important;border:1px solid rgba(150,120,66,.38) !important;color:#C4AE82 !important;border-radius:11px !important;}
+.boss-attack-log{background:rgba(12,9,5,.65) !important;border-color:rgba(150,120,66,.20) !important;border-radius:13px !important;}
+
+/* Program cards */
+.program-card-link{
+  min-height:112px !important;padding:15px !important;border-radius:17px !important;
+  border:1px solid rgba(150,120,66,.28) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.03),0 12px 28px rgba(0,0,0,.28) !important;
+}
+.program-card-link .title{font-family:var(--font-display) !important;letter-spacing:.7px !important;font-size:17px !important;}
+.program-card-link .sub,.program-card-link .sub2,.program-card-link .sub3{color:#8E7C5C !important;}
+.program-card-icon{border-radius:14px !important;background:rgba(10,7,4,.75) !important;border:1px solid currentColor !important;}
+/* exercise-type colors kept as-is on purpose — they're the app's
+   functional color code and already read fine against the new
+   warm background; only 'cindy' (the brand default) picks up gold */
+.mode-cindy{color:var(--primary) !important;}
+
+/* Tabs / bottom navigation */
+.period-row{gap:7px !important;}
+.period-pill{background:rgba(20,14,7,.82) !important;border:1px solid rgba(150,120,66,.24) !important;color:#8E7C5C !important;border-radius:9px !important;}
+.period-pill.sel{background:rgba(138,101,31,.22) !important;border-color:rgba(214,166,59,.60) !important;color:var(--rpg-gold-hi) !important;box-shadow:0 0 14px rgba(214,166,59,.08);}
+.tabbar{
+  background:rgba(9,7,4,.96) !important;border-top:1px solid rgba(150,120,66,.20) !important;
+  box-shadow:0 -12px 35px rgba(0,0,0,.40) !important;padding:7px 8px calc(7px + env(safe-area-inset-bottom)) !important;
+}
+.tab{color:#5E5236 !important;font-size:9px !important;letter-spacing:1.4px !important;}
+.tab.active{color:var(--rpg-gold-hi) !important;text-shadow:0 0 12px rgba(214,166,59,.30);}
+.tab .dot{width:4px !important;height:4px !important;background:var(--rpg-gold-hi) !important;box-shadow:0 0 8px var(--primary);}
+
+/* History / progress */
+.chart-bars{background:linear-gradient(180deg,rgba(214,166,59,.02),transparent) !important;border-radius:12px;}
+.metric-grid{gap:9px !important;}
+.metric-card .v{font-family:var(--font-display) !important;color:#F7EFD9 !important;text-shadow:0 0 12px rgba(214,166,59,.08);}
+.metric-card .l{color:#71624A !important;letter-spacing:1px !important;}
+
+/* Character */
+.character-sheet-hero{background:radial-gradient(circle at 50% 20%, rgba(196,150,74,.12), transparent 42%),linear-gradient(145deg,#19130A,#0C0906) !important;}
+.character-name-btn{font-family:var(--font-display) !important;color:#F7EFD9 !important;}
+.character-cp{color:var(--rpg-gold-hi) !important;text-shadow:0 0 12px rgba(214,166,59,.22);}
+.character-equip-slot{background:rgba(10,7,4,.80) !important;border:1px solid rgba(150,120,66,.26) !important;border-radius:14px !important;}
+.character-trophy-row{gap:8px !important;}
+
+/* Collection grids */
+.skin-grid{gap:10px !important;}
+.skin-grid > *{border-radius:14px !important;border-color:rgba(150,120,66,.24) !important;background:linear-gradient(145deg,#181209,#0B0805) !important;}
+
+/* Buttons */
+.btn{
+  font-family:var(--font-display) !important;
+  border-radius:12px !important;letter-spacing:.7px !important;font-weight:600 !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.08),0 7px 20px rgba(0,0,0,.24) !important;
+}
+.btn-primary,.battle-start-btn{background:linear-gradient(135deg,#C99A34,#8A651F) !important;border-color:var(--rpg-gold-hi) !important;color:#241A08 !important;box-shadow:0 0 22px rgba(214,166,59,.20),inset 0 1px rgba(255,255,255,.20) !important;}
+.btn-success{background:linear-gradient(135deg,#27b985,#19765b) !important;border-color:#49e5ad !important;}
+.btn-danger{background:linear-gradient(135deg,#d83e4b,#8c2631) !important;border-color:#ff5b67 !important;}
+.btn-outline,.btn-ghost{background:rgba(14,10,6,.72) !important;border-color:rgba(150,120,66,.32) !important;color:#B29D74 !important;}
+
+/* Workout HUD */
+.workout-wrap,.timer-wrap{background:transparent !important;}
+.exercise-row{background:linear-gradient(145deg,rgba(24,18,9,.96),rgba(12,9,6,.96)) !important;border:1px solid rgba(150,120,66,.24) !important;border-radius:15px !important;}
+.rep{font-family:var(--font-display) !important;color:#F7EFD9 !important;text-shadow:0 0 15px rgba(214,166,59,.16);}
+.save-round-btn{min-height:50px !important;font-size:14px !important;}
+.combo-result-card{border-color:rgba(214,166,59,.32) !important;background:linear-gradient(145deg,rgba(48,36,16,.50),rgba(19,15,10,.95)) !important;}
+
+/* Boss battle screen */
+#screen-bossbattle{background:linear-gradient(180deg,#120D07 0%,#0B0805 52%,#070503 100%) !important;}
+#screen-bossbattle .complete-wrap{padding:18px 16px 26px !important;}
+#screen-bossbattle .battle-eyebrow{font-size:10px !important;letter-spacing:2.5px !important;color:#8E7C5C !important;text-transform:uppercase;}
+#screen-bossbattle .boss-card{border-radius:20px !important;}
+#screen-bossbattle .boss-header{padding:14px 16px !important;}
+#screen-bossbattle .battle-field{min-height:340px !important;overflow:hidden;background:
+  radial-gradient(circle at 50% 62%, rgba(150,110,30,.18), transparent 33%),
+  linear-gradient(180deg,rgba(30,22,10,.45),rgba(9,7,4,.92)) !important;}
+#screen-bossbattle .battle-field::after{content:"";position:absolute;left:0;right:0;bottom:0;height:42%;background:linear-gradient(180deg,transparent,rgba(6,5,3,.90));pointer-events:none;}
+#screen-bossbattle .battle-field-clouds{opacity:.5 !important;}
+#screen-bossbattle .boss-stage{min-height:340px !important;}
+#screen-bossbattle .boss-stage .boss-art{transform:scale(1.06);}
+#screen-bossbattle .boss-hp-track{margin:13px 16px 0 !important;}
+#screen-bossbattle .boss-hp-label{font-size:10px !important;letter-spacing:1px !important;color:#8E7C5C !important;}
+#screen-bossbattle .battle-start-btn{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:5;min-width:230px;min-height:46px;border-radius:13px !important;}
+#screen-bossbattle .battle-log{margin-top:12px !important;padding:12px 14px !important;border:1px solid rgba(150,120,66,.22) !important;border-radius:12px !important;background:rgba(12,9,5,.82) !important;color:#A28D64 !important;}
+
+/* Completion */
+.complete-wrap{padding-left:16px !important;padding-right:16px !important;}
+.complete-hero{background:radial-gradient(circle,rgba(214,166,59,.10),transparent 62%) !important;}
+.complete-rounds{font-family:var(--font-display) !important;color:#F7EFD9 !important;text-shadow:0 0 24px rgba(214,166,59,.20);}
+.pr-badge{border-radius:9px !important;}
+
+/* Modals */
+.modal-card{box-shadow:0 30px 90px rgba(0,0,0,.70),inset 0 1px rgba(255,255,255,.05) !important;}
+.modal-title{font-family:var(--font-display) !important;letter-spacing:.5px !important;}
+.modal-row{border-color:rgba(150,120,66,.16) !important;}
+
+/* Celebration overlay (level-up / loot) */
+.celebration-title{font-family:var(--font-display) !important;color:var(--rpg-gold-hi) !important;text-shadow:0 0 20px rgba(214,166,59,.35) !important;}
+
+/* Responsive */
+@media(max-width:380px){
+  .home-content,.list-wrap{padding-left:12px !important;padding-right:12px !important;}
+  .topbar{padding-left:14px !important;padding-right:14px !important;}
+  .brand{font-size:25px !important;}
+  .mascot-card,.hero-card{border-radius:18px !important;}
+  #screen-bossbattle .battle-field,#screen-bossbattle .boss-stage{min-height:300px !important;}
+}
