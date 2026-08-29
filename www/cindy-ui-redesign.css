@@ -131,39 +131,57 @@ body::before{
 
 /* HOME hero */
 .mascot-card,.hero-card{
-  background:
-    radial-gradient(circle at 50% 22%, rgba(214,166,59,.14), transparent 40%),
-    linear-gradient(155deg,rgba(26,19,9,.98),rgba(11,8,5,.98)) !important;
   border:1px solid rgba(196,150,74,.35) !important;border-radius:22px !important;
   box-shadow:inset 0 1px rgba(255,255,255,.05),0 20px 50px rgba(0,0,0,.38),0 0 38px rgba(214,166,59,.06) !important;
   overflow:hidden;
 }
+/* the flat gradient below is only the *unlocked-backdrop-photo fallback*
+   look. .has-backdrop is added by JS once the player has unlocked a
+   character backdrop photo (--backdrop-img); that image must keep showing
+   untouched, which is why it's excluded here instead of being replaced. */
+.mascot-card:not(.has-backdrop),.hero-card:not(.has-backdrop){
+  background:
+    radial-gradient(circle at 50% 22%, rgba(214,166,59,.14), transparent 40%),
+    linear-gradient(155deg,rgba(26,19,9,.98),rgba(11,8,5,.98)) !important;
+}
 .mascot-card::before,.hero-card::before{background:linear-gradient(135deg,rgba(214,166,59,.10),transparent 50%) !important;}
 .mascot-avatar{filter:drop-shadow(0 0 18px rgba(214,166,59,.18));}
-.mascot-level-badge,.status-pill,.mascot-rank{
-  font-family:var(--font-display) !important;letter-spacing:.5px !important;
-  border-radius:8px !important;border:1px solid rgba(214,166,59,.45) !important;
-  background:rgba(24,16,6,.86) !important;color:var(--rpg-gold-hi) !important;
-}
+/* background/color/border intentionally left alone on these three — each
+   carries its own per-tier styling with no !important (.mascot-level-badge's
+   4 lvbadge-* gradients, .mascot-rank's 5 rank-* colors, .status-pill.paused)
+   which a flat override here would silently erase. The untiered/default
+   state already inherits the new gold via var(--primary) from :root above,
+   so nothing needs to be restated here — see the level-badge regression
+   note near the bottom of this file for what happens if you do restate it. */
+.mascot-level-badge{font-family:var(--font-display) !important;letter-spacing:.5px !important;}
 .xp-bar-track{background:#0E0A05 !important;border-color:rgba(150,120,66,.25) !important;height:8px !important;}
 .xp-bar-fill{background:linear-gradient(90deg,#8A651F,#F2CE6E) !important;box-shadow:0 0 12px rgba(214,166,59,.35);}
 
 /* Boss teaser */
 .boss-teaser-card,.boss-card{
-  background:
-    linear-gradient(180deg,rgba(14,10,6,.30),rgba(11,8,5,.94)),
-    radial-gradient(circle at 50% 25%, rgba(214,166,59,.10), transparent 48%),
-    var(--card) !important;
   border:1px solid rgba(150,120,66,.38) !important;border-radius:20px !important;
   box-shadow:inset 0 1px rgba(255,255,255,.05),0 16px 40px rgba(0,0,0,.35) !important;
   overflow:hidden;
 }
+/* the flat gradient below is a fallback look only — .has-backdrop means
+   this specific boss has a photo backdrop (--boss-backdrop-img, set by JS),
+   which must keep winning untouched */
+.boss-teaser-card:not(.has-backdrop),.boss-card:not(.has-backdrop){
+  background:
+    linear-gradient(180deg,rgba(14,10,6,.30),rgba(11,8,5,.94)),
+    radial-gradient(circle at 50% 25%, rgba(214,166,59,.10), transparent 48%),
+    var(--card) !important;
+}
 .boss-name{font-family:var(--font-display) !important;letter-spacing:1.8px !important;color:var(--rpg-gold-hi) !important;text-shadow:0 0 16px rgba(214,166,59,.20);}
-.boss-tag,.boss-phase-label{letter-spacing:1.5px !important;color:#A28D64 !important;}
-.boss-teaser-phase.phase-critical,.boss-phase-label.phase-critical{color:var(--danger) !important;} /* alarm state — stays red, see note 4 */
+/* .boss-tag and .boss-phase-label color left alone: .boss-tag reads
+   --boss-accent-rgb (a per-boss color set by JS) and .boss-phase-label's
+   3 phase-tier colors (armorbreak/rage/critical) need to stay distinct as
+   a boss gets more dangerous — flattening them to one color was the bug. */
+.boss-tag,.boss-phase-label{letter-spacing:1.5px !important;}
 .boss-hp-track{height:9px !important;border-radius:99px !important;background:#0E0A05 !important;border:1px solid rgba(150,120,66,.25) !important;}
 .boss-hp-fill{background:linear-gradient(90deg,#8A651F,var(--danger)) !important;box-shadow:0 0 12px rgba(214,166,59,.20);}
-.boss-stage{min-height:245px !important;background:radial-gradient(circle at 50% 55%, rgba(150,110,30,.16), transparent 48%) !important;}
+/* .boss-stage background left alone too — same --boss-accent-rgb per-boss glow */
+.boss-stage{min-height:245px !important;}
 .boss-stage .boss-art{filter:drop-shadow(0 0 14px rgba(214,166,59,.16));}
 .boss-view-btn,.boss-header-btns button{background:rgba(20,14,7,.86) !important;border:1px solid rgba(150,120,66,.38) !important;color:#C4AE82 !important;border-radius:11px !important;}
 .boss-attack-log{background:rgba(12,9,5,.65) !important;border-color:rgba(150,120,66,.20) !important;border-radius:13px !important;}
@@ -235,9 +253,11 @@ body::before{
 #screen-bossbattle .battle-eyebrow{font-size:10px !important;letter-spacing:2.5px !important;color:#8E7C5C !important;text-transform:uppercase;}
 #screen-bossbattle .boss-card{border-radius:20px !important;}
 #screen-bossbattle .boss-header{padding:14px 16px !important;}
-#screen-bossbattle .battle-field{min-height:340px !important;overflow:hidden;background:
-  radial-gradient(circle at 50% 62%, rgba(150,110,30,.18), transparent 33%),
-  linear-gradient(180deg,rgba(30,22,10,.45),rgba(9,7,4,.92)) !important;}
+/* background intentionally untouched here — this is the boss battle
+   backdrop itself, layering var(--battle-field-img) (the actual per-boss
+   art set by JS). Overriding it blanks every boss back to the flat
+   fallback sky gradient, which is the exact bug being fixed. */
+#screen-bossbattle .battle-field{min-height:340px !important;overflow:hidden;}
 #screen-bossbattle .battle-field::after{content:"";position:absolute;left:0;right:0;bottom:0;height:42%;background:linear-gradient(180deg,transparent,rgba(6,5,3,.90));pointer-events:none;}
 #screen-bossbattle .battle-field-clouds{opacity:.5 !important;}
 #screen-bossbattle .boss-stage{min-height:340px !important;}
