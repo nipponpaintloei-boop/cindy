@@ -2427,7 +2427,9 @@ function applyMascotGearAndAura(rank) {
 const STAT_DEFS = [
   { key: 'pull', label: 'STRENGTH', short: 'STR', color: 'var(--pull)' },
   { key: 'push', label: 'POWER', short: 'PWR', color: 'var(--push)' },
-  { key: 'squat', label: 'ENDURANCE', short: 'END', color: 'var(--squat)' }
+  { key: 'legs', label: 'ENDURANCE', short: 'END', color: 'var(--squat)' },
+  { key: 'core', label: 'CORE', short: 'CORE', color: 'var(--core)' },
+  { key: 'cardio', label: 'CARDIO', short: 'CARDIO', color: 'var(--run)' }
 ];
 function statReqForLevel(level) {
   return 30 + (level - 1) * 15;
@@ -2443,18 +2445,51 @@ function computeStatInfo(totalReps) {
   }
   return { level, pct: req > 0 ? remaining / req : 0 };
 }
-/** Lifetime Cindy rep totals per stat (pull/push/squat) — the same raw
- * numbers computeStatInfo() levels up, shared by the stat bars, the
- * derived "class" flavor title, and the CP number so none of them drift
- * out of sync with each other. */
+/** Best-effort category for one exerciseLog entry. Custom Workout
+ * exercises picked from the library carry their category from
+ * EXERCISE_LIBRARY (see selectLibraryExercise); freeform "พิมพ์ท่าเอง"
+ * entries get it from the category picker added to the exercise editor
+ * (see renderCustomExerciseList). Older saved data from before this
+ * field existed won't have it, so this falls back to matching the
+ * exercise's name against EXERCISE_LIBRARY, and finally to 'core' if
+ * nothing matches — a neutral bucket rather than dropping the volume
+ * (and thus the reps a player already earned) on the floor. */
+function exerciseCategoryOrGuess(entry) {
+  if (entry && STAT_DEFS.some(d => d.key === entry.category)) return entry.category;
+  const name = (entry && entry.name || '').trim().toLowerCase();
+  const match = name && EXERCISE_LIBRARY.find(e => e.name.trim().toLowerCase() === name);
+  return (match && match.category) || 'core';
+}
+/** Lifetime totals per stat, pooled from every source that logs the
+ * matching kind of work:
+ * - Cindy sessions: fixed pull/push/squat reps per round (squat is a
+ *   legs exercise, so it feeds the legs/END stat)
+ * - Custom Workout sessions: each exerciseLog entry's repsOrSecDone,
+ *   bucketed by its category (see exerciseCategoryOrGuess) — reps and
+ *   seconds are summed directly with no unit conversion, the same
+ *   undifferentiated-volume approach already used for Boss damage
+ *   (totalVolumeOfCustomSession) elsewhere in the app, so this doesn't
+ *   introduce a second, inconsistent balance model
+ * - Run sessions: moving seconds counted into cardio, same "seconds
+ *   count as volume" precedent as time-type Custom Workout exercises
+ * Shared by the stat bars, the derived "class" flavor title, and the
+ * CP number so none of them drift out of sync with each other. */
 function loadStatTotals() {
-  const all = loadSessions();
-  const totals = { pull: 0, push: 0, squat: 0 };
-  all.forEach(s => {
+  const totals = { pull: 0, push: 0, legs: 0, core: 0, cardio: 0 };
+  loadSessions().forEach(s => {
     if (!s.total) return;
     totals.pull += s.total.pull || 0;
     totals.push += s.total.push || 0;
-    totals.squat += s.total.squat || 0;
+    totals.legs += s.total.squat || 0;
+  });
+  loadCustomWorkoutSessions().forEach(s => {
+    (s.exerciseLog || []).forEach(e => {
+      const cat = exerciseCategoryOrGuess(e);
+      totals[cat] = (totals[cat] || 0) + (e.repsOrSecDone || 0);
+    });
+  });
+  loadRunSessions().forEach(s => {
+    totals.cardio += s.movingSec || 0;
   });
   return totals;
 }
@@ -2471,15 +2506,16 @@ function renderStatBars(containerId) {
   }).join('');
 }
 
-/* ---- derived "class" flavor title — whichever stat (STR/PWR/END) has
- * the most lifetime reps gets a title, so two people at the same level
- * can feel like a different build. Pure lookup on loadStatTotals(),
- * nothing new stored. */
-const STAT_CLASS_TITLES = { pull: 'นักดึงข้อ', push: 'นักทุบพลัง', squat: 'นักวิ่งทน' };
+/* ---- derived "class" flavor title — whichever stat has the most
+ * lifetime volume gets a title, so two people at the same level can
+ * feel like a different build. Pure lookup on loadStatTotals(), nothing
+ * new stored. */
+const STAT_CLASS_TITLES = { pull: 'นักดึงข้อ', push: 'นักทุบพลัง', legs: 'นักวิ่งทน', core: 'นักแกนกลาง', cardio: 'นักคาร์ดิโอ' };
 function computeClassTitle(totals) {
-  if (!totals.pull && !totals.push && !totals.squat) return '';
-  let best = 'pull';
-  ['push', 'squat'].forEach(k => { if (totals[k] > totals[best]) best = k; });
+  const keys = STAT_DEFS.map(d => d.key);
+  if (!keys.some(k => totals[k])) return '';
+  let best = keys[0];
+  keys.forEach(k => { if (totals[k] > totals[best]) best = k; });
   return STAT_CLASS_TITLES[best];
 }
 
@@ -6022,7 +6058,16 @@ function makeCustomExercise(overrides) {
     restBetweenSetsSec: 45,    // rest between sets of THIS exercise
     restAfterSec: 15,          // rest after the LAST set of this exercise, before the next exercise
     weight: 0,                 // optional load in kg; 0 = bodyweight / not tracked
-    supersetWithNext: false    // true = skip the rest-before-next-exercise, flow straight into it
+    supersetWithNext: false,   // true = skip the rest-before-next-exercise, flow straight into it
+    category: undefined        // pull|push|legs|core|cardio — which Character Stat this feeds
+                                // (see STAT_DEFS). Left unset by default (rather than defaulting
+                                // to 'core' here) so exerciseCategoryOrGuess() can fall through to
+                                // a name-match against EXERCISE_LIBRARY for callers — like
+                                // CARDIO_PRESETS — that never pass one explicitly; defaulting it
+                                // here would wrongly lock those in as 'core' before the name-match
+                                // ever ran. The exercise editor's category selector shows 'core' as
+                                // a UI fallback only (ex.category || 'core'); it isn't saved until
+                                // the user actually picks one.
   }, overrides || {});
 }
 
@@ -6271,6 +6316,13 @@ function renderCustomExerciseList() {
         : `<div class="field-row"><label>พักก่อนไปท่าถัดไป (วินาที)</label><input type="number" min="0" max="600" value="${ex.restAfterSec}" oninput="updateCustomExerciseField(${i}, 'restAfterSec', this.value)"></div>`
       }
       <div class="field-row"><label>น้ำหนักที่ใช้ (กก. — ถ้ามี)</label><input type="number" min="0" max="500" step="0.5" value="${ex.weight || 0}" oninput="updateCustomExerciseField(${i}, 'weight', this.value)"></div>
+      <div class="field-row"><label>หมวด (นับเข้า Stat ไหน)</label>
+        <select class="time-input" onchange="updateCustomExerciseField(${i}, 'category', this.value)">
+          ${EXERCISE_CATEGORIES.filter(c => c.id !== 'all').map(c =>
+            `<option value="${c.id}"${(ex.category || 'core') === c.id ? ' selected' : ''}>${c.label}</option>`
+          ).join('')}
+        </select>
+      </div>
     </div>`;
   }).join('');
 }
@@ -6343,7 +6395,8 @@ function selectLibraryExercise(libIdx) {
     type: preset.type,
     reps: preset.reps || 10,
     durationSec: preset.durationSec || 30,
-    restAfterSec: preset.restAfterSec != null ? preset.restAfterSec : 15
+    restAfterSec: preset.restAfterSec != null ? preset.restAfterSec : 15,
+    category: preset.category || 'core'
   }));
   closeModal('exerciseLibraryModal');
   renderCustomExerciseList();
@@ -6370,6 +6423,8 @@ function updateCustomExerciseField(idx, field, value) {
   if (!customEditorDraft) return;
   if (field === 'name') {
     customEditorDraft.exercises[idx][field] = value;
+  } else if (field === 'category') {
+    customEditorDraft.exercises[idx][field] = STAT_DEFS.some(d => d.key === value) ? value : 'core';
   } else if (field === 'weight') {
     customEditorDraft.exercises[idx][field] = Math.max(0, parseFloat(value) || 0);
   } else if (field === 'supersetWithNext') {
@@ -6580,7 +6635,7 @@ function beginCustomPlayerPhase() {
 
 function logCurrentCustomExercise(value) {
   const ex = currentCustomExercise();
-  customPlayer.exerciseLog.push({ name: ex.name, exIndex: customPlayer.exIndex, setNumber: customPlayer.setIndex + 1, repsOrSecDone: value, type: ex.type || 'reps', weight: ex.weight || 0 });
+  customPlayer.exerciseLog.push({ name: ex.name, exIndex: customPlayer.exIndex, setNumber: customPlayer.setIndex + 1, repsOrSecDone: value, type: ex.type || 'reps', weight: ex.weight || 0, category: exerciseCategoryOrGuess(ex) });
 }
 
 function onCustomExerciseTimeUp() {
