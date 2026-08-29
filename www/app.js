@@ -1544,6 +1544,8 @@ function closeBossView() {
 function initBossView() {
   const btn = document.getElementById('bossViewBtn');
   if (btn) btn.addEventListener('click', openBossView);
+  const infoBtn = document.getElementById('bossInfoBtn');
+  if (infoBtn) infoBtn.addEventListener('click', openBossView);
   document.querySelectorAll('[data-boss-close]').forEach(el => el.addEventListener('click', closeBossView));
 }
 
@@ -1551,13 +1553,37 @@ function initBossView() {
  * 40-10% RAGE, <10% CRITICAL. Order matters: first match wins, checked
  * high-to-low against the same hp% already driving the HP bar. */
 const BOSS_PHASES = [
-  { key: 'normal', label: 'NORMAL', min: 0.7 },
-  { key: 'armorbreak', label: 'ARMOR BREAK', min: 0.4 },
-  { key: 'rage', label: 'RAGE', min: 0.1 },
-  { key: 'critical', label: 'CRITICAL', min: 0 }
+  { key: 'normal', label: 'NORMAL', min: 0.7, desc: 'บอสอยู่ในสภาวะปกติ' },
+  { key: 'armorbreak', label: 'ARMOR BREAK', min: 0.4, desc: 'เกราะเริ่มแตก — HP ต่ำกว่า 70%' },
+  { key: 'rage', label: 'RAGE', min: 0.1, desc: 'บอสเข้าสู่ความบ้าคลั่ง — HP ต่ำกว่า 40%' },
+  { key: 'critical', label: 'CRITICAL', min: 0, desc: 'ใกล้พ่ายแพ้แล้ว — HP ต่ำกว่า 10%' }
 ];
 function bossPhaseFor(pct) {
   return BOSS_PHASES.find(p => pct >= p.min) || BOSS_PHASES[BOSS_PHASES.length - 1];
+}
+
+/* ---- 4-node phase progress strip (boss-fight redesign, 2026-08) ----
+ * Purely a re-render of BOSS_PHASES against the current phase — same data
+ * bossPhaseFor() already resolves for the label/HP bar, so this can't show
+ * a phase the rest of the card disagrees with. done = phases already
+ * passed (lower min than current), active = current phase, locked = phases
+ * still ahead. When the boss is defeated, every node shows done. */
+const BOSS_PHASE_ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg>';
+const BOSS_PHASE_ICON_LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7.5a4 4 0 018 0V11"/></svg>';
+function renderBossPhaseNodes(currentPhase, defeated) {
+  const wrap = document.getElementById('bossPhaseNodes');
+  if (!wrap) return;
+  const currentIdx = defeated ? BOSS_PHASES.length : BOSS_PHASES.findIndex(p => p === currentPhase);
+  wrap.innerHTML = BOSS_PHASES.map((p, i) => {
+    let state = 'locked', inner = '<span>' + (i + 1) + '</span>';
+    if (defeated || i < currentIdx) { state = 'done'; inner = BOSS_PHASE_ICON_CHECK; }
+    else if (i === currentIdx) { state = 'active'; inner = '<span>' + (i + 1) + '</span>'; }
+    else { inner = BOSS_PHASE_ICON_LOCK; }
+    const arrow = i < BOSS_PHASES.length - 1 ? '<div class="phase-arrow">&rarr;</div>' : '';
+    return '<div class="phase-node ' + state + '"><div class="phase-node-circle">' + inner + '</div>' +
+      '<div class="phase-node-lbl">PHASE ' + (i + 1) + '</div>' +
+      '<div class="phase-node-sub">' + p.label + '</div></div>' + arrow;
+  }).join('');
 }
 
 function renderBossCard() {
@@ -1612,6 +1638,7 @@ function renderBossCard() {
   const phase = state.defeated ? null : bossPhaseFor(pct);
   BOSS_PHASES.forEach(p => stage.classList.remove('boss-phase-' + p.key));
   const phaseLabelEl = document.getElementById('bossPhaseLabel');
+  const phaseDescEl = document.getElementById('bossPhaseDesc');
   if (phase) {
     stage.classList.add('boss-phase-' + phase.key);
     if (phaseLabelEl) {
@@ -1619,6 +1646,7 @@ function renderBossCard() {
       BOSS_PHASES.forEach(p => phaseLabelEl.classList.remove('phase-' + p.key));
       phaseLabelEl.classList.add('phase-' + phase.key);
     }
+    if (phaseDescEl) phaseDescEl.textContent = phase.desc;
     const phaseKey = state.weekIndex + '_' + phase.key;
     if (stage.dataset.bossPhase !== phaseKey) {
       const isFirstRenderThisFight = !stage.dataset.bossPhase || stage.dataset.bossPhase.split('_')[0] !== String(state.weekIndex);
@@ -1629,8 +1657,10 @@ function renderBossCard() {
       }
     }
   } else if (phaseLabelEl) {
-    phaseLabelEl.textContent = '';
+    phaseLabelEl.textContent = state.defeated ? 'DEFEATED' : '';
+    if (phaseDescEl) phaseDescEl.textContent = state.defeated ? 'ปราบบอสตัวนี้สำเร็จแล้วในสัปดาห์นี้' : '';
   }
+  renderBossPhaseNodes(phase, state.defeated);
 
   const weekKey = bossWeekKey(state.weekIndex);
   const lastSeenDmgKey = KEY_BOSS_DEFEAT_SEEN + '_dmg_' + weekKey;
