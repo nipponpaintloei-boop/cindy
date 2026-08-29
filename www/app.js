@@ -6689,6 +6689,10 @@ const RUN_XP_PER_KM = 60;
 
 let runWatchId = null;
 let runTickHandle = null;
+/* id of the most recently completed run session, so the "แชร์" button on
+ * the run-complete screen knows which session to render — set at the end
+ * of finishRunSession(), right after the session is pushed to history. */
+let lastCompletedRunId = null;
 
 /** Great-circle distance between two lat/lon points, in meters. */
 function haversineMeters(lat1, lon1, lat2, lon2) {
@@ -6831,7 +6835,12 @@ function startNewRun() {
     isPaused: false,
     lastFixLat: null,
     lastFixLon: null,
-    weakGpsFlag: false
+    weakGpsFlag: false,
+    // Array of segments (array of [lat,lon] point arrays). A new segment
+    // starts whenever lastFixLat is null (run start, or right after a
+    // pause/resume) so the route drawing never draws a straight line
+    // across a gap where the runner wasn't actually moving/tracked.
+    path: []
   };
   saveRunActive(active);
   enterRunScreen();
@@ -6873,8 +6882,15 @@ function onRunPosition(pos) {
     return; // fix too noisy — dropped, doesn't move distance or the last-fix pointer
   }
   active.weakGpsFlag = false;
+  if (!active.path) active.path = []; // migration guard for a run started before path recording existed
   if (active.lastFixLat != null) {
     active.distanceM += haversineMeters(active.lastFixLat, active.lastFixLon, latitude, longitude);
+    // continue the current segment
+    if (active.path.length === 0) active.path.push([]);
+    active.path[active.path.length - 1].push([latitude, longitude]);
+  } else {
+    // start of the run, or right after a pause/resume — begin a new segment
+    active.path.push([[latitude, longitude]]);
   }
   active.lastFixLat = latitude;
   active.lastFixLon = longitude;
@@ -6964,13 +6980,15 @@ function finishRunSession() {
     distanceKm,
     movingSec,
     paceSecPerKm,
-    xp
+    xp,
+    path: active.path || []
   };
   const sessions = loadRunSessions();
   sessions.push(session);
   saveRunSessions(sessions);
   clearRunActive();
 
+  lastCompletedRunId = session.id;
   renderRunCompleteScreen(session);
   go('runcomplete');
 }
@@ -6988,8 +7006,261 @@ function renderRunCompleteScreen(session) {
       hint.style.display = 'none';
     }
   }
+  const canvas = document.getElementById('runCompleteRouteCanvas');
+  if (canvas) drawRoutePreview(canvas, session.path);
 }
 function finishRunCompleteFlow() { go('home'); }
+function shareLastCompletedRun() {
+  if (lastCompletedRunId != null) shareRunResult(lastCompletedRunId);
+}
+
+/* ================= ROUTE PREVIEW (in-app mini canvas) ================= */
+/**
+ * Draws a small route-shape preview into an on-screen <canvas> — same
+ * projection logic as the big share-image renderer below, just scaled to
+ * the canvas's own pixel size. Segments (see startNewRun/onRunPosition)
+ * are drawn as separate strokes so a pause gap never shows as a straight
+ * line cutting across the map.
+ */
+function drawRoutePreview(canvas, pathSegments) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const allPoints = (pathSegments || []).flat();
+  if (allPoints.length < 2) {
+    ctx.fillStyle = 'rgba(141,147,166,0.7)';
+    ctx.font = '600 13px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('ไม่มีข้อมูลเส้นทางสำหรับการวิ่งนี้', W / 2, H / 2);
+    return;
+  }
+  const projected = projectRunPathSegments(pathSegments, W, H, 18);
+  ctx.strokeStyle = '#22C7B0';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  projected.forEach(seg => {
+    if (seg.length < 2) return;
+    ctx.beginPath();
+    seg.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+    ctx.stroke();
+  });
+  const firstSeg = projected.find(s => s.length > 0);
+  const lastSeg = [...projected].reverse().find(s => s.length > 0);
+  if (firstSeg) {
+    ctx.fillStyle = '#3ED598';
+    ctx.beginPath(); ctx.arc(firstSeg[0][0], firstSeg[0][1], 5, 0, Math.PI * 2); ctx.fill();
+  }
+  if (lastSeg) {
+    const p = lastSeg[lastSeg.length - 1];
+    ctx.fillStyle = '#E8232A';
+    ctx.beginPath(); ctx.arc(p[0], p[1], 5, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+/**
+ * Projects lat/lon segments onto a width x height pixel box, preserving
+ * real-world aspect ratio (longitude degrees are scaled by cos(avgLat) so
+ * the route shape isn't stretched near non-equatorial latitudes) and
+ * centering it within the padded box. Returns the same segment structure
+ * with each [lat,lon] replaced by an [x,y] pixel pair.
+ */
+function projectRunPathSegments(pathSegments, width, height, padding) {
+  const allPoints = (pathSegments || []).flat();
+  if (allPoints.length === 0) return [];
+  const lats = allPoints.map(p => p[0]), lons = allPoints.map(p => p[1]);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+  const avgLat = (minLat + maxLat) / 2;
+  const lonScale = Math.cos(avgLat * Math.PI / 180) || 1;
+  const lonRangeDeg = Math.max((maxLon - minLon) * lonScale, 0.00005);
+  const latRangeDeg = Math.max(maxLat - minLat, 0.00005);
+  const w = Math.max(width - padding * 2, 1), h = Math.max(height - padding * 2, 1);
+  const scale = Math.min(w / lonRangeDeg, h / latRangeDeg);
+  const drawnW = lonRangeDeg * scale, drawnH = latRangeDeg * scale;
+  const offsetX = padding + (w - drawnW) / 2;
+  const offsetY = padding + (h - drawnH) / 2;
+  return (pathSegments || []).map(seg => seg.map(([lat, lon]) => [
+    offsetX + (lon - minLon) * lonScale * scale,
+    offsetY + (maxLat - lat) * scale // flip: higher latitude draws nearer the top
+  ]));
+}
+
+/* ================= SHARE RUN RESULT (canvas image, Strava-style) =================
+ * Renders the GPS route shape together with distance/time/pace stats into
+ * one shareable image — same canvas-build + native/web share fallback
+ * chain as shareResult()/shareCustomResult() above, just with a route map
+ * in place of the workout web-burst decoration. */
+async function shareRunResult(id) {
+  const s = loadRunSessions().find(x => x.id === id);
+  if (!s) { showToast('ไม่พบข้อมูล'); return; }
+
+  const canvas = document.createElement('canvas');
+  const W = 1080, H = 1920;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // background: teal-to-navy diagonal, matches the RUN mode's accent color
+  const grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, '#0d2e2a');
+  grad.addColorStop(0.45, '#0a1520');
+  grad.addColorStop(1, '#05070f');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // faint concentric arcs, echoes the app's radial brand texture
+  ctx.save();
+  ctx.strokeStyle = 'rgba(34,199,176,0.18)';
+  ctx.lineWidth = 2.4;
+  [0.18, 0.34, 0.5].forEach(r => {
+    ctx.beginPath();
+    ctx.arc(0, 0, W * r * 1.5, 0, Math.PI / 2);
+    ctx.stroke();
+  });
+  ctx.restore();
+
+  // brand row
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#22C7B0';
+  ctx.font = '800 46px Arial';
+  ctx.fillText('CINDY RUN', W / 2, 130);
+  ctx.fillStyle = 'rgba(245,244,240,0.6)';
+  ctx.font = '600 26px Arial';
+  ctx.fillText(fmtDate(s.completedAt), W / 2, 172);
+
+  // route map card
+  const mapX = 60, mapY = 220, mapW = W - 120, mapH = 760;
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.04)';
+  if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(mapX, mapY, mapW, mapH, 24); ctx.fill(); }
+  else ctx.fillRect(mapX, mapY, mapW, mapH);
+  ctx.restore();
+
+  const allPoints = (s.path || []).flat();
+  if (allPoints.length >= 2) {
+    const projected = projectRunPathSegments(s.path, mapW, mapH, 70).map(seg =>
+      seg.map(([x, y]) => [x + mapX, y + mapY])
+    );
+    ctx.save();
+    ctx.shadowColor = 'rgba(34,199,176,0.55)';
+    ctx.shadowBlur = 22;
+    ctx.strokeStyle = '#22C7B0';
+    ctx.lineWidth = 9;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    projected.forEach(seg => {
+      if (seg.length < 2) return;
+      ctx.beginPath();
+      seg.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+      ctx.stroke();
+    });
+    ctx.shadowBlur = 0;
+    const firstSeg = projected.find(seg => seg.length > 0);
+    const lastSeg = [...projected].reverse().find(seg => seg.length > 0);
+    if (firstSeg) {
+      ctx.fillStyle = '#3ED598';
+      ctx.beginPath(); ctx.arc(firstSeg[0][0], firstSeg[0][1], 13, 0, Math.PI * 2); ctx.fill();
+    }
+    if (lastSeg) {
+      const p = lastSeg[lastSeg.length - 1];
+      ctx.fillStyle = '#E8232A';
+      ctx.beginPath(); ctx.arc(p[0], p[1], 13, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  } else {
+    ctx.fillStyle = 'rgba(245,244,240,0.4)';
+    ctx.font = '600 30px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('ไม่มีข้อมูลเส้นทางสำหรับการวิ่งนี้', W / 2, mapY + mapH / 2);
+  }
+
+  // big distance number
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#F5F4F0';
+  ctx.font = '800 300px Arial';
+  ctx.fillText(s.distanceKm.toFixed(2), W / 2, 1250);
+  ctx.fillStyle = 'rgba(245,244,240,0.65)';
+  ctx.font = '700 34px Arial';
+  ctx.letterSpacing = '4px';
+  ctx.fillText('กิโลเมตร', W / 2, 1300);
+  ctx.letterSpacing = '0px';
+
+  // stats grid 2x2: time / pace / xp / (blank date already shown up top)
+  const stats = [
+    ['เวลาที่วิ่ง', fmtTime(s.movingSec)],
+    ['เพซเฉลี่ย /กม.', fmtPace(s.paceSecPerKm)],
+    ['XP ที่ได้', '+' + (s.xp || 0)],
+  ];
+  const gridTop = 1420, cellW = W / stats.length, cellH = 160;
+  stats.forEach((st, i) => {
+    const x = cellW * i + cellW / 2;
+    ctx.fillStyle = '#F5F4F0';
+    ctx.font = '800 58px Arial';
+    ctx.fillText(String(st[1]), x, gridTop);
+    ctx.fillStyle = 'rgba(245,244,240,0.5)';
+    ctx.font = '700 22px Arial';
+    ctx.letterSpacing = '1.5px';
+    ctx.fillText(st[0], x, gridTop + 38);
+    ctx.letterSpacing = '0px';
+  });
+
+  // divider bar (teal), matches the run mode's brand color
+  ctx.fillStyle = '#22C7B0';
+  ctx.fillRect(W / 2 - 140, 1650, 280, 6);
+
+  ctx.fillStyle = 'rgba(245,244,240,0.45)';
+  ctx.font = '600 28px Arial';
+  ctx.fillText('CINDY — Fitness RPG Workout', W / 2, 1720);
+
+  const fileName = 'cindy_run_' + s.id + '.png';
+  const shareTitle = 'CINDY Run';
+  const shareText = s.distanceKm.toFixed(2) + ' กม. ในเวลา ' + fmtTime(s.movingSec) + ' เพซเฉลี่ย ' + fmtPace(s.paceSecPerKm) + '/กม. — CINDY RUN';
+
+  /* Native app (Capacitor): write to app cache then hand off to the OS
+     share sheet via @capacitor/share — same approach as shareResult(). */
+  const plugins = capPlugins();
+  if (plugins && plugins.Filesystem && plugins.Share) {
+    try {
+      const dataUrl = canvas.toDataURL('image/png');
+      const base64Data = dataUrl.split(',')[1];
+      const written = await plugins.Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: 'CACHE'
+      });
+      await plugins.Share.share({
+        title: shareTitle,
+        text: shareText,
+        url: written.uri,
+        dialogTitle: 'แชร์สถิติการวิ่ง'
+      });
+    } catch (e) {
+      if (!(e && String(e.message || e).toLowerCase().includes('cancel'))) {
+        showToast('แชร์ไม่สำเร็จ ลองอีกครั้ง');
+      }
+    }
+    return;
+  }
+
+  /* Web fallback (running in a normal browser tab, not the packaged app) */
+  canvas.toBlob(async (blob) => {
+    if (!blob) { showToast('สร้างรูปไม่สำเร็จ'); return; }
+    const file = new File([blob], fileName, { type: 'image/png' });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: shareTitle, text: shareText });
+        return;
+      } catch (e) { /* cancelled — fall through to download */ }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('บันทึกรูปสถิติการวิ่งแล้ว (เช็คโฟลเดอร์ Download)');
+  }, 'image/png');
+}
 
 /* ---- history detail / delete ---- */
 let currentRunDetailId = null;
@@ -7002,12 +7273,18 @@ function openRunDetail(id) {
       <div class="complete-rounds tabular">${s.distanceKm.toFixed(2)}</div>
       <div class="complete-lbl">กม. · ${fmtDate(s.completedAt)}</div>
     </div>
+    <div class="metric-card" style="margin-bottom:14px;padding:10px;">
+      <canvas id="runDetailRouteCanvas" width="600" height="280" style="width:100%;height:180px;display:block;border-radius:10px;"></canvas>
+    </div>
     <div class="metric-grid">
       <div class="metric-card"><div class="v tabular">${fmtTime(s.movingSec)}</div><div class="l">เวลาวิ่ง</div></div>
       <div class="metric-card"><div class="v tabular">${fmtPace(s.paceSecPerKm)}</div><div class="l">เพซเฉลี่ย /กม.</div></div>
       <div class="metric-card"><div class="v">${s.xp}</div><div class="l">XP ที่ได้</div></div>
     </div>
+    <button class="btn btn-outline" style="margin-top:14px;" onclick="shareRunResult('${s.id}')">แชร์สถิติการวิ่ง</button>
   `;
+  const canvas = document.getElementById('runDetailRouteCanvas');
+  if (canvas) drawRoutePreview(canvas, s.path || []);
   go('rundetail');
 }
 function confirmDeleteRunSession() {

@@ -3167,7 +3167,10 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <div id="runCompleteDistance" class="complete-rounds tabular">0.00</div>
         <div class="complete-lbl">กิโลเมตร</div>
       </div>
-      <div class="metric-grid">
+      <div class="metric-card" style="margin-top:14px;padding:10px;">
+        <canvas id="runCompleteRouteCanvas" width="600" height="280" style="width:100%;height:180px;display:block;border-radius:10px;"></canvas>
+      </div>
+      <div class="metric-grid" style="margin-top:14px;">
         <div class="metric-card"><div id="runCompleteTime" class="v tabular">00:00</div><div class="l">เวลาที่วิ่ง</div></div>
         <div class="metric-card"><div id="runCompletePace" class="v tabular">--:-- /กม.</div><div class="l">เพซเฉลี่ย</div></div>
       </div>
@@ -3175,7 +3178,8 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <div class="combo-result-title" id="runCompleteXp">+0 XP</div>
         <div id="runCompleteXpHint" class="combo-result-xp" style="display:none;"></div>
       </div>
-      <button class="btn btn-primary" style="margin-top:22px;" onclick="finishRunCompleteFlow()">กลับหน้าหลัก</button>
+      <button class="btn btn-outline" style="margin-top:18px;" onclick="shareLastCompletedRun()">แชร์สถิติการวิ่ง</button>
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="finishRunCompleteFlow()">กลับหน้าหลัก</button>
     </div>
   </section>
 
