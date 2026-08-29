@@ -45,10 +45,19 @@
 }
 
 /* HOME hero */
-.mascot-card,.hero-card{
+.mascot-card{
   border-radius:22px !important;
   box-shadow:inset 0 1px rgba(255,255,255,.05),0 20px 50px rgba(0,0,0,.38) !important;
   overflow:hidden;
+}
+/* .hero-card must NOT get overflow:hidden — .hero-eyebrow (the "20 MIN AMRAP"
+   ribbon) sits at top:-14px on purpose, poking above the card. overflow:hidden
+   here was silently guillotining the top of that ribbon (bug: badge reads as
+   cut off mid-letter). Nothing else in this card needs clipping, so dropping
+   it is safe. */
+.hero-card{
+  border-radius:22px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.05),0 20px 50px rgba(0,0,0,.38) !important;
 }
 .mascot-level-badge{font-family:var(--font-display) !important;letter-spacing:.5px !important;}
 .xp-bar-track{height:8px !important;}
@@ -67,19 +76,35 @@
    visual break. Splitting into "portrait zone / hp+phase zone / log zone"
    with a divider + its own panel background, matching the reference image's
    separation, without adding any new HTML sections. */
-#screen-bossfight .boss-header{padding-bottom:12px !important;}
+#screen-bossfight .boss-header{padding-bottom:14px !important;}
 #screen-bossfight .boss-stage{
-  margin-bottom:16px !important;padding-bottom:16px !important;
+  margin-bottom:18px !important;padding-bottom:18px !important;
   border-bottom:1px solid var(--card-border) !important;
 }
 #screen-bossfight .boss-hp-track{margin-top:2px !important;}
-#screen-bossfight .boss-hp-label{margin-bottom:14px !important;padding-bottom:14px !important;border-bottom:1px solid var(--card-border) !important;}
+#screen-bossfight .boss-hp-label{margin-bottom:16px !important;padding-bottom:16px !important;border-bottom:1px solid var(--card-border) !important;}
 #screen-bossfight .boss-phase-label{
-  margin-bottom:14px !important;padding:10px 12px !important;
+  margin-bottom:14px !important;padding:11px 12px !important;
   border-radius:var(--radius-sm) !important;border:1px solid var(--card-border) !important;
-  background:rgba(0,0,0,.22) !important;text-align:center !important;
+  background:rgba(0,0,0,.34) !important;text-align:center !important;
 }
 #screen-bossfight .boss-attack-log{margin-top:2px !important;}
+/* Over a per-boss backdrop photo, --card-border (#2B2E3D) all but disappears
+   against bright sky/cloud art, so the two zone-divider lines above read as
+   "no line at all" (this — not a missing rule — is why the screenshot looked
+   like one long unbroken card). Brighten just those two dividers, and the
+   header/HP/phase text shadows, when a backdrop is present. No new colors —
+   same border/shadow properties, just enough opacity to actually show up. */
+#screen-bossfight .boss-card.has-backdrop .boss-stage{border-bottom-color:rgba(255,255,255,.22) !important;}
+#screen-bossfight .boss-card.has-backdrop .boss-hp-label{border-bottom-color:rgba(255,255,255,.22) !important;}
+.boss-card.has-backdrop .boss-tag,
+.boss-card.has-backdrop .boss-chapter-label,
+.boss-card.has-backdrop .boss-modifier-label,
+.boss-card.has-backdrop .boss-countdown,
+.boss-card.has-backdrop .boss-hp-label,
+.boss-card.has-backdrop .boss-phase-label{
+  text-shadow:0 1px 2px rgba(0,0,0,.95),0 0 8px rgba(0,0,0,.75) !important;
+}
 .boss-tag,.boss-phase-label{letter-spacing:1.5px !important;}
 .boss-hp-track{height:9px !important;border-radius:99px !important;}
 .boss-view-btn,.boss-header-btns button{border-radius:11px !important;}
@@ -104,6 +129,14 @@
 
 /* Character */
 .character-name-btn{font-family:var(--font-display) !important;}
+/* .character-hero-info is display:flex;flex-direction:column with the
+   default align-items:stretch, so this button (a flex item) already
+   stretches to the full width of the info column — but a button's own
+   internal content still defaults to justify-content:flex-start, so the
+   name+pencil icon hugged the left edge while everything else in the
+   column (LV badge, RECRUIT pill, combat power) sits flush right. This
+   just right-aligns the button's own content so it lines up with the rest. */
+.character-hero-info .character-name-btn{width:100%;justify-content:flex-end;}
 .character-equip-slot{border-radius:14px !important;}
 .character-trophy-row{gap:8px !important;}
 
@@ -144,6 +177,57 @@
 
 /* Celebration overlay (level-up / loot) */
 .celebration-title{font-family:var(--font-display) !important;}
+
+/* ============================================================
+   DRAFT — Boss Fight additions requested alongside the zone-
+   separation pass above. Markup for these lives in index.html
+   inside #screen-bossfight (search "DRAFT"). Not wired to real
+   boss data yet — app.js needs a data source for weakness/resist
+   and the recommended-workout list; the phase-node CSS below is
+   the one exception, since app.js already has a finished
+   renderBossPhaseNodes() function (line ~1573) that was calling
+   a #bossPhaseNodes container that never existed in the HTML —
+   this makes that already-written feature actually render.
+   ============================================================ */
+
+/* ---- Phase progress strip (4 nodes: NORMAL/ARMOR BREAK/RAGE/CRITICAL) --- */
+.boss-phase-nodes{display:flex;align-items:flex-start;justify-content:center;margin:10px 0 4px;}
+.phase-node{display:flex;flex-direction:column;align-items:center;gap:4px;width:56px;}
+.phase-node-circle{
+  width:26px;height:26px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  border:1.5px solid var(--card-border);color:var(--text-faint);
+  font-family:var(--font-display);font-size:11px;background:var(--bg-elev);
+}
+.phase-node-circle svg{width:13px;height:13px;}
+.phase-node.active .phase-node-circle{
+  border-color:rgb(var(--boss-accent-rgb));color:rgb(var(--boss-accent-rgb));
+  box-shadow:0 0 0 3px rgba(var(--boss-accent-rgb),.18);
+}
+.phase-node.done .phase-node-circle{border-color:var(--success);color:var(--success);background:rgba(62,213,152,.1);}
+.phase-node-lbl{font-size:7.5px;font-weight:800;letter-spacing:.6px;color:var(--text-faint);text-align:center;}
+.phase-node.active .phase-node-lbl{color:var(--text);}
+.phase-node-sub{font-size:7px;color:var(--text-faint);text-align:center;line-height:1.3;}
+.phase-arrow{color:var(--text-faint);font-size:12px;margin:5px 2px 0;flex-shrink:0;}
+
+/* ---- Weakness / Resist chips (draft — placeholder copy in the HTML) ---- */
+.boss-weakness-row{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:12px;}
+.boss-weak-chip{font-size:9.5px;font-weight:700;padding:4px 10px;border-radius:99px;border:1px solid var(--card-border);background:var(--bg-elev);color:var(--text-dim);}
+.boss-weak-chip b{font-weight:800;margin-right:3px;letter-spacing:.4px;}
+.boss-weak-chip.weak{color:var(--danger);border-color:rgba(232,35,42,.4);}
+.boss-weak-chip.resist{color:var(--text-faint);}
+
+/* ---- Recommended-workout carousel (draft — placeholder cards in the HTML) --- */
+.boss-workout-carousel{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.boss-workout-carousel::-webkit-scrollbar{display:none;}
+.boss-workout-card{
+  flex:0 0 auto;width:118px;padding:14px 12px;text-align:center;cursor:pointer;
+  background:var(--card);border:1px solid var(--card-border);border-radius:14px;
+}
+.boss-workout-card:active{transform:scale(.97);}
+.boss-workout-card-icon{font-size:22px;margin-bottom:6px;line-height:1;}
+.boss-workout-card-title{font-size:11.5px;font-weight:700;}
+.boss-workout-card-tag{font-size:9px;color:var(--text-faint);margin-top:4px;line-height:1.3;}
 
 /* Responsive */
 @media(max-width:380px){

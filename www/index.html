@@ -2852,14 +2852,44 @@ textarea.note-input::placeholder{color:var(--text-faint);}
             <button id="bossViewBtn" class="boss-view-btn" type="button">VIEW</button>
           </div>
         </div>
+        <!-- DRAFT: wires up app.js's existing renderBossPhaseNodes() (line ~1573),
+             which had no matching container until now. -->
+        <div id="bossPhaseNodes" class="boss-phase-nodes"></div>
         <div id="bossStage" class="boss-stage">
           <div class="boss-art"></div>
           <div class="boss-boom"></div>
+        </div>
+        <!-- DRAFT: placeholder copy — needs a real weakness/resist field on
+             each BOSS_ROSTER entry in app.js before this can be data-driven. -->
+        <div id="bossWeaknessRow" class="boss-weakness-row">
+          <span class="boss-weak-chip weak"><b>WEAK</b> PULL-UP ×1.5</span>
+          <span class="boss-weak-chip resist"><b>RESIST</b> CARDIO ×0.5</span>
         </div>
         <div class="boss-hp-track"><div id="bossHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
         <div id="bossHpLabel" class="boss-hp-label">0 / 0 HP</div>
         <div id="bossPhaseLabel" class="boss-phase-label"></div>
         <div id="bossAttackLog" class="boss-attack-log"></div>
+      </div>
+
+      <!-- DRAFT: placeholder cards — needs a "which workout mode counters this
+           boss" mapping in app.js before this can be data-driven/clickable-for-real. -->
+      <div class="section-label" style="margin-top:16px;">แนะนำเวิร์กเอาท์สำหรับบอสนี้</div>
+      <div id="bossWorkoutCarousel" class="boss-workout-carousel">
+        <div class="boss-workout-card" onclick="go('cindy')">
+          <div class="boss-workout-card-icon">🥊</div>
+          <div class="boss-workout-card-title">Cindy (Classic)</div>
+          <div class="boss-workout-card-tag">ดาเมจ ×1.5 กับบอสนี้</div>
+        </div>
+        <div class="boss-workout-card" onclick="go('cardiolist')">
+          <div class="boss-workout-card-icon">🔥</div>
+          <div class="boss-workout-card-title">Cardio HIIT</div>
+          <div class="boss-workout-card-tag">ดาเมจ ×0.5 กับบอสนี้</div>
+        </div>
+        <div class="boss-workout-card" onclick="go('customlist')">
+          <div class="boss-workout-card-icon">⚡</div>
+          <div class="boss-workout-card-title">Custom Workout</div>
+          <div class="boss-workout-card-tag">ดาเมจปกติ</div>
+        </div>
       </div>
     </div>
 
