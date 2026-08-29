@@ -1657,6 +1657,7 @@ function renderBossCard() {
       everDefeated.push(state.boss.id);
       saveBossEverDefeated(everDefeated);
     }
+    addSeasonPoints(SEASON_POINTS_BOSS_DEFEAT); // product doc #20 — once per weekly defeat, guarded by loadBossDefeatSeenWeek() above
     const loot = rollLootDrop(state);
     const lootCount = addLootItem(loot.id);
     const lootRarity = rarityDef(loot.rarity);
@@ -2055,7 +2056,9 @@ function addQuestBonusXP(amount) {
 const KEY_COMBO_BONUS_XP = 'cindy_combo_bonus_xp';
 const COMBO_BONUS_MIN = 3; // combo streak needed before it starts paying out
 function comboBonusForMaxCombo(maxCombo) {
-  return maxCombo >= COMBO_BONUS_MIN ? maxCombo * 2 : 0;
+  // skillEffectMultiplier('comboMult') applies the OVERDRIVE skill (Skill
+  // Tree, product doc #18) once unlocked — 1 (no-op) otherwise.
+  return maxCombo >= COMBO_BONUS_MIN ? Math.round(maxCombo * 2 * skillEffectMultiplier('comboMult')) : 0;
 }
 function loadComboBonusXP() {
   const n = parseInt(localStorage.getItem(KEY_COMBO_BONUS_XP), 10);
@@ -2090,7 +2093,9 @@ const REST_SKIP_BONUS_MIN_SEC = 3;  // below this, no bonus — not worth the to
 const REST_SKIP_BONUS_MAX_SEC = 90; // cap the payout regardless of configured rest length
 function restSkipBonusXP(remainingSec) {
   if (!Number.isFinite(remainingSec) || remainingSec < REST_SKIP_BONUS_MIN_SEC) return 0;
-  return Math.round(Math.min(remainingSec, REST_SKIP_BONUS_MAX_SEC) * REST_SKIP_BONUS_RATE);
+  // skillEffectMultiplier('restSkipMult') applies the SECOND WIND skill
+  // (Skill Tree, product doc #18) once unlocked — 1 (no-op) otherwise.
+  return Math.round(Math.min(remainingSec, REST_SKIP_BONUS_MAX_SEC) * REST_SKIP_BONUS_RATE * skillEffectMultiplier('restSkipMult'));
 }
 function loadRestSkipBonusXP() {
   const n = parseInt(localStorage.getItem(KEY_REST_SKIP_BONUS_XP), 10);
@@ -2469,10 +2474,174 @@ function claimWeeklyChest() {
   claimedWeeks.push(wk);
   saveWeeklyChestClaimedWeeks(claimedWeeks);
   addWeeklyBonusXP(WEEKLY_CHEST_XP);
+  addSeasonPoints(SEASON_POINTS_WEEKLY_CHEST); // product doc #20 — see SEASON block below
   renderWeeklyMissions();
   renderXpBar();
   vibrate([60, 40, 60, 40, 120]);
   showToast('เปิด WEEKLY CHEST สำเร็จ +' + WEEKLY_CHEST_XP + ' XP', 'gift');
+}
+
+/* ================= SEASON (product doc #20) =================
+ * The doc flags this as the biggest, longest-term item and says it
+ * "shouldn't be rushed" — and per the Phase 3 plan, it's last precisely
+ * because it leans on everything else being stable first: Weekly
+ * Mission (#16, above) for a "Season Quest"-shaped activity loop, Boss
+ * Modifier (#8) + Story/Chapter (#9) for "Season Boss" flavor, and
+ * Achievements/Titles (Phase 1) for the cosmetic-reward pattern a
+ * Season Pass reuses. All four now exist, so this wires them together
+ * instead of building anything from scratch.
+ *
+ * Two things this deliberately does NOT do, both flagged in the doc
+ * itself as needing real art/design work this pass doesn't have:
+ *   - No new Season Skin/Background art asset — MASCOT_SKINS and
+ *     backdrops are hand-designed per-item elsewhere in this file, and
+ *     inventing a placeholder would ship a broken-looking reward. Pass
+ *     tiers pay bonus XP instead, same safe mechanism as every other
+ *     bonus-XP source in this file (folded into computeTotalXP() below),
+ *     until a real Season Skin is designed.
+ *   - No explicit Season start date — SEASON_LENGTH_WEEKS anchors off
+ *     the same absoluteWeekIndex() the Boss roster and Weekly systems
+ *     already use, so "CINDY SEASON 01" simply covers weeks 0-7 of that
+ *     counter and Season 02 would begin automatically at week 8 the
+ *     moment a second entry is added to SEASON_DEFS (falls back to
+ *     repeating SEASON_DEFS via modulo until then, same technique
+ *     BOSS_MODIFIERS uses for a repeating deterministic cycle).
+ *
+ * "Reset only Season Progress, never Character Progress permanently"
+ * (doc's own wording) is handled the same way Weekly Mission already
+ * resets per-week: loadSeasonState() compares the stored seasonIndex
+ * against the *current* one and zeroes just the season-scoped counters
+ * on mismatch. Nothing about Level, Stats, Boss trophies, Loot, Skins,
+ * or Achievements is touched — those all live in their own unrelated
+ * storage keys untouched by this block. */
+const SEASON_LENGTH_WEEKS = 8;
+const SEASON_DEFS = [
+  { name: 'RISE OF MACHINES' }
+];
+const KEY_SEASON_STATE = 'cindy_season_state_v1';
+const KEY_SEASON_BONUS_XP = 'cindy_season_bonus_xp';
+// Point values per source — small, one-shot, weekly-cadence events only
+// (never per-rep or per-session) so there's no way to farm Season Points
+// faster than actually playing across the week, same anti-farm posture
+// as the rest of this file's bonus-XP sources.
+const SEASON_POINTS_WEEKLY_CHEST = 50; // claimWeeklyChest(), above
+const SEASON_POINTS_BOSS_DEFEAT = 30;  // weekly boss-defeat-seen block, currentBossState()
+const SEASON_POINTS_ACHIEVEMENT = 15;  // checkAndUnlockAchievements()
+const SEASON_PASS_TIERS = [
+  { points: 50, xp: 20 },
+  { points: 150, xp: 30 },
+  { points: 300, xp: 50 },
+  { points: 500, xp: 80 },
+  { points: 800, xp: 120 }
+];
+/** { seasonIndex, weekInSeason (0-based), weekNumber (1-based),
+ * totalWeeks, name, subtitle } for "right now", derived purely from
+ * absoluteWeekIndex() — nothing stored, so it can never drift. */
+function currentSeasonInfo() {
+  const wIdx = absoluteWeekIndex(Date.now());
+  const seasonIndex = Math.floor(wIdx / SEASON_LENGTH_WEEKS);
+  const weekInSeason = ((wIdx % SEASON_LENGTH_WEEKS) + SEASON_LENGTH_WEEKS) % SEASON_LENGTH_WEEKS;
+  const def = SEASON_DEFS[seasonIndex % SEASON_DEFS.length];
+  return {
+    seasonIndex,
+    weekInSeason,
+    weekNumber: weekInSeason + 1,
+    totalWeeks: SEASON_LENGTH_WEEKS,
+    name: def.name,
+    subtitle: 'CINDY SEASON ' + String(seasonIndex + 1).padStart(2, '0')
+  };
+}
+/** Season Points + claimed-tier state, auto-reset to zero the moment the
+ * current season index no longer matches what's stored — same pattern
+ * loadWeeklyMissionClaimState() already uses per-week, just per-season. */
+function loadSeasonState() {
+  let state;
+  try { state = JSON.parse(localStorage.getItem(KEY_SEASON_STATE)); } catch (e) { state = null; }
+  const idx = currentSeasonInfo().seasonIndex;
+  if (!state || state.seasonIndex !== idx) {
+    state = { seasonIndex: idx, points: 0, claimedTiers: [] };
+    localStorage.setItem(KEY_SEASON_STATE, JSON.stringify(state));
+  }
+  return state;
+}
+function saveSeasonState(state) {
+  localStorage.setItem(KEY_SEASON_STATE, JSON.stringify(state));
+}
+function addSeasonPoints(amount) {
+  if (!(amount > 0)) return;
+  const state = loadSeasonState();
+  state.points += amount;
+  saveSeasonState(state);
+}
+function loadSeasonBonusXP() {
+  const n = parseInt(localStorage.getItem(KEY_SEASON_BONUS_XP), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+function addSeasonBonusXP(amount) {
+  if (amount <= 0) return;
+  localStorage.setItem(KEY_SEASON_BONUS_XP, String(loadSeasonBonusXP() + amount));
+}
+function claimSeasonTier(tierIdx) {
+  const state = loadSeasonState();
+  const tier = SEASON_PASS_TIERS[tierIdx];
+  if (!tier || state.points < tier.points || state.claimedTiers.indexOf(tierIdx) !== -1) return;
+  state.claimedTiers.push(tierIdx);
+  saveSeasonState(state);
+  addSeasonBonusXP(tier.xp);
+  renderSeasonPass();
+  renderXpBar();
+  vibrate([50, 30, 50, 30, 100]);
+  showToast('SEASON PASS TIER ' + (tierIdx + 1) + ' +' + tier.xp + ' XP', 'gift');
+}
+function renderSeasonPass() {
+  const info = currentSeasonInfo();
+  const state = loadSeasonState();
+  const headEl = document.getElementById('seasonPassHead');
+  if (headEl) {
+    headEl.innerHTML = '<div class="fitness-rank-overall-lbl">' + info.subtitle + '</div>'
+      + '<div class="character-cp-val" style="font-size:18px;">' + escapeHtml(info.name) + '</div>'
+      + '<div class="quest-desc">สัปดาห์ ' + info.weekNumber + '/' + info.totalWeeks + ' · SEASON POINTS ' + state.points + '</div>';
+  }
+  const wrap = document.getElementById('seasonPassTierList');
+  if (!wrap) return;
+  wrap.innerHTML = SEASON_PASS_TIERS.map((tier, idx) => {
+    const claimed = state.claimedTiers.indexOf(idx) !== -1;
+    const ready = !claimed && state.points >= tier.points;
+    let statusHtml;
+    if (claimed) statusHtml = '<div class="quest-claimed">' + iconHtml('check') + ' รับแล้ว</div>';
+    else if (ready) statusHtml = '<button class="quest-claim-btn" onclick="claimSeasonTier(' + idx + ')">รับ +' + tier.xp + ' XP</button>';
+    else statusHtml = '<div class="quest-xp-tag">' + Math.min(state.points, tier.points) + '/' + tier.points + ' PT</div>';
+    return '<div class="quest-row' + (claimed ? ' done' : '') + '">'
+      + '<div class="quest-info"><div class="quest-title">TIER ' + (idx + 1) + '</div></div>'
+      + statusHtml
+      + '</div>';
+  }).join('');
+}
+function openSeasonModal() {
+  const modal = document.getElementById('seasonModal');
+  if (!modal) return;
+  renderSeasonPass();
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+}
+function closeSeasonModal() {
+  const modal = document.getElementById('seasonModal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+function initSeasonModal() {
+  document.querySelectorAll('[data-season-close]').forEach(el => el.addEventListener('click', closeSeasonModal));
+}
+/** Small always-visible teaser on the Character sheet (season name +
+ * week X/8 + current points) so the Season Pass button doesn't require
+ * opening the modal just to see where you stand. */
+function renderSeasonTeaser() {
+  const el = document.getElementById('seasonTeaserText');
+  if (!el) return;
+  const info = currentSeasonInfo();
+  const state = loadSeasonState();
+  el.textContent = info.subtitle + ' · ' + info.name + ' · สัปดาห์ ' + info.weekNumber + '/' + info.totalWeeks + ' · ' + state.points + ' PT';
 }
 
 /* ================= MASCOT DIALOGUE =================
@@ -2598,7 +2767,7 @@ function computeSessionXP() {
 }
 function computeTotalXP() {
   const { cindyXP, customXP, runXP } = computeSessionXP();
-  return cindyXP + customXP + runXP + loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP() + loadStepsBonusXP() + loadWeeklyBonusXP();
+  return cindyXP + customXP + runXP + loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP() + loadStepsBonusXP() + loadWeeklyBonusXP() + loadSeasonBonusXP();
 }
 function xpRequiredForLevel(level) {
   return 100 + (level - 1) * 50;
@@ -3042,10 +3211,12 @@ function computeFitnessPower() {
 }
 function computeCombatPower() {
   const bonusXp = loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP() + loadStepsBonusXP();
-  // Equipment (Phase 2C) and Equipment Sets (product doc #4) add here
-  // only — see computeEquipmentPower's and computeSetBonusPower's
-  // comments for why neither ever reaches Fitness Power or Boss Damage.
-  return Math.round(computeFitnessPower() + bonusXp + computeEquipmentPower() + computeSetBonusPower());
+  // Equipment (Phase 2C), Equipment Sets (product doc #4), and the
+  // BOSS SLAYER skill's flat bonus (Skill Tree, product doc #18) all add
+  // here only — see computeEquipmentPower's, computeSetBonusPower's, and
+  // the Skill Tree comment above for why none of these ever reach
+  // Fitness Power or Boss Damage.
+  return Math.round(computeFitnessPower() + bonusXp + computeEquipmentPower() + computeSetBonusPower() + skillFlatBonus('flatCP'));
 }
 
 /* ---- Fitness Rank (product doc #13) ----
@@ -3107,6 +3278,81 @@ function renderFitnessRank(containerId) {
     + '<span class="fitness-rank-overall-grade">' + info.overall.label + '</span>'
     + '</div>'
     + '<div class="fitness-rank-rows">' + rowsHtml + '</div>';
+}
+
+/* ================= SKILL TREE (product doc #18) =================
+ * Team decision needed before starting this item was "what does a skill
+ * unlock from?" (Level / Fitness Rank / Achievement) — going with Fitness
+ * Rank's overall letter grade (computeFitnessRankInfo(), landed in
+ * Phase 3's Fitness Rank item), because it's the one progression axis
+ * that's a pure real-world signal already (no equipment/bonus-XP mixed
+ * in — see Phase 2B's Fitness Power split) and the doc's own framing for
+ * Skill Tree ("passive/modifier", not active abilities) fits a grade
+ * you *earn through training* better than a level you can also reach by
+ * grinding bonus XP.
+ *
+ * Kept deliberately small: the 3 skills the doc names as examples
+ * (SECOND WIND, OVERDRIVE, BOSS SLAYER), no allocation UI, no skill
+ * points to spend — every skill whose grade threshold is met is just
+ * always on, the same "nothing to configure, it reflects your training"
+ * feel as Fitness Rank itself. Nothing here is stored: unlock state is
+ * derived live from the current Fitness Rank grade every time it's
+ * checked, so there's no new save data that could ever drift out of
+ * sync with the stats it's based on.
+ *
+ * Same Phase 2C guardrail as Equipment/Sets applies to every effect
+ * below: they only ever add to bonus-XP counters or flat Combat Power —
+ * never to loadStatTotals()/computeFitnessPower(), and never anywhere
+ * near Boss Damage (still 100% real reps). SECOND WIND/OVERDRIVE tune
+ * *existing* bonus-XP formulas (rest-skip, combo) by a multiplier;
+ * BOSS SLAYER adds a flat Combat Power number the same way an equipped
+ * item's statBonus does. */
+const SKILL_DEFS = [
+  { id: 'skill_secondwind', name: 'SECOND WIND', unlockGrade: 'D', effect: 'restSkipMult', value: 1.2,
+    desc: 'Rest-skip ให้โบนัส XP มากขึ้น 20%' },
+  { id: 'skill_overdrive', name: 'OVERDRIVE', unlockGrade: 'B', effect: 'comboMult', value: 1.25,
+    desc: 'โบนัส XP จาก Max Combo ต่อเซสชันเพิ่มขึ้น 25%' },
+  { id: 'skill_bossslayer', name: 'BOSS SLAYER', unlockGrade: 'A', effect: 'flatCP', value: 10,
+    desc: 'Combat Power เพิ่มถาวร +10' }
+];
+/** ids of every skill whose unlockGrade tier is at or below the player's
+ * current overall Fitness Rank tier (suffix +/- ignored — tier letter
+ * only, same granularity the doc's grade examples use). */
+function loadUnlockedSkillIds() {
+  const overallTier = computeFitnessRankInfo().overall.tier;
+  const tierIdx = FITNESS_RANK_TIERS.indexOf(overallTier);
+  return SKILL_DEFS.filter(s => tierIdx >= FITNESS_RANK_TIERS.indexOf(s.unlockGrade)).map(s => s.id);
+}
+function isSkillUnlocked(id) {
+  return loadUnlockedSkillIds().indexOf(id) !== -1;
+}
+/** Combined multiplier from every unlocked skill tagged with this effect
+ * key (multiplicative — only matters once there's ever 2+ skills sharing
+ * a key, none do yet, but keeps this correct if that changes). */
+function skillEffectMultiplier(effectKey) {
+  const unlocked = loadUnlockedSkillIds();
+  return SKILL_DEFS.reduce((mult, s) => (s.effect === effectKey && unlocked.indexOf(s.id) !== -1) ? mult * s.value : mult, 1);
+}
+/** Combined flat bonus from every unlocked skill tagged with this effect key. */
+function skillFlatBonus(effectKey) {
+  const unlocked = loadUnlockedSkillIds();
+  return SKILL_DEFS.reduce((sum, s) => (s.effect === effectKey && unlocked.indexOf(s.id) !== -1) ? sum + s.value : sum, 0);
+}
+function renderSkillTree(containerId) {
+  const wrap = document.getElementById(containerId || 'skillTreeList');
+  if (!wrap) return;
+  const unlocked = loadUnlockedSkillIds();
+  wrap.innerHTML = SKILL_DEFS.map(s => {
+    const isUnlocked = unlocked.indexOf(s.id) !== -1;
+    return '<div class="boss-view-item' + (isUnlocked ? ' unlocked' : '') + '">'
+      + '<div class="boss-view-item-top">'
+      + '<div><div class="boss-view-item-name">' + s.name + '</div>'
+      + '<div class="boss-view-item-tag">ปลดล็อกที่ Fitness Rank ' + s.unlockGrade + ' ขึ้นไป</div></div>'
+      + '<div class="boss-view-item-status">' + (isUnlocked ? 'ACTIVE' : 'LOCKED') + '</div>'
+      + '</div>'
+      + '<div class="boss-view-item-story">' + s.desc + '</div>'
+      + '</div>';
+  }).join('');
 }
 
 /* ---- boss trophy wall — reuses loadBossEverDefeated() (already tracked
@@ -3204,6 +3450,7 @@ function checkAndUnlockAchievements() {
     if (unlocked.indexOf(a.id) === -1 && a.check(ctx)) {
       unlocked.push(a.id);
       changed = true;
+      addSeasonPoints(SEASON_POINTS_ACHIEVEMENT); // product doc #20
       showToast('ACHIEVEMENT UNLOCKED · ' + a.title, 'gift');
       vibrate([50, 40, 50, 40, 120]);
     }
@@ -3422,6 +3669,7 @@ function renderCharacterSheet() {
   applyEquippedLootBadge('characterLootBadge');
   renderStatBars('characterStatBarList');
   renderFitnessRank('characterFitnessRank');
+  renderSkillTree('skillTreeList');
 
   const cpEl = document.getElementById('characterCP');
   if (cpEl) {
@@ -3433,6 +3681,7 @@ function renderCharacterSheet() {
   if (classEl) classEl.textContent = computeClassTitle(loadStatTotals());
 
   renderCharacterEquipment();
+  renderSeasonTeaser();
   renderCharacterBossTrophyRow();
   renderCharacterRecentLog();
   renderCharacterTitleTag();
@@ -8059,3 +8308,4 @@ function deleteCustomHistorySessionExecute() {
 document.addEventListener('DOMContentLoaded', initBossView);
 document.addEventListener('DOMContentLoaded', initWorldMap);
 document.addEventListener('DOMContentLoaded', initAchModal);
+document.addEventListener('DOMContentLoaded', initSeasonModal);
