@@ -4346,6 +4346,14 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       กดปุ่มนี้ถ้าอัปเดตแอปใหม่ไปแล้วแต่หน้าจอยังเหมือนเดิม — จะล้างแคชเก่าแล้วโหลดเวอร์ชันล่าสุดให้ทันที
     </div>
 
+    <div class="section-label" style="margin-top:14px;">บัญชี</div>
+    <div class="control-row">
+      <button class="btn btn-outline btn-sm" onclick="openLogoutModal()">ออกจากระบบ (เปลี่ยนบัญชี Google)</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-faint);margin-top:8px;line-height:1.5;">
+      ใช้เมื่อต้องการสลับไปใช้บัญชี Google อื่น — ข้อมูลของบัญชีนี้ยังอยู่บนคลาวด์ตามปกติ
+    </div>
+
     <div class="section-label" style="margin-top:14px;">อันตราย</div>
     <div class="control-row">
       <button class="btn btn-danger btn-sm" onclick="openResetCharacterModal()">🗑 รีเซ็ตตัวละคร</button>
@@ -4367,6 +4375,19 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     </div>
   </div>
 </div>
+
+<!-- Logout Modal (switch Google account) -->
+<div id="logoutModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">ออกจากระบบ?</div>
+    <div class="modal-body">แอปจะออกจากบัญชี Google นี้และกลับไปหน้าเข้าสู่ระบบ ข้อมูลของคุณยังอยู่บนคลาวด์ตามปกติ — ล็อกอินด้วยบัญชีเดิมกลับมาได้ทุกเมื่อ</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('logoutModal')">ยกเลิก</button>
+      <button class="btn btn-danger btn-sm" onclick="logoutExecute()">ออกจากระบบ</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- PIN Gate Modal (generic — used before edit/delete history, reset character, import) -->
 <div id="pinGateModal" class="modal-overlay">

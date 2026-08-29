@@ -6057,6 +6057,41 @@ async function resetCharacterExecute() {
   setTimeout(() => location.reload(), 500);
 }
 
+/* ================= LOGOUT (switch Google account) =================
+ * Signs the current Google account out via the Firebase Auth compat SDK
+ * (loaded globally by index.html — firebase.auth() works regardless of
+ * what firebase-auth.js additionally wires up on top of it) and reloads,
+ * which lands back on the #loginScreen gate the same way a fresh app
+ * launch with no session would. Local data is intentionally left alone:
+ * signing back into the same account should find everything as it was,
+ * and firestore-sync.js's existing pull-on-login flow is what's expected
+ * to reconcile localStorage against whichever account signs in next —
+ * the same mechanism the app already relies on elsewhere (see the reset
+ * flow above), so logout doesn't need to duplicate that here. */
+function openLogoutModal() {
+  document.getElementById('logoutModal').classList.add('active');
+}
+async function logoutExecute() {
+  closeModal('logoutModal');
+  showToast('กำลังออกจากระบบ...');
+
+  // Cancel any debounced push still pending so it can't fire mid-signout.
+  if (window.__cindyCancelPendingSync) window.__cindyCancelPendingSync();
+
+  try {
+    if (window.firebase && firebase.auth) {
+      await firebase.auth().signOut();
+    } else if (window.__cindySignOut) {
+      await window.__cindySignOut();
+    }
+  } catch (e) {
+    console.error('[logout] sign-out failed:', e);
+    showToast('ออกจากระบบไม่สำเร็จ ลองอีกครั้ง');
+    return;
+  }
+  setTimeout(() => location.reload(), 300);
+}
+
 /* ================= BACKUP (Export / Import) =================
    v2: covers ALL locally-stored user data, not just Cindy sessions.
    Previously this only exported KEY_SESSIONS ('cindy_sessions'), so
@@ -6686,6 +6721,14 @@ const RUN_PACE_CEILING_SEC_PER_KM = 180; // 3:00 /km — fastest pace paid at fu
 const RUN_PACE_FLOOR_SEC_PER_KM = 900;   // 15:00 /km — slowest pace paid at full rate
 const RUN_MIN_XP_DISTANCE_KM = 0.3;
 const RUN_XP_PER_KM = 60;
+/* GPS jitter while standing still (or barely moving) commonly reads as
+ * 1-3m of apparent drift between fixes even when accuracy itself looks
+ * fine — well under RUN_GPS_ACCURACY_MAX_M. Without a floor here, that
+ * noise silently piles up into fake distance and a jagged fake route.
+ * A fix that "moved" less than this from the last accepted fix is
+ * treated as noise: dropped entirely, without advancing the anchor
+ * point, so it can't nudge the reference and drift over many fixes. */
+const RUN_MIN_MOVE_METERS = 4;
 
 let runWatchId = null;
 let runTickHandle = null;
@@ -6884,7 +6927,17 @@ function onRunPosition(pos) {
   active.weakGpsFlag = false;
   if (!active.path) active.path = []; // migration guard for a run started before path recording existed
   if (active.lastFixLat != null) {
-    active.distanceM += haversineMeters(active.lastFixLat, active.lastFixLon, latitude, longitude);
+    const movedM = haversineMeters(active.lastFixLat, active.lastFixLon, latitude, longitude);
+    if (movedM < RUN_MIN_MOVE_METERS) {
+      // GPS noise, not real movement — save the (possibly just-cleared)
+      // weakGpsFlag for the UI, but leave the anchor point, distance and
+      // path untouched so jitter can't accumulate fake distance or draw
+      // a jagged fake route while standing still.
+      saveRunActive(active);
+      refreshRunUI();
+      return;
+    }
+    active.distanceM += movedM;
     // continue the current segment
     if (active.path.length === 0) active.path.push([]);
     active.path[active.path.length - 1].push([latitude, longitude]);
