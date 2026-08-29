@@ -3,6 +3,7 @@ const RING_CIRC = 2 * Math.PI * 108;
 const KEY_SESSIONS = 'cindy_sessions';
 const KEY_ACTIVE = 'cindy_active_workout';
 const KEY_LAST_SEEN_LEVEL = 'cindy_last_seen_level';
+const KEY_CHARACTER_NAME = 'cindy_character_name';
 const KEY_RUN_SESSIONS = 'cindy_run_sessions';
 const KEY_RUN_ACTIVE = 'cindy_run_active';
 
@@ -2844,6 +2845,44 @@ function renderMascotCard() {
 
   renderXpBar();
   applyActiveMascotSkinFilter();
+  renderCharacterName();
+}
+
+/* ================= CHARACTER NAME =================
+ * A single free-text name the player can set for their character — nothing
+ * gameplay-affecting, just a display label shown on the Home mascot card
+ * and the Character sheet. Stored as one plain string; empty means "not
+ * set yet", in which case the UI falls back to a "ตั้งชื่อตัวละคร" prompt
+ * (Home hides the empty line entirely via the :empty CSS rule; Character's
+ * button always shows something tappable either way). */
+function loadCharacterName() {
+  return (localStorage.getItem(KEY_CHARACTER_NAME) || '').trim();
+}
+function saveCharacterName(name) {
+  const trimmed = String(name || '').trim().slice(0, 16);
+  localStorage.setItem(KEY_CHARACTER_NAME, trimmed);
+  return trimmed;
+}
+function renderCharacterName() {
+  const name = loadCharacterName();
+  const homeEl = document.getElementById('mascotCharacterName');
+  if (homeEl) homeEl.textContent = name;
+  const charText = document.getElementById('characterNameText');
+  if (charText) charText.textContent = name || 'ตั้งชื่อตัวละคร';
+}
+function openCharacterNameModal() {
+  const modal = document.getElementById('characterNameModal');
+  const input = document.getElementById('characterNameInput');
+  if (!modal) return;
+  if (input) input.value = loadCharacterName();
+  modal.classList.add('active');
+  if (input) setTimeout(() => input.focus(), 50);
+}
+function saveCharacterNameFromModal() {
+  const input = document.getElementById('characterNameInput');
+  saveCharacterName(input ? input.value : '');
+  closeModal('characterNameModal');
+  renderCharacterName();
 }
 
 /* ================= XP / LEVEL =================
@@ -3744,6 +3783,7 @@ function renderCharacterSheet() {
 
   const info = computeLevelInfo(computeTotalXP());
   if (levelBadge) levelBadge.textContent = 'LV.' + info.level;
+  renderCharacterName();
   const rank = rankForLevel(info.level);
   const rankEl = document.getElementById('characterRank');
   if (rankEl) {
@@ -4765,6 +4805,16 @@ function togglePause() {
 function openEndModal() { document.getElementById('endModal').classList.add('active'); }
 function openFinishModal() { document.getElementById('finishModal').classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+/** Settings modal reached via the gear icon on Progress — holds reminder,
+ * backup, refresh, and reset controls that used to sit inline on Progress.
+ * Just needs the reminder inputs freshly synced on open since applyReminderToUI()
+ * is normally only called when navigating to Progress (go('progress')), and this
+ * modal can now be reopened without a fresh Progress nav in between. */
+function openAppSettingsModal() {
+  applyReminderToUI();
+  document.getElementById('appSettingsModal').classList.add('active');
+}
 
 function confirmEndWorkout() {
   closeModal('endModal');

@@ -329,6 +329,18 @@ body{
    never fights with the skin recolor filter set inline by applyActiveMascotSkinFilter(). */
 #mascotImgGlow{z-index:0;filter:brightness(0);}
 .mascot-text{flex:1;min-width:0;}
+.mascot-character-name{
+  font-family:var(--font-display);font-size:15px;letter-spacing:.3px;color:var(--text);
+  margin-bottom:3px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.mascot-character-name:empty{display:none;}
+.character-name-btn{
+  display:inline-flex;align-items:center;gap:5px;margin-top:6px;
+  background:none;border:none;padding:0;cursor:pointer;
+  font-family:var(--font-display);font-size:14px;color:var(--text);letter-spacing:.3px;
+}
+.character-name-edit-icon{width:12px;height:12px;color:var(--text-faint);flex-shrink:0;}
+.character-name-edit-icon svg{width:100%;height:100%;display:block;}
 .mascot-headline{font-size:16px;font-weight:700;letter-spacing:.2px;}
 .mascot-sub{font-size:13px;color:var(--text-dim);margin-top:4px;line-height:1.4;}
 .mascot-rank{
@@ -2680,6 +2692,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
           <div class="mascot-skin-hint"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 100 18c1.4 0 2-1.1 1.2-2.2-.5-.7-.1-1.8 1-1.8H16a5 5 0 005-5c0-5-4.5-9-9-9z"/><circle cx="7.7" cy="10.5" r="1.15" fill="currentColor" stroke="none"/><circle cx="12" cy="7.3" r="1.15" fill="currentColor" stroke="none"/><circle cx="16.1" cy="10" r="1.15" fill="currentColor" stroke="none"/><circle cx="9.3" cy="15" r="1.15" fill="currentColor" stroke="none"/></svg></span></div>
         </div>
         <div class="mascot-text">
+          <div id="mascotCharacterName" class="mascot-character-name" onclick="openCharacterNameModal()"></div>
           <div id="mascotRank" class="mascot-rank rank-recruit"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 7.6-7 9-4-1.4-7-4.4-7-9V6z"/></svg></span> RECRUIT</div>
           <div id="mascotSkinTitle" class="mascot-skin-title"></div>
           <div id="mascotHeadline" class="mascot-headline">ยังไม่มีประวัติการเล่น</div>
@@ -3290,7 +3303,9 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <div class="brand" style="font-size:16px;">PROGRESS</div>
-      <div style="width:38px;"></div>
+      <button class="iconbtn" onclick="openAppSettingsModal()" aria-label="Settings">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </button>
     </div>
     <div class="list-wrap">
       <div class="stats-grid">
@@ -3345,60 +3360,6 @@ textarea.note-input::placeholder{color:var(--text-faint);}
           <label>Custom Workout (ครั้ง/สัปดาห์)</label>
           <input type="number" id="goalCustomInput" min="1" max="14" class="time-input" style="width:100%;" onchange="setRingGoal('custom', this.value)">
         </div>
-      </div>
-
-      <div class="section-label">เตือนเล่นทุกวัน</div>
-      <div class="metric-card reminder-card">
-        <div class="reminder-row">
-          <div>
-            <div class="reminder-lbl">เปิดการแจ้งเตือน</div>
-            <div class="reminder-sub">แจ้งเตือนตอนเปิดแอปถ้ายังไม่ได้เล่นวันนี้</div>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="reminderToggle" onchange="toggleReminder(this.checked)">
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-          </label>
-        </div>
-        <div class="reminder-row" style="margin-top:12px;">
-          <div class="reminder-lbl">เวลาที่อยากให้เตือน</div>
-          <input type="time" id="reminderTime" class="time-input" onchange="setReminderTime(this.value)">
-        </div>
-        <div class="reminder-row" style="margin-top:12px;">
-          <div class="reminder-lbl">เสียงแจ้งเตือน</div>
-          <select id="reminderSound" class="time-input" onchange="setReminderSound(this.value)">
-            <option value="default">มีเสียง (ค่าเริ่มต้นเครื่อง)</option>
-            <option value="silent">สั่นอย่างเดียว (ไม่มีเสียง)</option>
-          </select>
-        </div>
-        <div id="reminderNativeHint" style="display:none;font-size:11px;color:var(--text-faint);margin-top:10px;line-height:1.5;">
-          แอปเวอร์ชันนี้แจ้งเตือนได้จริงแม้ปิดแอปอยู่ — เสียงจะใช้ค่าเริ่มต้นของเครื่อง (Android ไม่รองรับการเลือกเสียงแจ้งเตือนเองต่อแอปแบบเสียงเรียกเข้า จึงเลือกได้ระหว่าง "มีเสียง" หรือ "สั่นอย่างเดียว")
-        </div>
-        <div id="reminderWebHint" style="display:block;font-size:11px;color:var(--text-faint);margin-top:10px;line-height:1.5;">
-          บนเว็บ การแจ้งเตือนจะทำงานเฉพาะตอนเปิดแอปอยู่เท่านั้น — ติดตั้งเป็น APK เพื่อให้เตือนได้จริงแม้ปิดแอป
-        </div>
-        <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="testReminderNow()">ทดสอบการแจ้งเตือน</button>
-      </div>
-
-      <div class="section-label">BACKUP</div>
-      <div class="control-row">
-        <button class="btn btn-outline btn-sm" onclick="exportData()">EXPORT ข้อมูล</button>
-        <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()">IMPORT ข้อมูล</button>
-      </div>
-      <input type="file" id="importFile" accept="application/json" style="display:none;" onchange="importData(event)" />
-
-      <div class="section-label" style="margin-top:8px;">แอป</div>
-      <div class="control-row">
-        <button class="btn btn-outline btn-sm" onclick="forceRefreshApp()">🔄 รีเฟรชแอป (โหลดเวอร์ชันล่าสุด)</button>
-      </div>
-      <div style="font-size:11px;color:var(--text-faint);margin-top:8px;line-height:1.5;">
-        กดปุ่มนี้ถ้าอัปเดตแอปใหม่ไปแล้วแต่หน้าจอยังเหมือนเดิม — จะล้างแคชเก่าแล้วโหลดเวอร์ชันล่าสุดให้ทันที
-      </div>
-
-      <div class="control-row" style="margin-top:12px;">
-        <button class="btn btn-danger btn-sm" onclick="openResetCharacterModal()">🗑 รีเซ็ตตัวละคร</button>
-      </div>
-      <div style="font-size:11px;color:var(--text-faint);margin-top:8px;line-height:1.5;">
-        ลบข้อมูลทั้งหมดในเครื่องนี้ถาวร (เลเวล, Streak, ประวัติ Workout, สกิน/ไอเทม, Boss ที่ปราบแล้ว) แล้วเริ่มใหม่จาก LV.1 — แนะนำให้ EXPORT ข้อมูลเก็บไว้ก่อนถ้ายังไม่แน่ใจ
       </div>
     </div>
     <div class="tabbar">
@@ -3465,6 +3426,10 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <div class="character-hero-info">
           <div id="characterLevelBadge" class="mascot-level-badge">LV.1</div>
           <div id="characterRank" class="mascot-rank rank-recruit" style="display:inline-block;"></div>
+          <button id="characterNameBtn" class="character-name-btn" onclick="openCharacterNameModal()" type="button">
+            <span id="characterNameText">ตั้งชื่อตัวละคร</span>
+            <span class="icon-inline character-name-edit-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/></svg></span>
+          </button>
           <div id="characterTitleTag" class="character-title-tag"></div>
           <div id="characterCP" class="character-cp"></div>
           <div id="characterSkinTitle" class="mascot-skin-title"></div>
@@ -3966,6 +3931,24 @@ textarea.note-input::placeholder{color:var(--text-faint);}
   </div>
 </div>
 
+<!-- Character Name Modal -->
+<div id="characterNameModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>ตั้งชื่อตัวละคร</span>
+      <span onclick="closeModal('characterNameModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
+    </div>
+    <div class="modal-body">ชื่อนี้จะแสดงบน Home และหน้า Character ของคุณ</div>
+    <div class="field-row" style="margin-top:10px;">
+      <input type="text" id="characterNameInput" class="time-input" style="width:100%;" maxlength="16" placeholder="เช่น นักสู้เงา">
+    </div>
+    <div class="modal-row" style="grid-template-columns:1fr 1fr;margin-top:14px;">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('characterNameModal')">ยกเลิก</button>
+      <button class="btn btn-primary btn-sm" onclick="saveCharacterNameFromModal()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <!-- Mascot Skin Picker Modal -->
 <div id="skinPickerModal" class="modal-overlay">
   <div class="modal-card" style="max-width:380px;">
@@ -4201,6 +4184,73 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="modal-row">
       <button class="btn btn-outline btn-sm" onclick="closeModal('customHistoryDeleteModal')">ยกเลิก</button>
       <button class="btn btn-danger btn-sm" onclick="deleteCustomHistorySessionExecute()">ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- App Settings Modal — reached via the gear icon on Progress. Holds the
+     account-wide controls (notification, backup, refresh, character reset)
+     that used to sit inline on the Progress page mixed in with stats/goals. -->
+<div id="appSettingsModal" class="modal-overlay">
+  <div class="modal-card" style="max-height:82vh;overflow:auto;">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>ตั้งค่า</span>
+      <span onclick="closeModal('appSettingsModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
+    </div>
+
+    <div class="section-label" style="margin-top:4px;">เตือนเล่นทุกวัน</div>
+    <div class="metric-card reminder-card">
+      <div class="reminder-row">
+        <div>
+          <div class="reminder-lbl">เปิดการแจ้งเตือน</div>
+          <div class="reminder-sub">แจ้งเตือนตอนเปิดแอปถ้ายังไม่ได้เล่นวันนี้</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="reminderToggle" onchange="toggleReminder(this.checked)">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
+      </div>
+      <div class="reminder-row" style="margin-top:12px;">
+        <div class="reminder-lbl">เวลาที่อยากให้เตือน</div>
+        <input type="time" id="reminderTime" class="time-input" onchange="setReminderTime(this.value)">
+      </div>
+      <div class="reminder-row" style="margin-top:12px;">
+        <div class="reminder-lbl">เสียงแจ้งเตือน</div>
+        <select id="reminderSound" class="time-input" onchange="setReminderSound(this.value)">
+          <option value="default">มีเสียง (ค่าเริ่มต้นเครื่อง)</option>
+          <option value="silent">สั่นอย่างเดียว (ไม่มีเสียง)</option>
+        </select>
+      </div>
+      <div id="reminderNativeHint" style="display:none;font-size:11px;color:var(--text-faint);margin-top:10px;line-height:1.5;">
+        แอปเวอร์ชันนี้แจ้งเตือนได้จริงแม้ปิดแอปอยู่ — เสียงจะใช้ค่าเริ่มต้นของเครื่อง (Android ไม่รองรับการเลือกเสียงแจ้งเตือนเองต่อแอปแบบเสียงเรียกเข้า จึงเลือกได้ระหว่าง "มีเสียง" หรือ "สั่นอย่างเดียว")
+      </div>
+      <div id="reminderWebHint" style="display:block;font-size:11px;color:var(--text-faint);margin-top:10px;line-height:1.5;">
+        บนเว็บ การแจ้งเตือนจะทำงานเฉพาะตอนเปิดแอปอยู่เท่านั้น — ติดตั้งเป็น APK เพื่อให้เตือนได้จริงแม้ปิดแอป
+      </div>
+      <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="testReminderNow()">ทดสอบการแจ้งเตือน</button>
+    </div>
+
+    <div class="section-label">BACKUP</div>
+    <div class="control-row">
+      <button class="btn btn-outline btn-sm" onclick="exportData()">EXPORT ข้อมูล</button>
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()">IMPORT ข้อมูล</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json" style="display:none;" onchange="importData(event)" />
+
+    <div class="section-label" style="margin-top:14px;">แอป</div>
+    <div class="control-row">
+      <button class="btn btn-outline btn-sm" onclick="forceRefreshApp()">🔄 รีเฟรชแอป (โหลดเวอร์ชันล่าสุด)</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-faint);margin-top:8px;line-height:1.5;">
+      กดปุ่มนี้ถ้าอัปเดตแอปใหม่ไปแล้วแต่หน้าจอยังเหมือนเดิม — จะล้างแคชเก่าแล้วโหลดเวอร์ชันล่าสุดให้ทันที
+    </div>
+
+    <div class="section-label" style="margin-top:14px;">อันตราย</div>
+    <div class="control-row">
+      <button class="btn btn-danger btn-sm" onclick="openResetCharacterModal()">🗑 รีเซ็ตตัวละคร</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-faint);margin-top:8px;line-height:1.5;">
+      ลบข้อมูลทั้งหมดในเครื่องนี้ถาวร (เลเวล, Streak, ประวัติ Workout, สกิน/ไอเทม, Boss ที่ปราบแล้ว) แล้วเริ่มใหม่จาก LV.1 — แนะนำให้ EXPORT ข้อมูลเก็บไว้ก่อนถ้ายังไม่แน่ใจ
     </div>
   </div>
 </div>
