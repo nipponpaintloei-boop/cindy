@@ -14,7 +14,16 @@ const KEY_RUN_ACTIVE = 'cindy_run_active';
  * Each migration must be idempotent (safe to re-run) since a stamp write
  * failing mid-way must not corrupt anything on retry. */
 const KEY_SCHEMA_VERSION = 'cindy_schema_version';
-const CURRENT_SCHEMA_VERSION = 1;
+const CURRENT_SCHEMA_VERSION = 2;
+
+/* v2 flag — Phase 2B redefined Combat Power (see computeCombatPower) so
+ * it stops double-counting reps that already feed the stat levels. That
+ * makes the number on screen drop for anyone who already had progress,
+ * even though nothing about their actual training changed. This flag
+ * just marks "explain that once" — the explanation itself is shown by
+ * maybeShowCPPatchNote(), called from init(), not here, since a toast
+ * needs the UI mounted and can't fire during a migration pass. */
+const KEY_CP_PATCHNOTE_V1_PENDING = 'cindy_cp_patchnote_v1_pending';
 
 const MIGRATIONS = [
   {
@@ -29,6 +38,17 @@ const MIGRATIONS = [
       // let changed = false;
       // sessions.forEach(s => { if (s.newField === undefined) { s.newField = defaultVal; changed = true; } });
       // if (changed) saveSessions(sessions);
+    }
+  },
+  {
+    version: 2,
+    run: () => {
+      // Only worth explaining to players who already have some XP —
+      // a brand-new player has never seen a Combat Power number yet,
+      // so there's nothing for them to notice "dropping".
+      if (computeTotalXP() > 0) {
+        localStorage.setItem(KEY_CP_PATCHNOTE_V1_PENDING, '1');
+      }
     }
   },
 ];
@@ -2519,14 +2539,34 @@ function computeClassTitle(totals) {
   return STAT_CLASS_TITLES[best];
 }
 
-/* ---- CP (power level) — a single big number combining total XP with
- * the summed levels of all 3 stats, purely derived from numbers already
- * computed elsewhere (computeTotalXP, computeStatInfo). */
-function computeCharacterPower() {
-  const totalXp = computeTotalXP();
+/* ---- Fitness Power vs Combat Power (Phase 2B) ----
+ * Fitness Power = pure real-world signal — the summed levels of all 5
+ * stats, which themselves are derived only from actual reps/seconds
+ * logged (see loadStatTotals). Nothing from equipment, quests, or combo
+ * play touches this number, on purpose: it's meant to answer "how fit
+ * is this player, really" independent of how they play the game.
+ *
+ * Combat Power used to be totalXP + statLevelSum, but totalXP itself is
+ * cindyXP + customXP + runXP + bonuses — and cindyXP/customXP are the
+ * exact same reps that feed statLevelSum, just run through a different
+ * curve (xpRequiredForLevel vs statReqForLevel). That meant every rep
+ * was being counted twice in one number under two different units.
+ * Combat Power now = Fitness Power + only the bonus XP that has no stat
+ * equivalent (quest/combo/rest-skip/steps — these reward *how* someone
+ * plays, not reps already counted above), so nothing is double-counted.
+ *
+ * This is a deliberate one-time redefinition (not just an additive
+ * change) — existing players will see Combat Power drop on the update
+ * that ships this, since it's no longer counting reps a second time.
+ * See maybeShowCPPatchNote() below for the one-time explanation toast;
+ * that toast must ship in the same release as this change. */
+function computeFitnessPower() {
   const totals = loadStatTotals();
-  const statLevelSum = STAT_DEFS.reduce((sum, def) => sum + computeStatInfo(totals[def.key]).level, 0);
-  return Math.round(totalXp) + statLevelSum;
+  return STAT_DEFS.reduce((sum, def) => sum + computeStatInfo(totals[def.key]).level, 0);
+}
+function computeCombatPower() {
+  const bonusXp = loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP() + loadStepsBonusXP();
+  return Math.round(computeFitnessPower() + bonusXp);
 }
 
 /* ---- boss trophy wall — reuses loadBossEverDefeated() (already tracked
@@ -2839,8 +2879,9 @@ function renderCharacterSheet() {
 
   const cpEl = document.getElementById('characterCP');
   if (cpEl) {
-    cpEl.innerHTML = '<div class="character-cp-val">' + computeCharacterPower().toLocaleString() + '</div>'
-      + '<div class="character-cp-lbl">CP</div>';
+    cpEl.innerHTML = '<div class="character-cp-val">' + computeCombatPower().toLocaleString() + '</div>'
+      + '<div class="character-cp-lbl">COMBAT POWER</div>'
+      + '<div class="character-fp-lbl">FITNESS POWER ' + computeFitnessPower().toLocaleString() + '</div>';
   }
   const classEl = document.getElementById('characterClassTitle');
   if (classEl) classEl.textContent = computeClassTitle(loadStatTotals());
@@ -5784,6 +5825,17 @@ function deleteRunSessionExecute() {
   go('history');
 }
 
+/* One-time explanation for the Phase 2B Combat Power redefinition (see
+ * computeCombatPower). Fires at most once per player, only for players
+ * flagged by the v2 migration above (i.e. only those who'd actually see
+ * a number drop). Deliberately placed after go('home') in init() so the
+ * toast element is already mounted and visible instead of firing behind
+ * the splash screen. */
+function maybeShowCPPatchNote() {
+  if (!localStorage.getItem(KEY_CP_PATCHNOTE_V1_PENDING)) return;
+  localStorage.removeItem(KEY_CP_PATCHNOTE_V1_PENDING);
+  showToast('ปรับปรุงระบบ Power ให้แม่นยำขึ้น — Combat Power ไม่นับเรพซ้ำกับ Stat แล้ว', 'target');
+}
 function init() {
   runMigrationsIfNeeded();
   maybeShowAppLock(); // check first: a locked player still sees the lock screen over whatever renders below
@@ -5805,6 +5857,7 @@ function init() {
   } else {
     go('home');
   }
+  maybeShowCPPatchNote();
   updateInstallButton();
   checkReminder();
   if (isNativeApp()) rescheduleNativeReminder(false);
