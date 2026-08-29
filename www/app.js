@@ -1806,6 +1806,7 @@ function renderBossTeaser() {
     }
   }
   card.classList.toggle('boss-teaser-defeated', state.defeated);
+  card.classList.toggle('boss-teaser-critical', !!phase && phase.key === 'critical');
 }
 
 /* ---- boss attack log (Home boss card) — replaces the always-visible
@@ -2029,7 +2030,7 @@ function go(name) {
   document.querySelectorAll('.tab').forEach(t => {
     if (t.getAttribute('onclick') === "go('" + name + "')") t.classList.add('active');
   });
-  if (name === 'home') renderHome();
+  if (name === 'home') { renderHome(); animateHomeEntrance(); }
   if (name === 'program') { renderProgram(); renderProgramHubCards(); }
   if (name === 'cindy') renderProgram();
   if (name === 'history') renderHistory();
@@ -2146,6 +2147,47 @@ function go(name) {
  * came from. Mode-specific starting/browsing UI lives on the Program tab
  * (see renderProgram()).
  */
+/* ---- Home Lobby feel: entrance reveal + ambient embers + mascot poke ----
+ * All additive polish, no change to what data renders — see the
+ * accompanying CSS block (search "Home Lobby feel") for the animations
+ * these trigger. */
+function animateHomeEntrance() {
+  const wrap = document.querySelector('#screen-home .home-content');
+  if (!wrap) return;
+  wrap.classList.remove('home-reveal');
+  void wrap.offsetWidth; // force reflow so the animation restarts every visit
+  wrap.classList.add('home-reveal');
+  ensureLobbyEmbers();
+}
+function ensureLobbyEmbers() {
+  const wrap = document.getElementById('lobbyAmbience');
+  if (!wrap || wrap.childElementCount) return; // spawn once, they loop forever via CSS
+  const count = 7;
+  let html = '';
+  for (let i = 0; i < count; i++) {
+    const x = Math.round(8 + Math.random() * 84);
+    const size = (2 + Math.random() * 2.4).toFixed(1);
+    const dur = (7 + Math.random() * 6).toFixed(1);
+    const delay = (Math.random() * 9).toFixed(1);
+    const drift = Math.round(-18 + Math.random() * 36);
+    html += '<span class="lobby-ember" style="--ember-x:' + x + '%;--ember-size:' + size + 'px;--ember-dur:' + dur + 's;--ember-delay:' + delay + 's;--ember-drift:' + drift + 'px;"></span>';
+  }
+  wrap.innerHTML = html;
+}
+(function bindMascotPoke() {
+  document.addEventListener('DOMContentLoaded', function () {
+    const avatar = document.getElementById('mascotAvatar');
+    const spark = document.getElementById('mascotPokeSpark');
+    if (!avatar || !spark) return;
+    avatar.addEventListener('click', function () {
+      spark.classList.remove('play');
+      void spark.offsetWidth;
+      spark.classList.add('play');
+      setTimeout(() => spark.classList.remove('play'), 550);
+    });
+  });
+})();
+
 function renderHome() {
   renderMascotCard();
   renderHomeWeeklyPlanCard();
@@ -2613,7 +2655,7 @@ function renderDailyQuests() {
     const done = q.check(ctx);
     let statusHtml;
     if (claimed) statusHtml = '<div class="quest-claimed">' + iconHtml('check') + ' รับแล้ว</div>';
-    else if (done) statusHtml = '<button class="quest-claim-btn" onclick="claimDailyQuest(\'' + id + '\')">รับ +' + q.xp + ' XP</button>';
+    else if (done) statusHtml = '<button class="quest-claim-btn" onclick="claimDailyQuest(\'' + id + '\', event)">รับ +' + q.xp + ' XP</button>';
     else statusHtml = '<div class="quest-xp-tag">+' + q.xp + ' XP</div>';
     return '<div class="quest-row' + (claimed ? ' done' : '') + '">'
       + '<div class="quest-info"><div class="quest-title">' + escapeHtml(q.title) + '</div><div class="quest-desc">' + escapeHtml(q.desc) + '</div></div>'
@@ -2621,18 +2663,55 @@ function renderDailyQuests() {
       + '</div>';
   }).join('');
 }
-function claimDailyQuest(id) {
+function claimDailyQuest(id, evt) {
   const state = loadQuestClaimState();
   if (state.ids.indexOf(id) !== -1) return;
   const q = QUEST_POOL.find(x => x.id === id);
   if (!q || !q.check(todayQuestContext())) return;
-  state.ids.push(id);
-  saveQuestClaimState(state);
-  addQuestBonusXP(q.xp);
-  renderDailyQuests();
-  renderXpBar();
+  const settle = playClaimFeedback(evt, q.xp);
   vibrate([40, 30, 60]);
-  showToast('รับเควสสำเร็จ +' + q.xp + ' XP', 'target');
+  settle(() => {
+    state.ids.push(id);
+    saveQuestClaimState(state);
+    addQuestBonusXP(q.xp);
+    renderDailyQuests();
+    renderXpBar();
+    showToast('รับเควสสำเร็จ +' + q.xp + ' XP', 'target');
+  });
+}
+
+/* ---- shared "satisfying claim" feedback for quest/mission buttons ----
+ * Fires a flying "+XP" number from the tapped button, flashes the row
+ * green, and locks the button — all BEFORE the underlying re-render swaps
+ * the row's innerHTML out from under it (which would otherwise cut the
+ * animation off instantly). Returns a `settle(cb)` function: call it with
+ * the actual claim logic, and it runs cb after the flash has had time to
+ * play (or immediately if there's no button/row to animate against, e.g.
+ * evt wasn't passed through).
+ */
+function playClaimFeedback(evt, xp) {
+  const btn = evt && evt.currentTarget;
+  if (!btn) return function (cb) { cb(); };
+  spawnFloatingXP(btn, xp);
+  const row = btn.closest('.quest-row');
+  btn.disabled = true;
+  btn.classList.add('claim-btn-done');
+  btn.textContent = 'รับแล้ว!';
+  if (row) row.classList.add('quest-claim-flash');
+  return function (cb) {
+    setTimeout(cb, row ? 280 : 0);
+  };
+}
+function spawnFloatingXP(anchorEl, xp) {
+  if (!anchorEl) return;
+  const rect = anchorEl.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = 'fly-xp';
+  el.textContent = '+' + xp + ' XP';
+  el.style.left = (rect.left + rect.width / 2) + 'px';
+  el.style.top = rect.top + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 950);
 }
 
 /* ================= WEEKLY MISSION BOARD (Phase 3) =================
@@ -2745,7 +2824,7 @@ function renderWeeklyMissions() {
     const done = current >= m.target;
     let statusHtml;
     if (claimed) statusHtml = '<div class="quest-claimed">' + iconHtml('check') + ' รับแล้ว</div>';
-    else if (done) statusHtml = '<button class="quest-claim-btn" onclick="claimWeeklyMission(\'' + m.id + '\')">รับ +' + m.xp + ' XP</button>';
+    else if (done) statusHtml = '<button class="quest-claim-btn" onclick="claimWeeklyMission(\'' + m.id + '\', event)">รับ +' + m.xp + ' XP</button>';
     else statusHtml = '<div class="quest-xp-tag">' + current + '/' + m.target + ' ' + m.unit + '</div>';
     return '<div class="quest-row' + (claimed ? ' done' : '') + '">'
       + '<div class="quest-info"><div class="quest-title">' + escapeHtml(m.title) + '</div></div>'
@@ -2767,18 +2846,21 @@ function renderWeeklyMissions() {
 
   wrap.innerHTML = rowsHtml + chestHtml;
 }
-function claimWeeklyMission(id) {
+function claimWeeklyMission(id, evt) {
   const state = loadWeeklyMissionClaimState();
   if (state.ids.indexOf(id) !== -1) return;
   const m = WEEKLY_MISSION_DEFS.find(x => x.id === id);
   if (!m || m.progress(thisWeekMissionContext()) < m.target) return;
-  state.ids.push(id);
-  saveWeeklyMissionClaimState(state);
-  addWeeklyBonusXP(m.xp);
-  renderWeeklyMissions();
-  renderXpBar();
+  const settle = playClaimFeedback(evt, m.xp);
   vibrate([40, 30, 60]);
-  showToast('รับภารกิจประจำสัปดาห์สำเร็จ +' + m.xp + ' XP', 'target');
+  settle(() => {
+    state.ids.push(id);
+    saveWeeklyMissionClaimState(state);
+    addWeeklyBonusXP(m.xp);
+    renderWeeklyMissions();
+    renderXpBar();
+    showToast('รับภารกิจประจำสัปดาห์สำเร็จ +' + m.xp + ' XP', 'target');
+  });
 }
 function claimWeeklyChest() {
   const state = loadWeeklyMissionClaimState();

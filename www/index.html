@@ -1130,6 +1130,124 @@ body{
 }
 .quest-claim-btn:active{transform:scale(.95);}
 
+/* ---- Home Lobby feel: ambient atmosphere + reveal/feedback polish ----
+   Additive only — no layout/DOM structure changes, just motion + juice
+   layered on the existing dashboard markup. */
+
+/* ambient embers drifting behind the lobby, like torchlight dust.
+   Positioned behind everything via negative z-index inside the
+   position:relative #screen-home (see rule further down). Pure CSS,
+   ~7 particles with staggered timing so it never looks mechanical. */
+.lobby-ambience{position:absolute;inset:0;z-index:-1;pointer-events:none;overflow:hidden;}
+.lobby-ember{
+  position:absolute;bottom:-6%;left:var(--ember-x,50%);
+  width:var(--ember-size,3px);height:var(--ember-size,3px);border-radius:50%;
+  background:radial-gradient(circle,rgba(232,35,42,.9),rgba(232,35,42,0) 70%);
+  opacity:0;filter:blur(.2px);
+  animation:lobbyEmberDrift var(--ember-dur,9s) ease-in var(--ember-delay,0s) infinite;
+}
+@keyframes lobbyEmberDrift{
+  0%{opacity:0;transform:translate(0,0) scale(.6);}
+  8%{opacity:.55;}
+  55%{opacity:.35;}
+  100%{opacity:0;transform:translate(var(--ember-drift,14px),-112vh) scale(1.1);}
+}
+#screen-home{position:relative;}
+
+/* entrance reveal — cards rise/fade in on every arrival at Home, staggered
+   by position, restarted via JS (see animateHomeEntrance()). */
+.home-content.home-reveal>*{animation:homeCardRise .55s cubic-bezier(.16,.9,.3,1) both;}
+.home-content.home-reveal>*:nth-child(1){animation-delay:.0s}
+.home-content.home-reveal>*:nth-child(2){animation-delay:.05s}
+.home-content.home-reveal>*:nth-child(3){animation-delay:.1s}
+.home-content.home-reveal>*:nth-child(4){animation-delay:.15s}
+.home-content.home-reveal>*:nth-child(5){animation-delay:.2s}
+.home-content.home-reveal>*:nth-child(6){animation-delay:.25s}
+.home-content.home-reveal>*:nth-child(7){animation-delay:.3s}
+.home-content.home-reveal>*:nth-child(8){animation-delay:.35s}
+.home-content.home-reveal>*:nth-child(9){animation-delay:.4s}
+.home-content.home-reveal>*:nth-child(n+10){animation-delay:.42s}
+@keyframes homeCardRise{
+  from{opacity:0;transform:translateY(16px) scale(.98);}
+  to{opacity:1;transform:translateY(0) scale(1);}
+}
+@media (prefers-reduced-motion:reduce){
+  .lobby-ember{display:none;}
+  .home-content.home-reveal>*{animation:none;}
+}
+
+/* mascot: tactile press feedback so tapping your character to open the
+   skin picker feels like poking a living character, not a flat button. */
+.mascot-avatar{transition:transform .12s ease;}
+.mascot-avatar:active{transform:scale(.96);}
+.mascot-avatar:active #mascotImg{animation-play-state:paused;}
+.mascot-poke-spark{position:absolute;inset:0;pointer-events:none;z-index:2;}
+.mascot-poke-spark span{
+  position:absolute;left:50%;top:55%;width:5px;height:5px;border-radius:50%;
+  background:radial-gradient(circle,#fff,rgba(255,255,255,0) 70%);
+  opacity:0;transform:translate(-50%,-50%);
+}
+.mascot-poke-spark.play span{animation:mascotPokeSpark .5s ease-out forwards;}
+.mascot-poke-spark.play span:nth-child(1){--sx:-26px;--sy:-30px;animation-delay:0s;}
+.mascot-poke-spark.play span:nth-child(2){--sx:22px;--sy:-34px;animation-delay:.02s;}
+.mascot-poke-spark.play span:nth-child(3){--sx:32px;--sy:-6px;animation-delay:.04s;}
+.mascot-poke-spark.play span:nth-child(4){--sx:-30px;--sy:-4px;animation-delay:.03s;}
+.mascot-poke-spark.play span:nth-child(5){--sx:0px;--sy:-42px;animation-delay:.01s;}
+@keyframes mascotPokeSpark{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.4);}
+  25%{opacity:1;}
+  100%{opacity:0;transform:translate(calc(-50% + var(--sx)),calc(-50% + var(--sy))) scale(1);}
+}
+
+/* quest/mission claim: satisfying flash on the row + a floating "+XP"
+   number that flies up from the tapped button, fired before the row is
+   replaced by the re-render (see spawnFloatingXP() in app.js). */
+.quest-row.quest-claim-flash{
+  animation:questClaimFlash .32s ease-out;border-radius:8px;
+}
+@keyframes questClaimFlash{
+  0%{background:rgba(62,213,152,0);}
+  35%{background:rgba(62,213,152,.16);}
+  100%{background:rgba(62,213,152,0);}
+}
+.quest-claim-btn.claim-btn-done{background:linear-gradient(90deg,var(--success),var(--success));opacity:.85;}
+.fly-xp{
+  position:fixed;z-index:9999;pointer-events:none;
+  font-family:var(--font-display);font-size:15px;letter-spacing:.3px;
+  color:var(--success);text-shadow:0 1px 6px rgba(0,0,0,.5);
+  animation:flyXpUp .9s cubic-bezier(.2,.7,.3,1) forwards;
+}
+@keyframes flyXpUp{
+  0%{opacity:0;transform:translate(-50%,-40%) scale(.7);}
+  15%{opacity:1;transform:translate(-50%,-70%) scale(1.08);}
+  75%{opacity:1;}
+  100%{opacity:0;transform:translate(-50%,-190%) scale(1);}
+}
+
+/* boss teaser: urgency pulse once the boss is in its CRITICAL phase, so
+   the lobby itself signals "finish it off" without opening the card. */
+.boss-teaser-card.boss-teaser-critical{animation:bossTeaserUrgent 1.6s ease-in-out infinite;}
+.boss-teaser-card.boss-teaser-critical .boss-teaser-thumb{animation:bossTeaserThumbShake 1.6s ease-in-out infinite;}
+@keyframes bossTeaserUrgent{
+  0%,100%{box-shadow:0 0 0 rgba(232,35,42,0);}
+  50%{box-shadow:0 0 0 1px rgba(232,35,42,.35),0 0 18px rgba(232,35,42,.28);}
+}
+@keyframes bossTeaserThumbShake{
+  0%,84%,100%{transform:translateX(0);}
+  86%{transform:translateX(-1.5px);}
+  90%{transform:translateX(1.5px);}
+  94%{transform:translateX(-1px);}
+}
+
+/* tab bar: press feedback + smoother active-state transition, so
+   switching tabs reads as a deliberate lobby-menu action. */
+.tab{transition:color .18s ease;}
+.tab-icon{transition:transform .16s cubic-bezier(.34,1.56,.64,1);}
+.tab:active .tab-icon{transform:scale(.86);}
+.tab.active .tab-icon{transform:scale(1.08);}
+.tab .dot{transition:opacity .18s ease,transform .18s ease;transform:scale(.4);}
+.tab.active .dot{transform:scale(1);}
+
 
 .boss-countdown{font-size:10px;color:var(--text-faint);letter-spacing:.3px;margin-top:4px;}
 .boss-view-btn{flex-shrink:0;font-size:10px;font-weight:800;letter-spacing:1px;color:var(--text-dim);background:var(--bg-elev);border:1px solid var(--card-border);border-radius:6px;padding:6px 10px;cursor:pointer;}
@@ -3009,6 +3127,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 
   <!-- HOME -->
   <section id="screen-home" class="screen active">
+    <div class="lobby-ambience" id="lobbyAmbience" aria-hidden="true"></div>
     <div class="topbar">
       <div class="brand">CINDY</div>
       <div style="display:flex;gap:8px;">
@@ -3044,6 +3163,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
           <div id="mascotGearBadge" class="mascot-gear-badge"></div>
           <div id="mascotSkinAccessory" class="mascot-skin-accessory"></div>
           <div id="mascotLootBadge" class="mascot-loot-badge"></div>
+          <div id="mascotPokeSpark" class="mascot-poke-spark"><span></span><span></span><span></span><span></span><span></span></div>
           <div class="mascot-skin-hint"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 100 18c1.4 0 2-1.1 1.2-2.2-.5-.7-.1-1.8 1-1.8H16a5 5 0 005-5c0-5-4.5-9-9-9z"/><circle cx="7.7" cy="10.5" r="1.15" fill="currentColor" stroke="none"/><circle cx="12" cy="7.3" r="1.15" fill="currentColor" stroke="none"/><circle cx="16.1" cy="10" r="1.15" fill="currentColor" stroke="none"/><circle cx="9.3" cy="15" r="1.15" fill="currentColor" stroke="none"/></svg></span></div>
         </div>
         <div class="mascot-text">
