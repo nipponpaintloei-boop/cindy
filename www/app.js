@@ -1293,6 +1293,19 @@ function initBossView() {
   document.querySelectorAll('[data-boss-close]').forEach(el => el.addEventListener('click', closeBossView));
 }
 
+/* ---- Boss Phase bands ---- 100-70% NORMAL, 70-40% ARMOR BREAK,
+ * 40-10% RAGE, <10% CRITICAL. Order matters: first match wins, checked
+ * high-to-low against the same hp% already driving the HP bar. */
+const BOSS_PHASES = [
+  { key: 'normal', label: 'NORMAL', min: 0.7 },
+  { key: 'armorbreak', label: 'ARMOR BREAK', min: 0.4 },
+  { key: 'rage', label: 'RAGE', min: 0.1 },
+  { key: 'critical', label: 'CRITICAL', min: 0 }
+];
+function bossPhaseFor(pct) {
+  return BOSS_PHASES.find(p => pct >= p.min) || BOSS_PHASES[BOSS_PHASES.length - 1];
+}
+
 function renderBossCard() {
   const nameEl = document.getElementById('bossName');
   const tagEl = document.getElementById('bossTag');
@@ -1328,8 +1341,34 @@ function renderBossCard() {
   if (hpLabel) hpLabel.textContent = Math.round(state.hp) + ' / ' + state.targetHp + ' HP';
 
   stage.classList.toggle('boss-defeated', state.defeated);
-  // last stretch of a fight gets a red pulse — the "finish it off" nudge
-  stage.classList.toggle('boss-critical', !state.defeated && pct > 0 && pct <= 0.25);
+
+  /* ---- Boss Phase — 4 HP bands, purely a presentation layer read off
+   * the same pct already computed above (100-70 / 70-40 / 40-10 / <10),
+   * same class-toggle pattern the old single "boss-critical" threshold
+   * used. Fires a one-time toast+buzz only when the phase actually
+   * changes, tracked via stage.dataset so it doesn't refire every render. */
+  const phase = state.defeated ? null : bossPhaseFor(pct);
+  BOSS_PHASES.forEach(p => stage.classList.remove('boss-phase-' + p.key));
+  const phaseLabelEl = document.getElementById('bossPhaseLabel');
+  if (phase) {
+    stage.classList.add('boss-phase-' + phase.key);
+    if (phaseLabelEl) {
+      phaseLabelEl.textContent = phase.label;
+      BOSS_PHASES.forEach(p => phaseLabelEl.classList.remove('phase-' + p.key));
+      phaseLabelEl.classList.add('phase-' + phase.key);
+    }
+    const phaseKey = state.weekIndex + '_' + phase.key;
+    if (stage.dataset.bossPhase !== phaseKey) {
+      const isFirstRenderThisFight = !stage.dataset.bossPhase || stage.dataset.bossPhase.split('_')[0] !== String(state.weekIndex);
+      stage.dataset.bossPhase = phaseKey;
+      if (!isFirstRenderThisFight && phase.key !== 'normal') {
+        showToast(state.boss.name + ' เข้าสู่ ' + phase.label, 'alert');
+        vibrate([40, 30, 40]);
+      }
+    }
+  } else if (phaseLabelEl) {
+    phaseLabelEl.textContent = '';
+  }
 
   const weekKey = bossWeekKey(state.weekIndex);
   const lastSeenDmgKey = KEY_BOSS_DEFEAT_SEEN + '_dmg_' + weekKey;
@@ -1568,6 +1607,7 @@ function renderHome() {
   renderTreasureChest();
   renderDailyQuests();
   renderStepsCard();
+  checkAndUnlockAchievements();
 }
 
 /** Combined streak across Cindy sessions + Custom Workout sessions. */
@@ -1936,6 +1976,20 @@ function renderStepsCard() {
     + '</div>';
 }
 
+/* Combo milestones — same combo counter and bonus-XP payout as before
+ * (COMBO_BONUS_MIN / comboBonusForMaxCombo above); this only adds a
+ * presentation tier at a few thresholds so hitting them reads as a beat,
+ * not just a bigger number. label mirrors the milestone flavor from the
+ * product proposal (bonus XP / power hit / critical / overdrive). */
+const COMBO_MILESTONES = [
+  { n: 20, tier: 'tier-20', label: 'OVERDRIVE', buzz: [40, 30, 40, 30, 100] },
+  { n: 10, tier: 'tier-10', label: 'CRITICAL', buzz: [40, 30, 90] },
+  { n: 5, tier: 'tier-5', label: 'POWER HIT', buzz: [30, 25, 60] },
+  { n: 3, tier: '', label: 'BONUS XP', buzz: [20] }
+];
+function comboMilestoneFor(combo) {
+  return COMBO_MILESTONES.find(m => combo === m.n) || null;
+}
 let lastRenderedCombo = null;
 function updateComboBadge(active) {
   const badge = document.getElementById('comboBadge');
@@ -1945,13 +1999,20 @@ function updateComboBadge(active) {
   const increased = lastRenderedCombo !== null && combo > lastRenderedCombo;
   lastRenderedCombo = combo;
   if (combo >= 2) {
-    badge.textContent = 'COMBO x' + combo;
+    const milestone = increased ? comboMilestoneFor(combo) : null;
+    badge.textContent = milestone ? ('COMBO x' + combo + ' · ' + milestone.label) : ('COMBO x' + combo);
     badge.classList.add('show');
+    COMBO_MILESTONES.forEach(m => { if (m.tier) badge.classList.remove(m.tier); });
+    if (milestone && milestone.tier) badge.classList.add(milestone.tier);
     if (increased) {
-      badge.classList.remove('pulse');
+      badge.classList.remove('pulse', 'milestone-pulse');
       void badge.offsetWidth;
-      badge.classList.add('pulse');
-      vibrate(20);
+      badge.classList.add(milestone ? 'milestone-pulse' : 'pulse');
+      vibrate(milestone ? milestone.buzz : 20);
+      if (milestone) {
+        beep(milestone.n >= 20 ? 1046 : milestone.n >= 10 ? 932 : 784, 110, 0.16);
+        showToast('COMBO x' + combo + ' — ' + milestone.label, 'target');
+      }
     }
   } else {
     badge.classList.remove('show');
@@ -2454,6 +2515,150 @@ function renderCharacterBossTrophyRow() {
   if (summary) summary.textContent = 'ผู้พิชิต ' + defeated.length + '/' + BOSS_ROSTER.length;
 }
 
+/* ================= ACHIEVEMENTS + TITLE =================
+ * Achievements are permanent records of things the player has already
+ * done — unlike Quests (see QUEST_POOL above), which are things the game
+ * is asking the player to do today. Every check below reads data that's
+ * already tracked elsewhere (sessions, streak, bosses defeated, per-
+ * session maxCombo) — nothing new is logged during a workout, only a
+ * small "which ids are unlocked" list that only ever grows. Rewards are
+ * cosmetic-only (a selectable Title), same guardrail already used for
+ * mascot skins, so this can't become a stat-balance problem. */
+const KEY_ACH_UNLOCKED = 'cindy_achievements_unlocked_v1';
+const KEY_ACTIVE_TITLE = 'cindy_active_title';
+
+const ACHIEVEMENTS = [
+  { id: 'first_blood', title: 'FIRST BLOOD', desc: 'ปราบบอสตัวแรกให้สำเร็จ', titleText: 'ผู้พิชิต',
+    check: (ctx) => ctx.bossesDefeated >= 1 },
+  { id: 'week_warrior', title: 'WEEK WARRIOR', desc: 'ทำ Streak ต่อเนื่อง 7 วัน', titleText: 'นักสู้ประจำสัปดาห์',
+    check: (ctx) => ctx.streak >= 7 },
+  { id: 'iron_will', title: 'IRON WILL', desc: 'ทำ Streak ต่อเนื่อง 30 วัน', titleText: 'IRON WILL',
+    check: (ctx) => ctx.streak >= 30 },
+  { id: 'century', title: 'CENTURY', desc: 'ออกกำลังกายครบ 100 ครั้ง', titleText: 'นักสู้ร้อยศึก',
+    check: (ctx) => ctx.totalWorkouts >= 100 },
+  { id: 'machine', title: 'MACHINE', desc: 'สะสมเรพรวมตลอดกาลครบ 1,000 ครั้ง', titleText: 'THE MACHINE',
+    check: (ctx) => ctx.totalReps >= 1000 },
+  { id: 'overdrive', title: 'OVERDRIVE', desc: 'ทำ Combo ถึง x20 ในหนึ่งเซสชัน', titleText: 'OVERDRIVE',
+    check: (ctx) => ctx.bestCombo >= 20 },
+  { id: 'boss_slayer', title: 'BOSS SLAYER', desc: 'ปราบบอสให้ครบทุกตัว', titleText: 'BOSS SLAYER',
+    check: (ctx) => ctx.allBosses > 0 && ctx.bossesDefeated >= ctx.allBosses }
+];
+
+function loadAchievementUnlocked() {
+  try { return JSON.parse(localStorage.getItem(KEY_ACH_UNLOCKED)) || []; }
+  catch (e) { return []; }
+}
+function saveAchievementUnlocked(list) {
+  localStorage.setItem(KEY_ACH_UNLOCKED, JSON.stringify(list));
+}
+function loadActiveTitleId() {
+  return localStorage.getItem(KEY_ACTIVE_TITLE) || '';
+}
+
+function achievementContext() {
+  const cindy = loadSessions().filter(s => s.completed !== false);
+  const custom = loadCustomWorkoutSessions();
+  const run = loadRunSessions();
+  const cindyReps = cindy.reduce((sum, s) => sum + (s.total ? s.total.reps : 0), 0);
+  const customReps = custom.reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
+  const bestCombo = cindy.reduce((m, s) => Math.max(m, s.maxCombo || 0), 0);
+  return {
+    totalWorkouts: cindy.length + custom.length + run.length,
+    totalReps: cindyReps + customReps,
+    streak: computeCombinedStreak(),
+    bossesDefeated: loadBossEverDefeated().length,
+    allBosses: BOSS_ROSTER.length,
+    bestCombo
+  };
+}
+
+/** Checks every achievement against current data, persists any newly
+ * earned ones, and — same "you earned this" language as boss defeats —
+ * surfaces a toast per new unlock. Cheap enough to call from any main
+ * render pass (renderHome / renderCharacterSheet); nothing here recomputes
+ * anything not already computed elsewhere on the same screen. */
+function checkAndUnlockAchievements() {
+  const unlocked = loadAchievementUnlocked();
+  const ctx = achievementContext();
+  let changed = false;
+  ACHIEVEMENTS.forEach(a => {
+    if (unlocked.indexOf(a.id) === -1 && a.check(ctx)) {
+      unlocked.push(a.id);
+      changed = true;
+      showToast('ACHIEVEMENT UNLOCKED · ' + a.title, 'gift');
+      vibrate([50, 40, 50, 40, 120]);
+    }
+  });
+  if (changed) saveAchievementUnlocked(unlocked);
+  return unlocked;
+}
+
+function activeTitleText() {
+  const id = loadActiveTitleId();
+  if (!id) return '';
+  const unlocked = loadAchievementUnlocked();
+  if (unlocked.indexOf(id) === -1) return ''; // guard against a stale/removed id
+  const a = ACHIEVEMENTS.find(x => x.id === id);
+  return a ? a.titleText : '';
+}
+
+function renderCharacterTitleTag() {
+  const el = document.getElementById('characterTitleTag');
+  if (!el) return;
+  const text = activeTitleText();
+  el.textContent = text ? '「' + text + '」' : '';
+}
+
+function setActiveTitle(id) {
+  const unlocked = loadAchievementUnlocked();
+  if (id && unlocked.indexOf(id) === -1) return; // can't equip a locked title
+  localStorage.setItem(KEY_ACTIVE_TITLE, id || '');
+  renderCharacterTitleTag();
+  renderAchList();
+}
+
+function renderAchList() {
+  const wrap = document.getElementById('achList');
+  const summary = document.getElementById('achSummary');
+  if (!wrap) return;
+  const unlocked = checkAndUnlockAchievements();
+  const activeId = loadActiveTitleId();
+  if (summary) summary.textContent = unlocked.length + '/' + ACHIEVEMENTS.length;
+  wrap.innerHTML = ACHIEVEMENTS.map(a => {
+    const isUnlocked = unlocked.indexOf(a.id) !== -1;
+    const isActive = isUnlocked && activeId === a.id;
+    let btnHtml = '';
+    if (isUnlocked) {
+      btnHtml = '<button class="btn btn-outline btn-sm ach-title-btn' + (isActive ? ' active' : '')
+        + '" onclick="setActiveTitle(\'' + (isActive ? '' : a.id) + '\')">'
+        + (isActive ? 'กำลังใช้เป็น Title' : 'ตั้งเป็น Title') + '</button>';
+    }
+    return '<div class="boss-view-item ach-item' + (isUnlocked ? ' unlocked' : '') + '">'
+      + '<div class="boss-view-item-top">'
+      + '<div><div class="boss-view-item-name">' + a.title + '</div>'
+      + '<div class="boss-view-item-tag">' + a.desc + '</div></div>'
+      + '<div class="boss-view-item-status">' + (isUnlocked ? 'UNLOCKED' : 'LOCKED') + '</div>'
+      + '</div>' + btnHtml + '</div>';
+  }).join('');
+}
+
+function openAchModal() {
+  const modal = document.getElementById('achModal');
+  if (!modal) return;
+  renderAchList();
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+}
+function closeAchModal() {
+  const modal = document.getElementById('achModal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+function initAchModal() {
+  document.querySelectorAll('[data-ach-close]').forEach(el => el.addEventListener('click', closeAchModal));
+}
+
 /* ---- equipment slots — the equipped skin + equipped loot badge, both
  * already tracked (loadActiveSkin / equippedLootItem) for the mascot
  * avatar itself; this just surfaces the same two picks as RPG-style
@@ -2607,6 +2812,8 @@ function renderCharacterSheet() {
   renderCharacterEquipment();
   renderCharacterBossTrophyRow();
   renderCharacterRecentLog();
+  renderCharacterTitleTag();
+  checkAndUnlockAchievements();
   renderPinSettingsUI();
 }
 
@@ -3444,8 +3651,24 @@ function saveRound() {
   saveActive(active);
   vibrate(40);
   beep(880, 90, 0.15);
+  flashPerfectRound();
   showToast('บันทึกรอบที่ ' + active.roundsSaved + ' แล้ว');
   refreshWorkoutUI();
+}
+
+/* ---- Perfect Round flourish ----
+ * Every saveRound() call already means Pull + Push + Squat were all done
+ * with no skip for that round (skipRound() is the only other path, and it
+ * doesn't log a round at all) — so there's no new "was it perfect" check
+ * to add, just a quick moment to mark it. Kept as a short flash rather
+ * than a loud interrupt so it doesn't get old by round 10. */
+function flashPerfectRound() {
+  const el = document.getElementById('perfectFlash');
+  if (!el) return;
+  el.innerHTML = iconHtml('check') + '<span>PERFECT ROUND</span>';
+  el.classList.remove('flash');
+  void el.offsetWidth;
+  el.classList.add('flash');
 }
 
 function skipRound() {
@@ -6963,3 +7186,4 @@ function deleteCustomHistorySessionExecute() {
 
 
 document.addEventListener('DOMContentLoaded', initBossView);
+document.addEventListener('DOMContentLoaded', initAchModal);

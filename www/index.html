@@ -1039,6 +1039,18 @@ body{
 .boss-view-item.current .boss-view-item-status{color:var(--success);}
 .boss-view-item-story{font-size:10.5px;line-height:1.5;color:var(--text-dim);border-top:1px solid var(--card-border);padding-top:6px;}
 
+/* ---- achievement list (reuses .boss-view-* modal/list shell above) ---- */
+.ach-item{opacity:.45;}
+.ach-item.unlocked{opacity:1;}
+.ach-item .boss-view-item-status{color:var(--text-faint);}
+.ach-item.unlocked .boss-view-item-status{color:var(--success,#2fbf6a);}
+.ach-title-btn{margin-top:2px;align-self:flex-start;padding:7px 12px;font-size:10.5px;}
+.ach-title-btn.active{background:var(--push);border-color:var(--push);color:#fff;}
+
+/* ---- cosmetic Title tag on the character hero (「TITLE」) ---- */
+.character-title-tag{font-size:11px;font-weight:700;color:var(--push);letter-spacing:.3px;margin-top:2px;}
+.character-title-tag:empty{display:none;}
+
 /* ---- boss battle cutscene (screen-bossbattle) ---- */
 .battle-eyebrow{text-align:center;font-size:11px;font-weight:800;letter-spacing:1.2px;color:var(--text-faint);text-transform:uppercase;margin-bottom:14px;}
 .battle-log{text-align:center;margin-top:16px;font-size:14px;font-weight:700;color:var(--text);min-height:20px;}
@@ -1067,15 +1079,36 @@ body{
   transition:width .6s ease,background .4s ease;
 }
 
-/* last 25% of HP — a slow red pulse traced around the boss art itself
-   (drop-shadow follows the PNG's alpha silhouette, unlike box-shadow which
-   draws a rectangle around the whole stage box) as urgency to finish the fight */
-.boss-stage.boss-critical .boss-art{animation:bossCriticalPulse 1.6s ease-in-out infinite;}
+/* ---- Boss Phase — 4 HP bands (NORMAL / ARMOR BREAK / RAGE / CRITICAL),
+   each with its own drop-shadow pulse around the boss art (drop-shadow
+   follows the PNG's alpha silhouette, unlike box-shadow which draws a
+   rectangle around the whole stage box). Intensity + speed escalate as
+   HP drops so the fight visibly ramps up without touching core gameplay. */
+.boss-stage.boss-phase-armorbreak .boss-art{animation:bossPhasePulseAmber 2.2s ease-in-out infinite;}
+.boss-stage.boss-phase-rage .boss-art{animation:bossPhasePulseOrange 1.8s ease-in-out infinite;}
+.boss-stage.boss-phase-critical .boss-art{animation:bossCriticalPulse 1.4s ease-in-out infinite;}
+@keyframes bossPhasePulseAmber{
+  0%,100%{filter:drop-shadow(0 0 0 rgba(255,176,32,0));}
+  50%{filter:drop-shadow(0 0 5px rgba(255,176,32,.7));}
+}
+@keyframes bossPhasePulseOrange{
+  0%,100%{filter:drop-shadow(0 0 0 rgba(255,106,61,0));}
+  50%{filter:drop-shadow(0 0 6px rgba(255,106,61,.85)) drop-shadow(0 0 12px rgba(255,106,61,.4));}
+}
 @keyframes bossCriticalPulse{
   0%,100%{filter:drop-shadow(0 0 0 rgba(232,35,42,0)) drop-shadow(0 0 0 rgba(232,35,42,0));}
   50%{filter:drop-shadow(0 0 6px rgba(232,35,42,.9)) drop-shadow(0 0 16px rgba(232,35,42,.55));}
 }
-.boss-stage.boss-critical.boss-defeated .boss-art{animation:none;filter:none;}
+.boss-stage.boss-phase-armorbreak.boss-defeated .boss-art,
+.boss-stage.boss-phase-rage.boss-defeated .boss-art,
+.boss-stage.boss-phase-critical.boss-defeated .boss-art{animation:none;filter:none;}
+.boss-phase-label{
+  text-align:center;font-size:9.5px;font-weight:800;letter-spacing:1.2px;
+  margin-top:5px;color:var(--text-faint);
+}
+.boss-phase-label.phase-armorbreak{color:#ffb020;}
+.boss-phase-label.phase-rage{color:#ff6a3d;}
+.boss-phase-label.phase-critical{color:#e8232a;}
 .boss-hp-label{font-size:10px;color:var(--text-faint);margin-top:6px;text-align:center;letter-spacing:.3px;}
 
 .boss-dmg-breakdown{margin-top:12px;}
@@ -1331,6 +1364,39 @@ body{
   0%{transform:translateX(-50%) scale(1);}
   40%{transform:translateX(-50%) scale(1.25);}
   100%{transform:translateX(-50%) scale(1);}
+}
+/* combo milestone tiers (x3/x5/x10/x20) — same badge, escalating color +
+   a slightly bigger pulse so later milestones read as more of a moment */
+.combo-badge.tier-5{background:linear-gradient(90deg,var(--push),#ff5a7a);box-shadow:0 3px 14px rgba(255,90,122,.55);}
+.combo-badge.tier-10{background:linear-gradient(90deg,#ff5a7a,#e8232a);box-shadow:0 3px 16px rgba(232,35,42,.6);}
+.combo-badge.tier-20{background:linear-gradient(90deg,#e8232a,#ffd23d);box-shadow:0 3px 20px rgba(255,210,61,.65);}
+.combo-badge.milestone-pulse{animation:comboMilestonePulse .5s ease;}
+@keyframes comboMilestonePulse{
+  0%{transform:translateX(-50%) scale(1);}
+  35%{transform:translateX(-50%) scale(1.4);}
+  60%{transform:translateX(-50%) scale(1.15);}
+  100%{transform:translateX(-50%) scale(1);}
+}
+
+/* ---- Perfect Round flourish — a quick checkmark flash each time a round
+   is saved (never on skip), sitting in the same spot as .combo-badge but
+   independent of it so both can appear in the same moment. ---- */
+.perfect-flash{
+  position:absolute;top:-6px;left:50%;transform:translateX(-50%) translateY(6px) scale(.85);
+  display:flex;align-items:center;gap:5px;
+  font-family:var(--font-display);font-size:13px;letter-spacing:.5px;color:#fff;
+  background:linear-gradient(90deg,var(--success,#2fbf6a),#57e08f);
+  padding:4px 11px 3px;border-radius:20px;white-space:nowrap;
+  box-shadow:0 3px 12px rgba(47,191,106,.5);
+  opacity:0;pointer-events:none;
+}
+.perfect-flash .icon-inline{width:11px;height:11px;}
+.perfect-flash.flash{animation:perfectFlashPop 1.1s cubic-bezier(.3,1.4,.4,1);}
+@keyframes perfectFlashPop{
+  0%{opacity:0;transform:translateX(-50%) translateY(6px) scale(.85);}
+  15%{opacity:1;transform:translateX(-50%) translateY(-34px) scale(1);}
+  75%{opacity:1;transform:translateX(-50%) translateY(-34px) scale(1);}
+  100%{opacity:0;transform:translateX(-50%) translateY(-44px) scale(.9);}
 }
 
 .rounds-banner{text-align:center;margin:6px 0 18px;}
@@ -2525,6 +2591,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         </div>
         <div class="boss-hp-track"><div id="bossHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
         <div id="bossHpLabel" class="boss-hp-label">0 / 0 HP</div>
+        <div id="bossPhaseLabel" class="boss-phase-label"></div>
         <div id="bossDmgBreakdown" class="boss-dmg-breakdown"></div>
       </div>
 
@@ -2830,6 +2897,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
           <div class="timer-sub">เวลาที่เหลือ</div>
         </div>
         <div id="comboBadge" class="combo-badge"></div>
+        <div id="perfectFlash" class="perfect-flash"></div>
       </div>
 
       <div class="rounds-banner">
@@ -3173,6 +3241,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <div class="character-hero-info">
           <div id="characterLevelBadge" class="mascot-level-badge">LV.1</div>
           <div id="characterRank" class="mascot-rank rank-recruit" style="display:inline-block;"></div>
+          <div id="characterTitleTag" class="character-title-tag"></div>
           <div id="characterCP" class="character-cp"></div>
           <div id="characterSkinTitle" class="mascot-skin-title"></div>
           <div id="characterClassTitle" class="character-class-title"></div>
@@ -3210,6 +3279,15 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <div id="characterBossTrophyRow" class="character-trophy-row"></div>
       </div>
 
+      <div class="section-label" style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span>ACHIEVEMENTS</span>
+        <span id="achSummary" style="font-size:10px;color:var(--text-faint);font-weight:600;letter-spacing:.3px;">0/0</span>
+      </div>
+      <button class="metric-card" style="padding:14px 16px;width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:10px;" onclick="openAchModal()">
+        <span style="font-size:11.5px;color:var(--text-dim);">แตะเพื่อดู Achievement ทั้งหมด และตั้ง Title</span>
+        <span style="font-size:16px;color:var(--text-faint);">›</span>
+      </button>
+
       <div class="section-label">RECENT BATTLE LOG</div>
       <div id="characterRecentLog" class="character-recent-log"></div>
 
@@ -3226,6 +3304,20 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         </div>
         <button class="btn btn-outline btn-sm" id="pinDisableBtn" style="display:none;" onclick="confirmDisablePin()">ปิดการใช้ PIN</button>
         <div style="font-size:10.5px;color:var(--text-faint);line-height:1.5;">PIN ใช้กันไม่ให้คนอื่นที่หยิบมือถือไปแก้ไข/ลบข้อมูลของคุณ ไม่ใช่ระบบความปลอดภัยระดับธนาคาร ถ้าลืม PIN ต้องยืนยันตัวตนผ่าน Google ก่อนตั้งใหม่ได้</div>
+      </div>
+    </div>
+
+    <div id="achModal" class="boss-view-modal" aria-hidden="true">
+      <div class="boss-view-backdrop" data-ach-close></div>
+      <div class="boss-view-panel" role="dialog" aria-modal="true" aria-label="Achievements">
+        <div class="boss-view-panel-head">
+          <div>
+            <div class="boss-view-eyebrow">ACHIEVEMENTS</div>
+            <div class="boss-view-title">ความสำเร็จ</div>
+          </div>
+          <button class="boss-view-close" type="button" data-ach-close>×</button>
+        </div>
+        <div id="achList" class="boss-view-list"></div>
       </div>
     </div>
   </section>
