@@ -1796,6 +1796,143 @@ body{
 }
 
 /* ---- complete screen ---- */
+/* ---- Mission Complete + Level Up polish ----
+ * Additive only, layered on the existing markup/classes above. Two parts:
+ * (1) a "victory moment" entrance sequence on screen-complete (flash →
+ *     eyebrow banner → star pop → number count-ups, driven by
+ *     playMissionCompleteEntrance() in app.js), and
+ * (2) a bigger "character grew" read on the level-up celebration/avatar
+ *     glow (variant-levelup on .celebration-overlay, growth-punch on
+ *     #mascotImg) — see queueCelebration()/renderXpBar() in app.js. */
+.complete-flash{
+  position:fixed;inset:0;z-index:80;pointer-events:none;
+  background:radial-gradient(circle at 50% 38%, rgba(255,255,255,.9), rgba(255,176,32,.35) 45%, transparent 72%);
+  opacity:0;
+}
+.complete-flash.play{animation:missionFlash .55s ease-out forwards;}
+@keyframes missionFlash{
+  0%{opacity:0;}
+  12%{opacity:1;}
+  100%{opacity:0;}
+}
+.mission-eyebrow-wrap{overflow:hidden;text-align:center;padding-top:10px;}
+.mission-eyebrow{
+  display:inline-block;font-family:var(--font-display);font-size:13px;letter-spacing:4px;
+  color:var(--warning);text-shadow:0 0 10px rgba(255,176,32,.55);
+  padding:5px 16px;border:1px solid rgba(255,176,32,.4);border-radius:20px;
+  background:linear-gradient(90deg,rgba(255,176,32,.08),rgba(255,176,32,.02));
+  opacity:0;transform:translateY(-14px);
+  position:relative;overflow:hidden;
+}
+.mission-eyebrow.play{animation:missionEyebrowIn .5s cubic-bezier(.2,.8,.3,1) forwards;}
+@keyframes missionEyebrowIn{
+  0%{opacity:0;transform:translateY(-14px) scale(.9);}
+  60%{opacity:1;transform:translateY(0) scale(1.03);}
+  100%{opacity:1;transform:translateY(0) scale(1);}
+}
+.mission-eyebrow::after{
+  content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;
+  background:linear-gradient(115deg,transparent,rgba(255,255,255,.55),transparent);
+  transform:skewX(-20deg);
+}
+.mission-eyebrow.play::after{animation:missionEyebrowSweep 1.1s ease .35s 1;}
+@keyframes missionEyebrowSweep{
+  0%{left:-60%;}
+  100%{left:120%;}
+}
+.complete-star{position:relative;}
+.complete-star-ring{
+  position:absolute;left:50%;top:50%;width:74px;height:74px;border-radius:50%;
+  transform:translate(-50%,-50%) scale(.3);opacity:0;pointer-events:none;
+  background:radial-gradient(circle,rgba(255,176,32,.5),rgba(255,176,32,.14) 45%,transparent 72%);
+}
+.complete-star.play{animation:completeStarPop .55s cubic-bezier(.2,1.8,.4,1) both;}
+.complete-star.play .complete-star-ring{animation:completeStarRing .7s ease-out both;}
+@keyframes completeStarPop{
+  0%{transform:scale(.2) rotate(-35deg);opacity:0;}
+  60%{transform:scale(1.25) rotate(8deg);opacity:1;}
+  100%{transform:scale(1) rotate(0deg);opacity:1;}
+}
+@keyframes completeStarRing{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.3);}
+  30%{opacity:1;}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(2.1);}
+}
+.complete-xp-earned{
+  font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--success);
+  margin-top:6px;opacity:0;
+}
+.complete-xp-earned.play{animation:xpEarnedIn .4s ease .15s both;}
+@keyframes xpEarnedIn{
+  from{opacity:0;transform:translateY(6px);}
+  to{opacity:1;transform:translateY(0);}
+}
+/* stagger-reveal for everything below the hero, once stats are in */
+.complete-wrap.mission-reveal .metric-grid,
+.complete-wrap.mission-reveal #comboResultCard,
+.complete-wrap.mission-reveal .section-label,
+.complete-wrap.mission-reveal .metric-card,
+.complete-wrap.mission-reveal .feedback-block,
+.complete-wrap.mission-reveal>.btn{
+  animation:missionBlockRise .45s cubic-bezier(.2,.8,.3,1) both;
+}
+.complete-wrap.mission-reveal .metric-grid{animation-delay:.15s;}
+.complete-wrap.mission-reveal .section-label:nth-of-type(1){animation-delay:.2s;}
+.complete-wrap.mission-reveal .metric-card:nth-of-type(3){animation-delay:.25s;}
+.complete-wrap.mission-reveal .feedback-block{animation-delay:.3s;}
+.complete-wrap.mission-reveal>.btn{animation-delay:.35s;}
+@keyframes missionBlockRise{
+  from{opacity:0;transform:translateY(12px);}
+  to{opacity:1;transform:translateY(0);}
+}
+@media (prefers-reduced-motion:reduce){
+  .complete-flash,.mission-eyebrow,.complete-star.play,.complete-star.play .complete-star-ring,
+  .complete-xp-earned,.complete-wrap.mission-reveal *{animation:none !important;opacity:1 !important;transform:none !important;}
+}
+
+/* level-up "growth" read: a scale punch on the actual character art
+   (not just the container glow above) so leveling up visibly reads as
+   "got bigger/stronger", plus a distinct look for the celebration overlay
+   when it's specifically a level-up (vs. loot/skin unlock). */
+.mascot-avatar.level-up-glow #mascotImg{animation:mascotGrowthPunch 1.1s cubic-bezier(.25,1.4,.4,1) both;}
+@keyframes mascotGrowthPunch{
+  0%{filter:brightness(1);}
+  30%{transform:translateX(-50%) scale(1.16);filter:brightness(1.25);}
+  55%{transform:translateX(-50%) scale(.97);}
+  100%{transform:translateX(-50%) scale(1);filter:brightness(1);}
+}
+.celebration-overlay.variant-levelup .celebration-badge{
+  animation:levelupBadgePulse 1.1s ease .1s 1;
+}
+@keyframes levelupBadgePulse{
+  0%{box-shadow:0 0 0 0 rgba(var(--cel-rgb),.7);}
+  60%{box-shadow:0 0 0 16px rgba(var(--cel-rgb),0);}
+  100%{box-shadow:0 0 24px 3px rgba(var(--cel-rgb),.55);}
+}
+.celebration-overlay.variant-levelup .celebration-card::before{
+  content:"";position:absolute;inset:-40px;z-index:-1;pointer-events:none;
+  background:repeating-conic-gradient(from 0deg, rgba(var(--cel-rgb),.22) 0deg 4deg, transparent 4deg 18deg);
+  border-radius:50%;opacity:0;
+}
+.celebration-overlay.show.variant-levelup .celebration-card::before{
+  animation:levelupRaySpin 1.6s linear forwards;
+}
+@keyframes levelupRaySpin{
+  0%{opacity:0;transform:rotate(0deg) scale(.7);}
+  20%{opacity:.8;}
+  100%{opacity:0;transform:rotate(70deg) scale(1.15);}
+}
+.celebration-rankup{
+  position:relative;z-index:1;margin-top:2px;font-size:11px;font-weight:800;letter-spacing:1.5px;
+  color:var(--cel-color);text-shadow:0 0 8px rgba(var(--cel-rgb),.5);display:none;
+}
+.celebration-rankup.show{display:block;animation:xpEarnedIn .4s ease .3s both;}
+@media (prefers-reduced-motion:reduce){
+  .mascot-avatar.level-up-glow #mascotImg{animation:none !important;}
+  .celebration-overlay.variant-levelup .celebration-badge,
+  .celebration-overlay.show.variant-levelup .celebration-card::before{animation:none !important;}
+}
+
 .complete-wrap{flex:1;min-height:0;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .complete-hero{position:relative;text-align:center;padding:22px 0 8px;}
 .complete-hero::before{
@@ -3727,10 +3864,15 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 
   <section id="screen-complete" class="screen">
     <div class="complete-wrap">
+      <div class="complete-flash" id="completeFlash" aria-hidden="true"></div>
+      <div class="mission-eyebrow-wrap">
+        <div class="mission-eyebrow" id="missionEyebrow">MISSION COMPLETE</div>
+      </div>
       <div class="complete-hero">
-        <div class="complete-star"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.85 6.32 6.9.68-5.22 4.66 1.55 6.84L12 17.6l-6.08 3.4 1.55-6.84L2.25 9.5l6.9-.68z"/></svg></span></div>
+        <div class="complete-star"><div class="complete-star-ring"></div><span class="icon-inline"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.85 6.32 6.9.68-5.22 4.66 1.55 6.84L12 17.6l-6.08 3.4 1.55-6.84L2.25 9.5l6.9-.68z"/></svg></span></div>
         <div id="completeRounds" class="complete-rounds tabular">0</div>
         <div class="complete-lbl">ROUNDS</div>
+        <div id="completeXpEarned" class="complete-xp-earned"></div>
         <div id="prBadge" class="pr-badge no">PR —</div>
       </div>
       <div class="metric-grid">
@@ -4858,6 +5000,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="celebration-badge" id="celebrationBadge"></div>
     <div class="celebration-title" id="celebrationTitle"></div>
     <div class="celebration-subtitle" id="celebrationSubtitle"></div>
+    <div class="celebration-rankup" id="celebrationRankup"></div>
   </div>
 </div>
 

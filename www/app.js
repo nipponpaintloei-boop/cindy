@@ -1976,6 +1976,7 @@ function _renderCelebration(opts) {
   const badge = document.getElementById('celebrationBadge');
   const titleEl = document.getElementById('celebrationTitle');
   const subtitleEl = document.getElementById('celebrationSubtitle');
+  const rankupEl = document.getElementById('celebrationRankup');
   if (!overlay || !badge || !titleEl || !subtitleEl) { // markup missing — don't jam the queue
     _celebrationActive = false;
     return;
@@ -1983,9 +1984,14 @@ function _renderCelebration(opts) {
   const color = opts.accent || '#FFB020';
   overlay.style.setProperty('--cel-color', color);
   overlay.style.setProperty('--cel-rgb', hexToRgbTriplet(color));
+  overlay.classList.toggle('variant-levelup', opts.variant === 'levelup');
   badge.innerHTML = opts.icon ? iconHtml(opts.icon) : '';
   titleEl.textContent = opts.title || '';
   subtitleEl.textContent = opts.subtitle || '';
+  if (rankupEl) {
+    if (opts.rankup) { rankupEl.textContent = opts.rankup; rankupEl.classList.add('show'); }
+    else { rankupEl.textContent = ''; rankupEl.classList.remove('show'); }
+  }
 
   // particle burst — regenerated fresh each call (evenly spaced angles with
   // a little jitter) so repeats don't all look identical
@@ -3239,6 +3245,7 @@ function renderXpBar() {
 
   const lastSeen = loadLastSeenLevel();
   if (info.level > lastSeen) {
+    const prevRank = rankForLevel(lastSeen);
     saveLastSeenLevel(info.level);
     if (avatar) {
       avatar.classList.remove('level-up-glow');
@@ -3256,7 +3263,9 @@ function renderXpBar() {
       icon: rank.icon,
       title: 'LEVEL UP!',
       subtitle: 'ตอนนี้ LV.' + info.level + ' · ' + rank.title,
-      accent: RANK_ACCENT_HEX[rank.title.toLowerCase()]
+      accent: RANK_ACCENT_HEX[rank.title.toLowerCase()],
+      variant: 'levelup',
+      rankup: rank.title !== prevRank.title ? 'RANK UP → ' + rank.title : null
     });
   }
   renderRankTag(info.level);
@@ -5197,17 +5206,79 @@ function completeWorkout(active, reason) {
   startBossBattleCutscene(session, false, () => {
     renderCompleteScreen(session);
     go('complete');
+    playMissionCompleteEntrance(session);
+    // Give the victory entrance a beat to land before any LEVEL UP
+    // celebration pops in on top of it — same screen, next beat, instead
+    // of waiting until the player navigates back to Home.
+    setTimeout(renderXpBar, 900);
   });
 }
 
+/* ---- tween helper for Mission Complete number count-ups ---- */
+function tweenNumber(el, to, opts) {
+  if (!el) return;
+  opts = opts || {};
+  const duration = opts.duration || 700;
+  const start = performance.now();
+  function step(now) {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(to * eased) + (opts.suffix || '');
+    if (t < 1) requestAnimationFrame(step);
+    else el.textContent = to + (opts.suffix || '');
+  }
+  requestAnimationFrame(step);
+}
+
+/* ---- "Mission Complete" victory entrance ----
+ * Plays the flash / eyebrow banner / star pop / stagger-reveal / number
+ * count-ups on screen-complete. Called once the screen is actually
+ * visible (see completeWorkout()) so the sequence is never running behind
+ * a still-active boss-battle cutscene. */
+function playMissionCompleteEntrance(session) {
+  const wrap = document.querySelector('#screen-complete .complete-wrap');
+  if (!wrap) return;
+  const flash = document.getElementById('completeFlash');
+  const eyebrow = document.getElementById('missionEyebrow');
+  const star = wrap.querySelector('.complete-star');
+  const xpEl = document.getElementById('completeXpEarned');
+  [flash, eyebrow, star, xpEl].forEach(el => { if (el) { el.classList.remove('play'); void el.offsetWidth; } });
+  wrap.classList.remove('mission-reveal');
+  void wrap.offsetWidth;
+  wrap.classList.add('mission-reveal');
+  if (flash) flash.classList.add('play');
+  if (eyebrow) eyebrow.classList.add('play');
+  if (star) star.classList.add('play');
+
+  tweenNumber(document.getElementById('completeRounds'), session.rounds, { duration: 650 });
+  tweenNumber(document.getElementById('cTotalReps'), session.total.reps, { duration: 600 });
+  tweenNumber(document.getElementById('bdPull'), session.total.pull, { duration: 550 });
+  tweenNumber(document.getElementById('bdPush'), session.total.push, { duration: 550 });
+  tweenNumber(document.getElementById('bdSquat'), session.total.squat, { duration: 550 });
+
+  if (xpEl) {
+    const totalXp = (session.completed ? session.total.reps : 0) + (session.comboBonusXp || 0);
+    if (totalXp > 0) {
+      xpEl.textContent = '+' + totalXp + ' XP';
+      xpEl.classList.add('play');
+    } else {
+      xpEl.textContent = '';
+    }
+  }
+}
+
 function renderCompleteScreen(session) {
-  document.getElementById('completeRounds').textContent = session.rounds;
-  document.getElementById('cTotalReps').textContent = session.total.reps;
+  // Rounds/reps/breakdown are set to 0 here and animated up to their real
+  // values by playMissionCompleteEntrance() (called once this screen is
+  // actually visible) — avoids a one-frame flash of the final number
+  // before the count-up tween takes over.
+  document.getElementById('completeRounds').textContent = '0';
+  document.getElementById('cTotalReps').textContent = '0';
   const avgRoundSec = session.rounds > 0 ? session.duration / session.rounds : 0;
   document.getElementById('cAvgRound').textContent = fmtTime(avgRoundSec);
-  document.getElementById('bdPull').textContent = session.total.pull;
-  document.getElementById('bdPush').textContent = session.total.push;
-  document.getElementById('bdSquat').textContent = session.total.squat;
+  document.getElementById('bdPull').textContent = '0';
+  document.getElementById('bdPush').textContent = '0';
+  document.getElementById('bdSquat').textContent = '0';
 
   const comboCard = document.getElementById('comboResultCard');
   if (comboCard) {
