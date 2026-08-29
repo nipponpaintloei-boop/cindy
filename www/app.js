@@ -6360,21 +6360,81 @@ function saveCustomWorkoutSessions(list) {
   invalidateXPCache();
 }
 
+/* ================= WORKOUT QUALITY CAP (Phase 2E — anti-cheat) =================
+ * Custom Workout reps are typed in by the player (tap +/- to set the count,
+ * then confirm — see adjustPlayerReps/confirmPlayerExerciseDone), unlike
+ * Cindy's protocol where every round's rep target is fixed by the app.
+ * That free-entry step is exactly the gap #19 in the product doc flagged:
+ * nothing stops a player from setting an absurd number and confirming
+ * instantly, and that number flows straight into XP, the 5-stat totals
+ * (loadStatTotals) and Boss damage (currentBossState) with no check at all.
+ *
+ * The signal used here is the same kind of "does the physical world back
+ * this number up" check already used for Run (pace ceiling/floor) and
+ * rest-skip (payout cap): total workout duration is real wall-clock time
+ * (Date.now() start to finish — see finishCustomPlayerWorkout), so it can't
+ * be typed in directly. If the reps-type volume logged this session would
+ * need more time than was actually spent — at a floor of
+ * CUSTOM_QUALITY_MIN_SEC_PER_REP per rep, already far faster than any real
+ * athlete sustains across a full set — the reps-type entries are scaled
+ * down proportionally so the total fits what the clock says was possible.
+ *
+ * Deliberately NOT part of this check:
+ * - type:'time' entries (Plank, Flutter Kick, ...) — their value already IS
+ *   real elapsed seconds off the in-app timer, not a typed number, so
+ *   there's nothing to fake here the way there is for reps. They're also
+ *   subtracted out of the time budget before judging the reps-type volume,
+ *   since that time wasn't available for reps.
+ * - RPE — self-reported, entered after the fact on the complete screen, and
+ *   not something the app can verify (same "trust model" as the Training
+ *   Camp tests). Gating XP/stats on it would punish honest low-RPE entries,
+ *   not catch farming.
+ * - Cindy protocol sessions — reps per round are fixed by the app, not
+ *   typed by the player, so this exploit doesn't apply to them.
+ *
+ * A capped entry keeps the player's original typed value in enteredValue
+ * alongside the counted repsOrSecDone, so the breakdown UI can show the
+ * adjustment transparently instead of silently overwriting a number the
+ * player just typed. */
+const CUSTOM_QUALITY_MIN_SEC_PER_REP = 0.35; // ~171 reps/min sustained — generous floor, not a realistic pace
+
+function applyWorkoutQualityCap(exerciseLog, totalDurationSec) {
+  const log = Array.isArray(exerciseLog) ? exerciseLog : [];
+  const repsVolume = log.filter(e => e.type !== 'time').reduce((sum, e) => sum + (e.repsOrSecDone || 0), 0);
+  if (repsVolume <= 0) return { exerciseLog: log, capped: false };
+
+  const timeVolumeSec = log.filter(e => e.type === 'time').reduce((sum, e) => sum + (e.repsOrSecDone || 0), 0);
+  const timeBudgetForReps = Math.max(0, (totalDurationSec || 0) - timeVolumeSec);
+  const maxPlausibleReps = timeBudgetForReps / CUSTOM_QUALITY_MIN_SEC_PER_REP;
+  if (repsVolume <= maxPlausibleReps) return { exerciseLog: log, capped: false };
+
+  const scale = maxPlausibleReps / repsVolume;
+  const cappedLog = log.map(e => {
+    if (e.type === 'time') return e;
+    const counted = Math.max(0, Math.round((e.repsOrSecDone || 0) * scale));
+    return Object.assign({}, e, { repsOrSecDone: counted, enteredValue: e.repsOrSecDone });
+  });
+  return { exerciseLog: cappedLog, capped: true };
+}
+
 /**
  * Records one completed run of a custom workout. The (future) Workout Player
  * calls this when the user finishes the last set.
  */
 function recordCustomWorkoutSession(session) {
   const list = loadCustomWorkoutSessions();
+  const totalDurationSec = session.totalDurationSec || 0;
+  const quality = applyWorkoutQualityCap(session.exerciseLog, totalDurationSec);
   const clean = {
     id: 'wsession_' + Date.now(),
     workoutId: session.workoutId,
     workoutName: session.workoutName || '',
     completedAt: Date.now(),
-    totalDurationSec: session.totalDurationSec || 0,
+    totalDurationSec,
     setsCompleted: session.setsCompleted || 0,
     // e.g. [{ name:'Push-up', exIndex:0, setNumber:1, repsOrSecDone:15, type:'reps' }, ...]
-    exerciseLog: Array.isArray(session.exerciseLog) ? session.exerciseLog : [],
+    exerciseLog: quality.exerciseLog,
+    qualityCapped: quality.capped, // see applyWorkoutQualityCap() above (Phase 2E)
     restSkipBonusXP: session.restSkipBonusXP > 0 ? session.restSkipBonusXP : 0,
     isPR: !!session.isPR,
     rpe: null,
@@ -6986,6 +7046,12 @@ function finishCustomPlayerWorkout() {
   beep(660, 200, 0.2);
   customPlayer = null;
   lastCompletedCustomSessionId = session.id;
+  // Phase 2E: quiet, non-accusatory heads-up — the number itself was already
+  // adjusted in recordCustomWorkoutSession(); this just tells the player why
+  // what they see doesn't match what they typed, instead of staying silent.
+  if (session.qualityCapped) {
+    showToast('เวลาที่ใช้ไม่พอกับจำนวนครั้งที่กด ระบบเลยปรับยอดให้ตรงกับเวลาจริง', 'target');
+  }
   go('bossbattle');
   startBossBattleCutscene(session, true, () => {
     renderCustomCompleteScreen(session);
@@ -7114,15 +7180,22 @@ function buildCustomExerciseBreakdownHtml(exerciseLog) {
   const totals = {};
   const order = [];
   exerciseLog.forEach(entry => {
-    if (!(entry.name in totals)) { totals[entry.name] = { value: 0, type: entry.type, weight: entry.weight || 0 }; order.push(entry.name); }
+    if (!(entry.name in totals)) { totals[entry.name] = { value: 0, entered: 0, type: entry.type, weight: entry.weight || 0 }; order.push(entry.name); }
     totals[entry.name].value += entry.repsOrSecDone;
+    // enteredValue only exists on entries the Phase 2E quality cap touched
+    // (see applyWorkoutQualityCap) — sum the pre-cap number too so the row
+    // can show what was typed vs. what actually counted.
+    totals[entry.name].entered += (entry.enteredValue != null ? entry.enteredValue : entry.repsOrSecDone);
   });
   if (!order.length) return '<div class="empty-hint">ไม่มีข้อมูลท่าออกกำลังกาย</div>';
   return order.map(name => {
     const t = totals[name];
     const unit = t.type === 'time' ? 'วินาที' : 'ครั้ง';
     const weightTag = t.weight > 0 ? ' · ' + t.weight + ' กก.' : '';
-    return `<div class="breakdown-row"><span class="breakdown-name">${escapeHtml(name)}${weightTag}</span><span class="breakdown-val">${t.value} <span style="font-size:11px;color:var(--text-faint);">${unit}</span></span></div>`;
+    const enteredTag = t.entered > t.value
+      ? ' <span style="font-size:11px;color:var(--text-faint);text-decoration:line-through;">' + t.entered + '</span>'
+      : '';
+    return `<div class="breakdown-row"><span class="breakdown-name">${escapeHtml(name)}${weightTag}</span><span class="breakdown-val">${t.value}${enteredTag} <span style="font-size:11px;color:var(--text-faint);">${unit}</span></span></div>`;
   }).join('');
 }
 
