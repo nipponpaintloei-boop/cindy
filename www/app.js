@@ -360,7 +360,15 @@ const ICONS = {
   speakerOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9l5 6M21 9l-5 6"/></svg>',
   target: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>',
   web: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 3v18M4 7l16 10M20 7L4 17M2 12h20"/><path d="M12 3a13 13 0 00-5.5 4M12 3a13 13 0 015.5 4M2 12a13 13 0 004 6M22 12a13 13 0 01-4 6"/></svg>',
-  muscle: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 13c0-2 1.3-3 3-3 .3-1.6 1.4-2.5 3-2.5 2 0 3 1.3 3 3.2V15c1.6-1 2.6-.7 3.4.3.5-2 1.7-3 3.6-3 2.3 0 4 1.8 4 4.3 0 3-2.3 5.2-5.6 5.2H8.4C4.8 21.8 2 19 2 15.3z"/></svg>'
+  muscle: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 13c0-2 1.3-3 3-3 .3-1.6 1.4-2.5 3-2.5 2 0 3 1.3 3 3.2V15c1.6-1 2.6-.7 3.4.3.5-2 1.7-3 3.6-3 2.3 0 4 1.8 4 4.3 0 3-2.3 5.2-5.6 5.2H8.4C4.8 21.8 2 19 2 15.3z"/></svg>',
+  bolt: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h6l-1 8 10-13h-6z"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M8 11l4 4 4-4"/><path d="M5 19h14"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0114-5.3"/><path d="M20 12a8 8 0 01-14 5.3"/><path d="M18 3v4.5h-4.5"/><path d="M6 21v-4.5h4.5"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4.5a1 1 0 011-1h4a1 1 0 011 1V7"/><path d="M6 7l1 13a2 2 0 002 2h6a2 2 0 002-2l1-13"/><path d="M10 11v6M14 11v6"/></svg>',
+  navHome: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5L12 4l8 7.5"/><path d="M6 10v9a1 1 0 001 1h3v-5h4v5h3a1 1 0 001-1v-9"/></svg>',
+  navProgram: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9.5" width="3" height="5" rx="1"/><rect x="19" y="9.5" width="3" height="5" rx="1"/><rect x="6" y="7.5" width="2.5" height="9" rx="1"/><rect x="15.5" y="7.5" width="2.5" height="9" rx="1"/><path d="M8.5 12h7"/></svg>',
+  navHistory: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h11a2 2 0 012 2V19a2 2 0 01-2 2H8a2 2 0 01-2-2z"/><path d="M6 3.5a2 2 0 00-2 2v13a2 2 0 002 2"/><path d="M9 8h7M9 12h7M9 16h4"/></svg>',
+  navProgress: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l6-6 4 4 8-9"/><path d="M15 6h6v6"/></svg>'
 };
 /** Wraps a named icon in an inline span sized/colored by its context (font-
  * size + color/currentColor), so it drops into text flow like the emoji it
@@ -5513,7 +5521,7 @@ function renderProgressRecords() {
         <div class="date">${fmtDate(s.completedAt)}<span class="type-tag custom">${escapeHtml((s.workoutName || 'CUSTOM').toUpperCase())}</span></div>
         <div class="reps">${s.setsCompleted} เซ็ต · ${fmtTime(s.totalDurationSec)}</div>
       </div>
-      <div class="rounds tabular" style="color:var(--warning);">🏆</div>
+      <div class="rounds tabular" style="color:var(--warning);"><span class="icon-inline">${BADGE_ICONS.trophy}</span></div>
     </div>`;
   }).join('');
 }
@@ -5589,7 +5597,7 @@ async function rescheduleNativeReminder(forceTomorrow) {
       notifications: [{
         id: REMINDER_NOTIF_ID,
         title: 'CINDY',
-        body: 'ยังไม่ได้เล่น Workout วันนี้เลย — ลุยสักรอบไหม? 🕸️',
+        body: 'ยังไม่ได้เล่น Workout วันนี้เลย — ลุยสักรอบไหม?',
         schedule: { at: fireDate },
         channelId: cfg.sound === 'silent' ? 'cindy_silent' : 'cindy_default',
         smallIcon: 'ic_stat_icon'
@@ -5607,7 +5615,7 @@ async function testReminderNow() {
       if (perm.display !== 'granted') { showToast('ยังไม่ได้อนุญาตการแจ้งเตือน'); return; }
       await plugins.LocalNotifications.schedule({
         notifications: [{
-          id: 9999, title: 'CINDY', body: 'นี่คือการแจ้งเตือนทดสอบ 🕸️',
+          id: 9999, title: 'CINDY', body: 'นี่คือการแจ้งเตือนทดสอบ',
           schedule: { at: new Date(Date.now() + 3000) },
           channelId: cfg.sound === 'silent' ? 'cindy_silent' : 'cindy_default'
         }]
