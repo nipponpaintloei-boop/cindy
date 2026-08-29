@@ -1592,6 +1592,65 @@ body{
 .toast.show{opacity:1;}
 .toast .toast-icon{font-size:15px;color:var(--squat);flex-shrink:0;}
 
+/* ================= CELEBRATION OVERLAY =================
+ * Full-screen reward moment for level-up / loot drop — bigger and more
+ * ceremonial than .toast above, which stays reserved for routine notices
+ * (phase changes, refresh confirmations, etc). Driven entirely by
+ * queueCelebration()/dismissCelebration() in app.js; the CSS here only
+ * needs --cel-color/--cel-rgb set on #celebrationOverlay per call. */
+.celebration-overlay{
+  position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,0);opacity:0;pointer-events:none;
+  transition:opacity .25s ease, background .25s ease;
+  --cel-color:#FFB020;--cel-rgb:255,176,32;
+}
+.celebration-overlay.show{background:rgba(0,0,0,.6);opacity:1;pointer-events:auto;}
+.celebration-card{
+  position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;
+  padding:34px 30px 24px;text-align:center;max-width:300px;
+  transform:scale(.72);opacity:0;
+  transition:transform .4s cubic-bezier(.2,1.7,.4,1), opacity .25s ease;
+}
+.celebration-overlay.show .celebration-card{transform:scale(1);opacity:1;}
+.celebration-burst{
+  position:absolute;top:-4px;left:50%;width:160px;height:160px;
+  transform:translateX(-50%);border-radius:50%;pointer-events:none;overflow:visible;
+  background:radial-gradient(circle, rgba(var(--cel-rgb),.55) 0%, rgba(var(--cel-rgb),.18) 45%, transparent 72%);
+  opacity:0;
+}
+.celebration-overlay.show .celebration-burst{animation:celebrationBurst 1.3s ease forwards;}
+@keyframes celebrationBurst{
+  0%{opacity:0;transform:translateX(-50%) scale(.35);}
+  30%{opacity:1;transform:translateX(-50%) scale(1);}
+  100%{opacity:0;transform:translateX(-50%) scale(1.85);}
+}
+.celebration-particle{
+  position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px;border-radius:50%;
+  background:var(--cel-color);opacity:0;pointer-events:none;
+  --px:0px;--py:0px;
+}
+.celebration-overlay.show .celebration-particle{animation:celebrationParticle .9s ease-out forwards;}
+@keyframes celebrationParticle{
+  0%{opacity:1;transform:translate(0,0) scale(1);}
+  100%{opacity:0;transform:translate(var(--px),var(--py)) scale(.25);}
+}
+.celebration-badge{
+  position:relative;z-index:1;width:74px;height:74px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:34px;
+  background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.18), rgba(0,0,0,.3)), var(--card);
+  border:2px solid var(--cel-color);color:var(--cel-color);
+  box-shadow:0 0 24px 3px rgba(var(--cel-rgb),.55);
+}
+.celebration-badge .icon-inline{width:1em;height:1em;}
+.celebration-title{
+  position:relative;z-index:1;margin-top:6px;
+  font-family:var(--font-display);font-size:27px;letter-spacing:.5px;color:var(--text);
+  text-shadow:0 2px 10px rgba(0,0,0,.7);
+}
+.celebration-subtitle{
+  position:relative;z-index:1;font-size:13px;font-weight:600;color:var(--text-dim);
+}
+
 /* ---- complete screen ---- */
 .complete-wrap{flex:1;min-height:0;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .complete-hero{position:relative;text-align:center;padding:22px 0 8px;}
@@ -4313,6 +4372,20 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 </div>
 
 <div id="toast" class="toast"></div>
+
+<!-- ---- celebration overlay: full-screen reward moment (level-up / loot
+     drop), separate from the small corner .toast above. Never rendered
+     directly by feature code — always via queueCelebration() in app.js,
+     which queues so simultaneous rewards (e.g. a boss kill that also
+     triggers a level-up) play one after another instead of stacking. ---- -->
+<div id="celebrationOverlay" class="celebration-overlay" onclick="dismissCelebration()">
+  <div class="celebration-card">
+    <div class="celebration-burst"></div>
+    <div class="celebration-badge" id="celebrationBadge"></div>
+    <div class="celebration-title" id="celebrationTitle"></div>
+    <div class="celebration-subtitle" id="celebrationSubtitle"></div>
+  </div>
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>

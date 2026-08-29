@@ -1663,10 +1663,25 @@ function renderBossCard() {
     const loot = rollLootDrop(state);
     const lootCount = addLootItem(loot.id);
     const lootRarity = rarityDef(loot.rarity);
-    let msg = 'ปราบ ' + state.boss.name + ' สำเร็จ!';
-    if (firstTimeEver) msg += ' ปลดล็อคสกิน Mascot ใหม่ ·';
-    msg += ' ได้ [' + lootRarity.label + '] ' + loot.name + (lootCount > 1 ? ' x' + lootCount : '');
-    showToast(msg, firstTimeEver ? 'palette' : 'gift');
+    // Boss-kill celebration + (if new) skin-unlock celebration both queue
+    // here via queueCelebration() — same queue a level-up push from
+    // renderXpBar lands in, so if this kill also crosses a level threshold
+    // the player sees all of it, one moment at a time, instead of only
+    // whichever fired last.
+    queueCelebration({
+      icon: 'gift',
+      title: '[' + lootRarity.label + '] ' + loot.name + (lootCount > 1 ? ' x' + lootCount : ''),
+      subtitle: 'ปราบ ' + state.boss.name + ' สำเร็จ!',
+      accent: lootRarity.c2
+    });
+    if (firstTimeEver) {
+      queueCelebration({
+        icon: 'palette',
+        title: 'ปลดล็อคสกินใหม่!',
+        subtitle: state.boss.name,
+        accent: state.boss.accent
+      });
+    }
   }
   renderBossAttackLog();
 }
@@ -1843,6 +1858,90 @@ function showToast(msg, icon) {
   t.classList.add('show');
   clearTimeout(showToast._h);
   showToast._h = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+/* ================= CELEBRATION OVERLAY (full-screen reward moment) =================
+ * A bigger, more ceremonial notification than showToast() above — reserved
+ * for "you earned something" moments: level-ups and loot drops. showToast
+ * stays as-is for routine notices (phase changes, connection status, etc).
+ *
+ * Callers never touch the DOM directly — they call queueCelebration({icon,
+ * title, subtitle, accent}), which pushes onto _celebrationQueue and plays
+ * them one at a time. This matters because some reward moments fire
+ * multiple celebrations in the same tick (e.g. a boss kill awards loot AND
+ * can push the player over a level-up threshold in the same renderBossCard
+ * → renderXpBar pass) — without a queue the second call would just cut off
+ * or overwrite the first mid-animation.
+ *
+ * icon: an ICONS key (see iconHtml()). title/subtitle: plain text, already
+ * translated/formatted by the caller. accent: a hex color driving the
+ * badge ring + glow + particle color (rarity color for loot, rank color
+ * for level-ups) — falls back to the CSS default (warning amber) if
+ * omitted. */
+const CELEBRATION_DURATION_MS = 2200;
+const CELEBRATION_GAP_MS = 220;
+const _celebrationQueue = [];
+let _celebrationActive = false;
+let _celebrationTimer = null;
+
+function queueCelebration(opts) {
+  _celebrationQueue.push(opts || {});
+  _runCelebrationQueue();
+}
+function _runCelebrationQueue() {
+  if (_celebrationActive || _celebrationQueue.length === 0) return;
+  _celebrationActive = true;
+  _renderCelebration(_celebrationQueue.shift());
+}
+function _renderCelebration(opts) {
+  const overlay = document.getElementById('celebrationOverlay');
+  const badge = document.getElementById('celebrationBadge');
+  const titleEl = document.getElementById('celebrationTitle');
+  const subtitleEl = document.getElementById('celebrationSubtitle');
+  if (!overlay || !badge || !titleEl || !subtitleEl) { // markup missing — don't jam the queue
+    _celebrationActive = false;
+    return;
+  }
+  const color = opts.accent || '#FFB020';
+  overlay.style.setProperty('--cel-color', color);
+  overlay.style.setProperty('--cel-rgb', hexToRgbTriplet(color));
+  badge.innerHTML = opts.icon ? iconHtml(opts.icon) : '';
+  titleEl.textContent = opts.title || '';
+  subtitleEl.textContent = opts.subtitle || '';
+
+  // particle burst — regenerated fresh each call (evenly spaced angles with
+  // a little jitter) so repeats don't all look identical
+  const burst = overlay.querySelector('.celebration-burst');
+  burst.querySelectorAll('.celebration-particle').forEach(p => p.remove());
+  const count = 10;
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + (Math.random() * 0.4 - 0.2);
+    const dist = 55 + Math.random() * 35;
+    const p = document.createElement('div');
+    p.className = 'celebration-particle';
+    p.style.setProperty('--px', Math.round(Math.cos(angle) * dist) + 'px');
+    p.style.setProperty('--py', Math.round(Math.sin(angle) * dist) + 'px');
+    p.style.animationDelay = (Math.random() * 0.12).toFixed(2) + 's';
+    burst.appendChild(p);
+  }
+
+  overlay.classList.add('show');
+  vibrate([50, 30, 50]);
+  clearTimeout(_celebrationTimer);
+  _celebrationTimer = setTimeout(dismissCelebration, CELEBRATION_DURATION_MS);
+}
+/** Ends the current celebration early (tap-to-dismiss) or via its own
+ * timeout, then — after a short gap so the fade-out isn't cut off by the
+ * next one popping in instantly — advances the queue. */
+function dismissCelebration() {
+  const overlay = document.getElementById('celebrationOverlay');
+  if (!overlay || !overlay.classList.contains('show')) return;
+  clearTimeout(_celebrationTimer);
+  overlay.classList.remove('show');
+  setTimeout(() => {
+    _celebrationActive = false;
+    _runCelebrationQueue();
+  }, CELEBRATION_GAP_MS);
 }
 
 /* ---------- navigation ---------- */
@@ -2235,10 +2334,19 @@ function addRestSkipBonusXP(amount) {
  *
  * STEPS_PER_EXP is the one number to tune for game balance later —
  * nothing else here needs to change to adjust the rate.
+ *
+ * STEPS_DAILY_XP_CAP caps how much of this bonus can be earned per day —
+ * tracked as converted.xpAwarded alongside converted.steps in the same
+ * KEY_STEPS_CONVERTED record (both reset together at dayKey() rollover).
+ * Once the cap is hit for the day, further steps still count toward
+ * stepsTodayCount for display but stop converting into XP — set close to
+ * REST_SKIP_BONUS_MAX_SEC*REST_SKIP_BONUS_RATE (90*.5=45) so no single
+ * bonus source dominates total XP for the day.
  */
 const KEY_STEPS_BONUS_XP = 'cindy_steps_bonus_xp';
-const KEY_STEPS_CONVERTED = 'cindy_steps_converted_v1'; // { date, steps } — steps already turned into XP today
-const STEPS_PER_EXP = 100; // TODO: tune for game balance
+const KEY_STEPS_CONVERTED = 'cindy_steps_converted_v1'; // { date, steps, xpAwarded } — steps already turned into XP today + running XP total for the day
+const STEPS_PER_EXP = 400;
+const STEPS_DAILY_XP_CAP = 45;
 let stepsHealthAuthorized = false;
 let stepsTodayCount = 0;
 
@@ -2255,9 +2363,12 @@ function loadStepsConvertedToday() {
   try { state = JSON.parse(localStorage.getItem(KEY_STEPS_CONVERTED)); } catch (e) { state = null; }
   const todayKey = dayKey(Date.now());
   if (!state || state.date !== todayKey) {
-    state = { date: todayKey, steps: 0 };
+    state = { date: todayKey, steps: 0, xpAwarded: 0 };
     localStorage.setItem(KEY_STEPS_CONVERTED, JSON.stringify(state));
   }
+  // backward-compat: records saved before the daily cap existed won't have
+  // xpAwarded — treat as 0 rather than dropping/resetting the whole record
+  if (!Number.isFinite(state.xpAwarded)) state.xpAwarded = 0;
   return state;
 }
 function saveStepsConvertedToday(state) {
@@ -2319,13 +2430,25 @@ async function refreshStepsToday() {
     stepsTodayCount = Math.max(0, Math.round(total));
     const converted = loadStepsConvertedToday();
     const newSteps = Math.max(0, stepsTodayCount - converted.steps);
-    const xpToAward = Math.floor(newSteps / STEPS_PER_EXP);
+    const rawXpToAward = Math.floor(newSteps / STEPS_PER_EXP);
+    const remainingCap = Math.max(0, STEPS_DAILY_XP_CAP - converted.xpAwarded);
+    const xpToAward = Math.min(rawXpToAward, remainingCap);
     if (xpToAward > 0) {
       converted.steps += xpToAward * STEPS_PER_EXP;
+      converted.xpAwarded += xpToAward;
       saveStepsConvertedToday(converted);
       addStepsBonusXP(xpToAward);
       renderXpBar();
       showToast('ก้าวเดินวันนี้ +' + xpToAward + ' XP', 'target');
+    } else if (rawXpToAward > 0 && remainingCap === 0 && !converted.capNotified) {
+      // steps are there but today's steps-XP cap is already maxed out —
+      // don't advance converted.steps for them (next refresh re-checks in
+      // case the cap logic changes). Only tell the player once per day
+      // (capNotified) so tapping refresh repeatedly doesn't keep re-showing
+      // the same toast.
+      converted.capNotified = true;
+      saveStepsConvertedToday(converted);
+      showToast('ก้าวเดินวันนี้ครบโควต้า XP แล้ว', 'target');
     }
   } catch (e) {
     // read failed (Health Connect momentarily unavailable, etc.) — keep
@@ -2347,9 +2470,13 @@ function renderStepsCard() {
   }
   const converted = loadStepsConvertedToday();
   const pending = Math.max(0, stepsTodayCount - converted.steps);
+  const capped = converted.xpAwarded >= STEPS_DAILY_XP_CAP;
+  const descText = capped
+    ? 'ครบโควต้า ' + STEPS_DAILY_XP_CAP + ' XP/วันแล้ว'
+    : 'อีก ' + pending + ' ก้าว ได้ +1 XP · วันนี้ได้ ' + converted.xpAwarded + '/' + STEPS_DAILY_XP_CAP + ' XP';
   body.innerHTML = '<div class="quest-row">'
     + '<div class="quest-info"><div class="quest-title">' + stepsTodayCount.toLocaleString('th-TH') + ' ก้าว</div>'
-    + '<div class="quest-desc">อีก ' + pending + ' ก้าว ได้ +1 XP</div></div>'
+    + '<div class="quest-desc">' + descText + '</div></div>'
     + '<button class="quest-claim-btn" onclick="refreshStepsToday()">รีเฟรช</button>'
     + '</div>';
 }
@@ -2965,7 +3092,13 @@ function renderXpBar() {
     badge.classList.add('bump');
     badge.addEventListener('animationend', () => badge.classList.remove('bump'), { once: true });
     vibrate([60, 40, 60]);
-    showToast('เลเวลอัพ! ตอนนี้ LV.' + info.level);
+    const rank = rankForLevel(info.level);
+    queueCelebration({
+      icon: rank.icon,
+      title: 'LEVEL UP!',
+      subtitle: 'ตอนนี้ LV.' + info.level + ' · ' + rank.title,
+      accent: RANK_ACCENT_HEX[rank.title.toLowerCase()]
+    });
   }
   renderRankTag(info.level);
   applyMascotBackdrop(info.level);
