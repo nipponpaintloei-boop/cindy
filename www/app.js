@@ -1662,6 +1662,7 @@ function renderHome() {
   renderHomeLastWorkout();
   renderTreasureChest();
   renderDailyQuests();
+  renderWeeklyMissions();
   renderStepsCard();
   checkAndUnlockAchievements();
 }
@@ -2109,6 +2110,166 @@ function claimDailyQuest(id) {
   showToast('รับเควสสำเร็จ +' + q.xp + ' XP', 'target');
 }
 
+/* ================= WEEKLY MISSION BOARD (Phase 3) =================
+ * Bigger-picture sibling of the Daily Quest board above — same claim/XP
+ * pattern (own bonus-XP counter folded into computeTotalXP, own claimed-
+ * ids list that resets automatically on rollover) but keyed to the week
+ * instead of the day, and with a numeric target/progress bar instead of a
+ * plain done/not-done check, since "300 reps this week" needs to show how
+ * close you are, not just yes/no.
+ *
+ * Reuses weekStart()/absoluteWeekIndex() from the Boss system (see
+ * currentBossState()) for the week boundary, so "this week" always means
+ * the same Monday-start window the Boss fight and Boss Damage already use
+ * — no second definition of "week" to keep in sync.
+ *
+ * Unlike the Daily Quest board, all 5 missions show every week (fixed set,
+ * not picked from a pool) — matching the product doc's example list
+ * exactly (#16). A pool/rotation can be added later the same way
+ * QUEST_POOL→todaysQuestIds() does it for Daily Quest, if the team wants
+ * variety; kept fixed for now to ship the core loop first.
+ *
+ * WEEKLY CHEST unlocks once all 5 are claimed for the week — separate
+ * claim state (KEY_WEEKLY_CHEST_CLAIMED) so it can't be claimed twice, and
+ * ratchets forward by week key the same way KEY_STREAK_CHESTS_OPENED
+ * ratchets by streak milestone. Reward is flat bonus XP for now, same
+ * mechanism as everything else here — a future team wiring this into the
+ * Boss loot table (rollLootDrop) just needs to call addLootItem() instead
+ * of/alongside addWeeklyBonusXP() in claimWeeklyChest() below. */
+const KEY_WEEKLY_MISSION_CLAIMED = 'cindy_weekly_mission_claimed_v1';
+const KEY_WEEKLY_CHEST_CLAIMED = 'cindy_weekly_chest_claimed_v1';
+const KEY_WEEKLY_BONUS_XP = 'cindy_weekly_bonus_xp';
+const WEEKLY_CHEST_XP = 100;
+const WEEKLY_MISSION_DEFS = [
+  { id: 'workouts3', title: 'ออกกำลังกาย 3 ครั้ง', xp: 30, target: 3, unit: 'ครั้ง',
+    progress: (ctx) => ctx.sessionsCount },
+  { id: 'reps300', title: 'สะสมเรพรวม 300', xp: 30, target: 300, unit: 'ครั้ง',
+    progress: (ctx) => ctx.totalReps },
+  { id: 'cardio1', title: 'ทำ Cardio 1 ครั้ง', xp: 20, target: 1, unit: 'ครั้ง',
+    progress: (ctx) => ctx.cardioCount },
+  { id: 'cindy1', title: 'ทำ Cindy Protocol 1 ครั้ง', xp: 20, target: 1, unit: 'ครั้ง',
+    progress: (ctx) => ctx.cindyCount },
+  { id: 'active5', title: 'Active ให้ครบ 5 วัน', xp: 30, target: 5, unit: 'วัน',
+    progress: (ctx) => ctx.activeDays }
+];
+/** Stable id for "the week containing ts" — same absoluteWeekIndex() the
+ * Boss roster already uses, just prefixed so it can't collide with any
+ * other kind of key sharing localStorage. */
+function weekKey(ts) {
+  return 'w' + absoluteWeekIndex(ts);
+}
+function thisWeekMissionContext() {
+  const start = weekStart(Date.now()).getTime();
+  const cindyThisWeek = loadSessions().filter(s => s.finished >= start && s.completed !== false);
+  const customThisWeek = loadCustomWorkoutSessions().filter(s => s.completedAt >= start);
+  const runThisWeek = loadRunSessions().filter(s => s.completedAt >= start);
+
+  const cindyReps = cindyThisWeek.reduce((sum, s) => sum + (s.total ? s.total.reps : 0), 0);
+  const customReps = customThisWeek.reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
+
+  const activeDayKeys = new Set();
+  cindyThisWeek.forEach(s => activeDayKeys.add(dayKey(s.finished)));
+  customThisWeek.forEach(s => activeDayKeys.add(dayKey(s.completedAt)));
+  runThisWeek.forEach(s => activeDayKeys.add(dayKey(s.completedAt)));
+
+  return {
+    sessionsCount: cindyThisWeek.length + customThisWeek.length + runThisWeek.length,
+    totalReps: cindyReps + customReps,
+    cardioCount: runThisWeek.length,
+    cindyCount: cindyThisWeek.length,
+    activeDays: activeDayKeys.size
+  };
+}
+function loadWeeklyMissionClaimState() {
+  let state;
+  try { state = JSON.parse(localStorage.getItem(KEY_WEEKLY_MISSION_CLAIMED)); } catch (e) { state = null; }
+  const wk = weekKey(Date.now());
+  if (!state || state.week !== wk) {
+    state = { week: wk, ids: [] };
+    localStorage.setItem(KEY_WEEKLY_MISSION_CLAIMED, JSON.stringify(state));
+  }
+  return state;
+}
+function saveWeeklyMissionClaimState(state) {
+  localStorage.setItem(KEY_WEEKLY_MISSION_CLAIMED, JSON.stringify(state));
+}
+function loadWeeklyChestClaimedWeeks() {
+  try { return JSON.parse(localStorage.getItem(KEY_WEEKLY_CHEST_CLAIMED)) || []; }
+  catch (e) { return []; }
+}
+function saveWeeklyChestClaimedWeeks(list) {
+  localStorage.setItem(KEY_WEEKLY_CHEST_CLAIMED, JSON.stringify(list));
+}
+function loadWeeklyBonusXP() {
+  const n = parseInt(localStorage.getItem(KEY_WEEKLY_BONUS_XP), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+function addWeeklyBonusXP(amount) {
+  if (amount <= 0) return;
+  localStorage.setItem(KEY_WEEKLY_BONUS_XP, String(loadWeeklyBonusXP() + amount));
+}
+function renderWeeklyMissions() {
+  const wrap = document.getElementById('weeklyMissionList');
+  if (!wrap) return;
+  const ctx = thisWeekMissionContext();
+  const claimState = loadWeeklyMissionClaimState();
+
+  const rowsHtml = WEEKLY_MISSION_DEFS.map(m => {
+    const claimed = claimState.ids.indexOf(m.id) !== -1;
+    const current = Math.min(m.target, m.progress(ctx));
+    const done = current >= m.target;
+    let statusHtml;
+    if (claimed) statusHtml = '<div class="quest-claimed">' + iconHtml('check') + ' รับแล้ว</div>';
+    else if (done) statusHtml = '<button class="quest-claim-btn" onclick="claimWeeklyMission(\'' + m.id + '\')">รับ +' + m.xp + ' XP</button>';
+    else statusHtml = '<div class="quest-xp-tag">' + current + '/' + m.target + ' ' + m.unit + '</div>';
+    return '<div class="quest-row' + (claimed ? ' done' : '') + '">'
+      + '<div class="quest-info"><div class="quest-title">' + escapeHtml(m.title) + '</div></div>'
+      + statusHtml
+      + '</div>';
+  }).join('');
+
+  const allClaimed = WEEKLY_MISSION_DEFS.every(m => claimState.ids.indexOf(m.id) !== -1);
+  let chestHtml = '';
+  if (allClaimed) {
+    const chestClaimed = loadWeeklyChestClaimedWeeks().indexOf(weekKey(Date.now())) !== -1;
+    chestHtml = '<div class="quest-row done" style="margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;">'
+      + '<div class="quest-info"><div class="quest-title">' + iconHtml('gift') + ' WEEKLY CHEST</div><div class="quest-desc">ทำภารกิจประจำสัปดาห์ครบทุกข้อ</div></div>'
+      + (chestClaimed
+          ? '<div class="quest-claimed">' + iconHtml('check') + ' รับแล้ว</div>'
+          : '<button class="quest-claim-btn" onclick="claimWeeklyChest()">รับ +' + WEEKLY_CHEST_XP + ' XP</button>')
+      + '</div>';
+  }
+
+  wrap.innerHTML = rowsHtml + chestHtml;
+}
+function claimWeeklyMission(id) {
+  const state = loadWeeklyMissionClaimState();
+  if (state.ids.indexOf(id) !== -1) return;
+  const m = WEEKLY_MISSION_DEFS.find(x => x.id === id);
+  if (!m || m.progress(thisWeekMissionContext()) < m.target) return;
+  state.ids.push(id);
+  saveWeeklyMissionClaimState(state);
+  addWeeklyBonusXP(m.xp);
+  renderWeeklyMissions();
+  renderXpBar();
+  vibrate([40, 30, 60]);
+  showToast('รับภารกิจประจำสัปดาห์สำเร็จ +' + m.xp + ' XP', 'target');
+}
+function claimWeeklyChest() {
+  const state = loadWeeklyMissionClaimState();
+  if (!WEEKLY_MISSION_DEFS.every(m => state.ids.indexOf(m.id) !== -1)) return;
+  const wk = weekKey(Date.now());
+  const claimedWeeks = loadWeeklyChestClaimedWeeks();
+  if (claimedWeeks.indexOf(wk) !== -1) return;
+  claimedWeeks.push(wk);
+  saveWeeklyChestClaimedWeeks(claimedWeeks);
+  addWeeklyBonusXP(WEEKLY_CHEST_XP);
+  renderWeeklyMissions();
+  renderXpBar();
+  vibrate([60, 40, 60, 40, 120]);
+  showToast('เปิด WEEKLY CHEST สำเร็จ +' + WEEKLY_CHEST_XP + ' XP', 'gift');
+}
+
 /* ================= MASCOT DIALOGUE =================
  * Pools of lines per mascot "mood" state, all derived from data that's
  * already tracked (streak, played-today, isPR) — nothing new stored. One
@@ -2232,7 +2393,7 @@ function computeSessionXP() {
 }
 function computeTotalXP() {
   const { cindyXP, customXP, runXP } = computeSessionXP();
-  return cindyXP + customXP + runXP + loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP() + loadStepsBonusXP();
+  return cindyXP + customXP + runXP + loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP() + loadStepsBonusXP() + loadWeeklyBonusXP();
 }
 function xpRequiredForLevel(level) {
   return 100 + (level - 1) * 50;
