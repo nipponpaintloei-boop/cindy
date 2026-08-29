@@ -1433,6 +1433,7 @@ function renderBossViewList() {
     const mod = currentBossModifier();
     modifierEl.innerHTML = 'สัปดาห์นี้: <strong>"' + mod.name + '"</strong> — ' + mod.desc;
   }
+  renderBossDmgBreakdown('bossViewDmgBreakdown');
   list.innerHTML = BOSS_ROSTER.map((boss, i) => {
     const current = boss.id === state.boss.id;
     const next = i === (idx + 1) % BOSS_ROSTER.length;
@@ -1666,7 +1667,66 @@ function renderBossCard() {
     msg += ' ได้ [' + lootRarity.label + '] ' + loot.name + (lootCount > 1 ? ' x' + lootCount : '');
     showToast(msg, firstTimeEver ? 'palette' : 'gift');
   }
-  renderBossDmgBreakdown();
+  renderBossAttackLog();
+}
+
+/* ---- boss attack log (Home boss card) — replaces the always-visible
+ * PULL/PUSH/SQUAT/CUSTOM breakdown that used to sit in this spot. That
+ * view read as a static weekly stat table and looked broken whenever a
+ * player trained in only one category (three 0-width bars taking up
+ * space for no reason). This instead lists each session that hit the
+ * boss this week as its own entry — same underlying data (Cindy +
+ * Custom sessions since weekStart(), same as currentBossState() /
+ * currentBossDamageBreakdown() use, so the log's numbers always match
+ * the HP bar exactly), just presented as "things that happened" instead
+ * of a totals table. The category totals table still exists — it moved
+ * into the VIEW archive modal (renderBossDmgBreakdown below) since it's
+ * reference detail worth keeping, just not something that needs to
+ * occupy the main card on every visit. */
+const BOSS_ATTACK_LOG_LIMIT = 8;
+function currentWeekBossAttackLog() {
+  const startTs = weekStart(Date.now()).getTime();
+  const cardioIds = new Set(CARDIO_PRESETS.map(p => p.id));
+  const cindyItems = loadSessions()
+    .filter(s => s.finished >= startTs)
+    .map(s => ({ ts: s.finished, tag: 'CINDY', dmg: s.total ? s.total.reps : 0 }));
+  const customItems = loadCustomWorkoutSessions()
+    .filter(s => s.completedAt >= startTs)
+    .map(s => ({
+      ts: s.completedAt,
+      tag: (s.workoutName || (cardioIds.has(s.workoutId) ? 'CARDIO' : 'CUSTOM')).toUpperCase(),
+      dmg: totalVolumeOfCustomSession(s)
+    }));
+  return cindyItems.concat(customItems)
+    .filter(item => item.dmg > 0)
+    .sort((a, b) => b.ts - a.ts);
+}
+function fmtClockTime(ts) {
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function renderBossAttackLog(containerId) {
+  const wrap = document.getElementById(containerId || 'bossAttackLog');
+  if (!wrap) return;
+  const entries = currentWeekBossAttackLog();
+  if (entries.length === 0) {
+    wrap.innerHTML = '<div class="boss-attack-log-empty">ยังไม่มีการโจมตีในสัปดาห์นี้ — เริ่มออกกำลังกายเพื่อตีบอส</div>';
+    return;
+  }
+  const shown = entries.slice(0, BOSS_ATTACK_LOG_LIMIT);
+  const rowsHtml = shown.map(item =>
+    '<div class="boss-attack-log-item">'
+    + '<div class="boss-attack-log-meta">'
+    + '<div class="boss-attack-log-tag">' + escapeHtml(item.tag) + '</div>'
+    + '<div class="boss-attack-log-time">' + fmtClockTime(item.ts) + '</div>'
+    + '</div>'
+    + '<div class="boss-attack-log-dmg">-' + item.dmg + '</div>'
+    + '</div>'
+  ).join('');
+  const moreHtml = entries.length > shown.length
+    ? '<div class="boss-attack-log-more">+' + (entries.length - shown.length) + ' ครั้งก่อนหน้านี้</div>'
+    : '';
+  wrap.innerHTML = rowsHtml + moreHtml;
 }
 
 /* ---- elemental damage breakdown ----
@@ -1696,8 +1756,11 @@ function currentBossDamageBreakdown() {
 
   return { pull, push, squat, custom, cardio };
 }
-function renderBossDmgBreakdown() {
-  const wrap = document.getElementById('bossDmgBreakdown');
+/* ---- category totals table (was on Home, moved into the VIEW archive
+ * modal — see boss attack log comment above for why) — rendered by
+ * renderBossViewList()/openBossView() now, not on every Home render. */
+function renderBossDmgBreakdown(containerId) {
+  const wrap = document.getElementById(containerId || 'bossViewDmgBreakdown');
   if (!wrap) return;
   const dmg = currentBossDamageBreakdown();
   const rows = [

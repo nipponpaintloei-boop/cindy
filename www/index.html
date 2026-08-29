@@ -1176,6 +1176,28 @@ body{
 .boss-dmg-fill{height:100%;border-radius:4px;transition:width .5s ease;}
 .boss-dmg-val{flex-shrink:0;font-size:10.5px;font-weight:700;color:var(--text-faint);min-width:34px;text-align:right;}
 
+/* ---- boss attack log (Home boss card) — replaces the old PULL/PUSH/
+   SQUAT/CUSTOM breakdown in this spot: that view stayed empty-looking
+   whenever a player trained in only one category (3 dead 0-width bars),
+   and read as a static weekly stat table rather than something that
+   happened. This instead lists each session that hit the boss this
+   week as a discrete entry, most recent first — the full category
+   breakdown still exists, just moved into the VIEW archive modal
+   (#bossViewDmgBreakdown) since it's reference detail, not something
+   that needs to occupy the main card every time. */
+.boss-attack-log{background:rgba(0,0,0,.28);border:1px solid var(--card-border);border-radius:var(--radius-sm);overflow:hidden;}
+.boss-attack-log-item{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.06);
+}
+.boss-attack-log-item:last-child{border-bottom:none;}
+.boss-attack-log-meta{display:flex;flex-direction:column;gap:2px;}
+.boss-attack-log-tag{font-size:9.5px;font-weight:800;letter-spacing:.4px;color:var(--text-faint);}
+.boss-attack-log-time{font-size:10px;color:var(--text-faint);}
+.boss-attack-log-dmg{flex-shrink:0;font-family:var(--font-display);font-size:15px;color:var(--danger);}
+.boss-attack-log-more{padding:8px 12px;font-size:10.5px;color:var(--text-faint);text-align:center;}
+.boss-attack-log-empty{padding:14px 12px;font-size:11px;color:var(--text-faint);text-align:center;}
+
 /* hit flash — small shake + quick red pulse */
 .boss-stage.boss-hit .boss-art{animation:bossHitShake .4s ease;}
 @keyframes bossHitShake{
@@ -2660,7 +2682,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         <div class="boss-hp-track"><div id="bossHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
         <div id="bossHpLabel" class="boss-hp-label">0 / 0 HP</div>
         <div id="bossPhaseLabel" class="boss-phase-label"></div>
-        <div id="bossDmgBreakdown" class="boss-dmg-breakdown"></div>
+        <div id="bossAttackLog" class="boss-attack-log"></div>
       </div>
 
       <div id="bossViewModal" class="boss-view-modal" aria-hidden="true">
@@ -2674,6 +2696,8 @@ textarea.note-input::placeholder{color:var(--text-faint);}
             <button class="boss-view-close" type="button" data-boss-close>×</button>
           </div>
           <div id="bossViewModifier" class="boss-view-modifier"></div>
+          <div class="section-label" style="margin-top:2px;">DAMAGE SOURCE</div>
+          <div id="bossViewDmgBreakdown" class="boss-dmg-breakdown" style="margin-bottom:14px;"></div>
           <div id="bossViewList" class="boss-view-list"></div>
         </div>
       </div>
