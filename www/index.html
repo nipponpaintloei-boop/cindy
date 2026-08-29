@@ -1017,26 +1017,30 @@ body{
   overflow:hidden;
 }
 /* Per-boss backdrop photo. renderBossCard() sets --boss-backdrop-img (a url())
-   and toggles this class per BOSS_ROSTER[].bg — same convention as the
-   mascot-card/character-hero backdrops (see applyBackdropToEl). Unlike the
-   mascot-card, this box is tall+narrow (header, then the 158x158 boss-stage,
-   then the HP bar + damage breakdown all stacked), and it's full of text top
-   AND bottom rather than text on one side only — so the overlay here is a
-   vertical dark-light-dark gradient (darkest behind the header and the HP/
-   damage rows, lightest in the middle behind the boss-stage) instead of the
-   mascot-card's side-anchored fade. */
-.boss-card.has-backdrop{
+   and toggles .has-backdrop on .boss-card — same convention as the
+   mascot-card/character-hero backdrops (see applyBackdropToEl). The class +
+   var stay on the outer .boss-card (untouched in app.js); the actual photo
+   is painted on .boss-portrait-zone, a wrapper around just the header +
+   boss-stage that bleeds to the card's own edges via negative margin (the
+   parent's overflow:hidden + border-radius clip it back to a rounded top).
+   Confining the photo to this zone — instead of the whole card, like
+   before — means the HP bar/phase box/log below always sit on the card's
+   normal solid dark background, however long the log grows, instead of a
+   background-photo that had to guess where "the bottom" was on a
+   variable-height card. Read var(--boss-backdrop-img) inherits down from
+   .boss-card automatically, so no JS changes were needed for this. */
+.boss-portrait-zone{position:relative;margin:-16px -16px 0;padding:16px 16px 0;}
+.boss-card.has-backdrop .boss-portrait-zone{
   background-image:
-    linear-gradient(180deg, rgba(6,7,10,.82) 0%, rgba(6,7,10,.42) 30%, rgba(6,7,10,.46) 62%, rgba(6,7,10,.9) 100%),
-    var(--boss-backdrop-img, none),
-    linear-gradient(155deg,var(--card) 0%,#0d0e14 100%);
-  background-size:auto, cover, cover;
+    linear-gradient(180deg, rgba(6,7,10,.85) 0%, rgba(6,7,10,.35) 28%, rgba(6,7,10,.3) 55%, rgba(6,7,10,.92) 85%, #08090c 100%),
+    var(--boss-backdrop-img, none);
+  background-size:auto, cover;
   /* "38%" keeps the artwork's own focal point (sunset core, reactor glow,
      etc — see boss-background-briefs.md) roughly behind the boss-stage
      silhouette rather than under the header text. Tweak per-image if a
      given backdrop's hot spot sits higher/lower. */
-  background-position:center, center 38%, center bottom;
-  background-repeat:no-repeat, no-repeat, no-repeat;
+  background-position:center, center 38%;
+  background-repeat:no-repeat, no-repeat;
 }
 /* faint accent wash behind the whole card, tinted per-boss — still painted
    above the backdrop photo so the boss's rank color reads through either way */
@@ -2839,36 +2843,39 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     </div>
     <div class="list-wrap">
       <div class="boss-card">
-        <div class="boss-header">
-          <div>
-            <div id="bossChapterLabel" class="boss-chapter-label"></div>
-            <div id="bossName" class="boss-name">GRINDER-1</div>
-            <div id="bossTag" class="boss-tag">SCRAP BRAWLER</div>
-            <div id="bossModifierLabel" class="boss-modifier-label"></div>
-            <div id="bossCountdown" class="boss-countdown">เหลือเวลา —</div>
+        <div class="boss-portrait-zone">
+          <div class="boss-header">
+            <div>
+              <div id="bossChapterLabel" class="boss-chapter-label"></div>
+              <div id="bossName" class="boss-name">GRINDER-1</div>
+              <div id="bossTag" class="boss-tag">SCRAP BRAWLER</div>
+              <div id="bossModifierLabel" class="boss-modifier-label"></div>
+              <div id="bossCountdown" class="boss-countdown">เหลือเวลา —</div>
+            </div>
+            <div class="boss-header-btns">
+              <button id="worldMapBtn" class="boss-view-btn" type="button">MAP</button>
+              <button id="bossViewBtn" class="boss-view-btn" type="button">VIEW</button>
+            </div>
           </div>
-          <div class="boss-header-btns">
-            <button id="worldMapBtn" class="boss-view-btn" type="button">MAP</button>
-            <button id="bossViewBtn" class="boss-view-btn" type="button">VIEW</button>
+          <div id="bossStage" class="boss-stage">
+            <div class="boss-art"></div>
+            <div class="boss-boom"></div>
           </div>
         </div>
-        <!-- DRAFT: wires up app.js's existing renderBossPhaseNodes() (line ~1573),
-             which had no matching container until now. -->
-        <div id="bossPhaseNodes" class="boss-phase-nodes"></div>
-        <div id="bossStage" class="boss-stage">
-          <div class="boss-art"></div>
-          <div class="boss-boom"></div>
-        </div>
+        <div class="boss-hp-track"><div id="bossHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
+        <div id="bossHpLabel" class="boss-hp-label">0 / 0 HP</div>
+        <div id="bossPhaseLabel" class="boss-phase-label"></div>
         <!-- DRAFT: placeholder copy — needs a real weakness/resist field on
              each BOSS_ROSTER entry in app.js before this can be data-driven. -->
         <div id="bossWeaknessRow" class="boss-weakness-row">
           <span class="boss-weak-chip weak"><b>WEAK</b> PULL-UP ×1.5</span>
           <span class="boss-weak-chip resist"><b>RESIST</b> CARDIO ×0.5</span>
         </div>
-        <div class="boss-hp-track"><div id="bossHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
-        <div id="bossHpLabel" class="boss-hp-label">0 / 0 HP</div>
-        <div id="bossPhaseLabel" class="boss-phase-label"></div>
         <div id="bossAttackLog" class="boss-attack-log"></div>
+        <!-- DRAFT: wires up app.js's existing renderBossPhaseNodes() (line ~1573),
+             which had no matching container until now. -->
+        <div class="boss-phase-nodes-title">BOSS PHASE INDICATOR</div>
+        <div id="bossPhaseNodes" class="boss-phase-nodes"></div>
       </div>
 
       <!-- DRAFT: placeholder cards — needs a "which workout mode counters this
