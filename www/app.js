@@ -851,45 +851,51 @@ const RARITY_DEFS = [
 function rarityDef(id) {
   return RARITY_DEFS.find(r => r.id === id) || RARITY_DEFS[0];
 }
+/* statBonus: flat Combat-Power-only points per stat key (see STAT_DEFS),
+ * scaled to rarity (common ~1, uncommon ~2, rare ~3+1, epic ~4+1,
+ * mythic ~5+ or spread across every stat for the top tier). Flavor-
+ * matched to each item's lore/theme where a stat fits naturally.
+ * These NEVER touch loadStatTotals()/computeFitnessPower() — see the
+ * Phase 2C note above computeEquipmentPower() for why. */
 const LOOT_ITEMS = [
   { id: 'scrapPlate',    name: 'แผ่นเกราะเศษเหล็ก',   icon: 'gearCog', rarity: 'common',
-    img: 'assets/loot/scrapPlate.png',
+    img: 'assets/loot/scrapPlate.png', statBonus: { core: 1 },
     lore: 'ปะติดปะต่อจากเศษเกราะที่เก็บได้หลังศึกแรก ๆ ยังไม่สวยหรู แต่กันได้ทุกหมัดแรกที่ไม่มีใครกันให้' },
   { id: 'wornGrip',      name: 'ผ้าพันมือเก่า',       icon: 'mitten',  rarity: 'common',
-    img: 'assets/loot/wornGrip.png',
+    img: 'assets/loot/wornGrip.png', statBonus: { pull: 1 },
     lore: 'ผ้าพันมือผืนแรกที่แลกมาด้วยเหงื่อ เก่าจนสีซีดแต่ไม่เคยขาดแม้แต่เซตเดียว' },
   { id: 'basicShield',   name: 'โล่ฝึกหัด',           icon: 'shield',  rarity: 'common',
-    img: 'assets/loot/basicShield.png',
+    img: 'assets/loot/basicShield.png', statBonus: { legs: 1 },
     lore: 'โล่ไม้แผ่นแรกที่ใช้ฝึกรับแรงกระแทก รอยบุบทุกรอยคือบทเรียนของวันที่ยังไม่แข็งแรงพอ' },
   { id: 'ironFang',      name: 'เขี้ยว IRON MAW',      icon: 'fang',    rarity: 'uncommon',
-    img: 'assets/loot/ironFang.png',
+    img: 'assets/loot/ironFang.png', statBonus: { pull: 2 },
     lore: 'เขี้ยวที่หลุดจากขากรรไกรของ IRON MAW ตอนมันพ่ายให้ความแข็งแกร่งที่ฝึกมาไม่หยุด' },
   { id: 'scoutScarf',    name: 'ผ้าพันคอสอดแนม',      icon: 'scarf',   rarity: 'uncommon',
-    img: 'assets/loot/scoutScarf.png',
+    img: 'assets/loot/scoutScarf.png', statBonus: { cardio: 2 },
     lore: 'ผ้าพันคอของนักสอดแนมที่แอบตามดูฟอร์มการฝึกอยู่ไกล ๆ ก่อนยอมมอบให้ด้วยความเคารพ' },
   { id: 'trainerGi',     name: 'ชุดฝึกซ้อมเก่าแก่',    icon: 'gi',      rarity: 'uncommon',
-    img: 'assets/loot/trainerGi.png',
+    img: 'assets/loot/trainerGi.png', statBonus: { push: 2 },
     lore: 'ชุดฝึกของครูฝึกรุ่นก่อน ส่งต่อกันมาให้คนที่พิสูจน์แล้วว่าไม่ยอมแพ้กลางทาง' },
   { id: 'voidShard',     name: 'เศษเสี้ยว VOID',       icon: 'vortex',  rarity: 'rare',
-    img: 'assets/loot/voidShard.png',
+    img: 'assets/loot/voidShard.png', statBonus: { core: 3 },
     lore: 'เศษเสี้ยวที่หลุดออกจากร่าง VOID-9 หลังมันแตกสลาย ยังสั่นไหวราวกับมีพลังงานเหลืออยู่ในนั้น' },
   { id: 'reaperFeather', name: 'ขนปีก WING REAPER',    icon: 'wing',    rarity: 'rare',
-    img: 'assets/loot/reaperFeather.png',
+    img: 'assets/loot/reaperFeather.png', statBonus: { cardio: 3, legs: 1 },
     lore: 'ขนปีกที่ร่วงจาก WING REAPER ตอนมันโฉบลงมาท้าทาย แล้วพ่ายให้ความอึดที่ไม่มีวันหมด' },
   { id: 'grinderCog',    name: 'เฟือง GRINDER-1',      icon: 'gearCog', rarity: 'epic',
-    img: 'assets/loot/grinderCog.png',
+    img: 'assets/loot/grinderCog.png', statBonus: { legs: 4, core: 1 },
     lore: 'เฟืองหลักของ GRINDER-1 ที่หยุดหมุนเป็นครั้งแรกในรอบหลายสัปดาห์ เมื่อเจอแรงที่มันหยุดไม่ได้' },
   { id: 'coreFragment',  name: 'ชิ้นส่วนแกนปฏิกรณ์',   icon: 'core',    rarity: 'epic',
-    img: 'assets/loot/coreFragment.png',
+    img: 'assets/loot/coreFragment.png', statBonus: { core: 4, push: 1 },
     lore: 'ชิ้นส่วนแกนปฏิกรณ์จาก CORE-ZERO ยังเปล่งแสงจาง ๆ เหมือนไม่ยอมรับว่าตัวเองพ่ายไปแล้ว' },
   { id: 'twinBlades',    name: 'ดาบคู่นักรบ',          icon: 'swordsCross', rarity: 'epic',
-    img: 'assets/loot/twinBlades.png',
+    img: 'assets/loot/twinBlades.png', statBonus: { pull: 3, push: 2 },
     lore: 'ดาบคู่ที่ตีขึ้นจากชัยชนะติดต่อกันหลายศึก แต่ละครั้งที่ฟันคือแรงที่สะสมมาโดยไม่มีวันหยุด' },
   { id: 'championCrown', name: 'มงกุฎผู้พิชิต',        icon: 'crown',   rarity: 'mythic',
-    img: 'assets/loot/championCrown.png',
+    img: 'assets/loot/championCrown.png', statBonus: { pull: 2, push: 2, legs: 2, core: 2, cardio: 2 },
     lore: 'มงกุฎที่มอบให้เฉพาะผู้พิชิตทุก Boss ในสังเวียน สัญลักษณ์ของนักสู้ที่ไม่เคยเลิกกลางคัน' },
   { id: 'phoenixCore',   name: 'แก่นเพลิงอมตะ',        icon: 'flame',   rarity: 'mythic',
-    img: 'assets/loot/phoenixCore.png',
+    img: 'assets/loot/phoenixCore.png', statBonus: { cardio: 4, core: 3 },
     lore: 'แก่นเพลิงที่ไม่เคยดับ แม้ในวันที่ล้มเหลว มันก็ยังคุกรุ่นรอวันลุกขึ้นมาใหม่' }
 ];
 function loadLootInventory() {
@@ -926,6 +932,33 @@ function equippedLootItem() {
   const inv = loadLootInventory();
   if (!(inv[id] > 0)) return null; // owned check — in case inventory ever changes
   return LOOT_ITEMS.find(it => it.id === id) || null;
+}
+/* ---- equipment stat bonuses → Combat Power only (Phase 2C) ----
+ * Per the Phase 1 agreement, equipment must never affect Boss Damage
+ * (still 100% real reps — see totalVolumeOfCustomSession/currentBoss-
+ * DamageBreakdown, neither of which this touches) and must never feed
+ * loadStatTotals()/computeFitnessPower() (Fitness Power must stay a
+ * pure real-world signal). So an item's statBonus is only ever summed
+ * into Combat Power as flat points — it never becomes part of a stat's
+ * *level* or its progress bar. lootStatBonusLabel() below is the one
+ * shared formatter so the grid tile, detail popup, and any future spot
+ * that shows an item's stats all render identically. */
+function equippedLootStatBonus() {
+  const item = equippedLootItem();
+  return (item && item.statBonus) || {};
+}
+function computeEquipmentPower() {
+  const bonus = equippedLootStatBonus();
+  return Object.keys(bonus).reduce((sum, k) => sum + (bonus[k] || 0), 0);
+}
+function lootStatBonusLabel(item) {
+  if (!item || !item.statBonus) return '';
+  return Object.keys(item.statBonus)
+    .map(k => {
+      const def = STAT_DEFS.find(d => d.key === k);
+      return (def ? def.short : k.toUpperCase()) + ' +' + item.statBonus[k];
+    })
+    .join('  ');
 }
 function toggleEquipLoot(itemId) {
   const inv = loadLootInventory();
@@ -1032,6 +1065,8 @@ function openLootDetail(itemId) {
   document.getElementById('lootDetailRarity').textContent = rarity.label + (count > 1 ? ' · x' + count : '');
   document.getElementById('lootDetailRarity').style.color = rarity.c2;
   document.getElementById('lootDetailName').textContent = item.name;
+  const statEl = document.getElementById('lootDetailStats');
+  if (statEl) statEl.textContent = lootStatBonusLabel(item);
   document.getElementById('lootDetailLore').textContent = item.lore || '';
   const btn = document.getElementById('lootDetailEquipBtn');
   btn.textContent = isEquipped ? 'ถอดออก' : 'สวมใส่';
@@ -2566,7 +2601,9 @@ function computeFitnessPower() {
 }
 function computeCombatPower() {
   const bonusXp = loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP() + loadStepsBonusXP();
-  return Math.round(computeFitnessPower() + bonusXp);
+  // Equipment (Phase 2C) adds here only — see computeEquipmentPower's
+  // comment for why it never reaches Fitness Power or Boss Damage.
+  return Math.round(computeFitnessPower() + bonusXp + computeEquipmentPower());
 }
 
 /* ---- boss trophy wall — reuses loadBossEverDefeated() (already tracked
@@ -2760,6 +2797,8 @@ function renderCharacterEquipment() {
       : lockedBadgeHtml();
   }
   if (lootNameEl) lootNameEl.textContent = item ? item.name : 'ยังไม่ได้สวม';
+  const lootStatEl = document.getElementById('characterEquipLootStat');
+  if (lootStatEl) lootStatEl.textContent = item ? lootStatBonusLabel(item) : '';
 }
 /** Jumps to the Collection screen and scrolls straight to the relevant
  * section (skins or loot) — used by the Character sheet's equipment

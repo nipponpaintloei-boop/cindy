@@ -714,6 +714,15 @@ body{
 .loot-detail-name{
   font-family:var(--font-display);font-size:22px;letter-spacing:.5px;text-align:center;margin-bottom:10px;
 }
+/* ---- equipment stat bonus row (Phase 2C) — Combat-Power-only points,
+   shown here so a player can see what an item does before equipping it.
+   Deliberately not styled like the rarity/name (which are about
+   identity/collection) — this is a stat readout, so it borrows the
+   monospace-ish feel of the stat bar labels instead. */
+.loot-detail-stats{
+  font-family:var(--font-display);font-size:13px;letter-spacing:1px;text-align:center;
+  color:var(--text);margin-bottom:10px;min-height:1px;
+}
 .loot-detail-lore{
   font-size:13px;color:var(--text-dim);line-height:1.6;text-align:center;
   padding:0 4px;margin-bottom:18px;
@@ -845,6 +854,11 @@ body{
 .character-equip-info{min-width:0;}
 .character-equip-label{font-size:9.5px;font-weight:800;letter-spacing:1px;color:var(--text-faint);}
 .character-equip-name{font-size:12px;font-weight:700;color:var(--text);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* ---- equipped item's Combat-Power stat bonus (Phase 2C) — a quiet
+   third line under the loot slot's name, empty when nothing's equipped
+   or the equipped item has no bonus. */
+.character-equip-stat{font-size:10px;font-weight:700;color:var(--success);margin-top:1px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
 /* ---- boss trophy wall ---- */
@@ -3276,6 +3290,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
           <div class="character-equip-info">
             <div class="character-equip-label">LOOT BADGE</div>
             <div class="character-equip-name" id="characterEquipLootName">ยังไม่ได้สวม</div>
+            <div class="character-equip-stat" id="characterEquipLootStat"></div>
           </div>
         </button>
       </div>
@@ -3760,6 +3775,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <img id="lootDetailImg" class="loot-detail-img" src="" alt="" />
     <div id="lootDetailRarity" class="loot-detail-rarity"></div>
     <div id="lootDetailName" class="loot-detail-name"></div>
+    <div id="lootDetailStats" class="loot-detail-stats"></div>
     <div id="lootDetailLore" class="loot-detail-lore"></div>
     <div class="modal-row" style="grid-template-columns:1fr;">
       <button id="lootDetailEquipBtn" class="btn btn-primary btn-sm" onclick="toggleEquipLootFromDetail()">สวมใส่</button>
