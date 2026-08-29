@@ -1,0 +1,200 @@
+/* CINDY UI REDESIGN — visual layer only
+   No gameplay/state selectors are changed here. */
+:root{
+  --bg:#07090f !important;
+  --bg-elev:#0d111a !important;
+  --card:#111722 !important;
+  --card-border:rgba(95,122,160,.30) !important;
+  --primary:#35bff3 !important;
+  --primary-text:#f4f8ff !important;
+  --primary-dim:#173247 !important;
+  --success:#39e0a0 !important;
+  --warning:#ffb44a !important;
+  --danger:#ff4d5f !important;
+  --text:#eef5ff !important;
+  --text-dim:#8fa0b8 !important;
+  --text-faint:#536174 !important;
+  --radius:18px !important;
+  --radius-sm:12px !important;
+  --font-display:"Bebas Neue",Impact,"Arial Narrow",sans-serif;
+}
+
+html,body{background:#07090f !important;}
+body{
+  background:
+    radial-gradient(ellipse at 50% -8%,rgba(41,118,180,.18),transparent 46%),
+    radial-gradient(ellipse at 10% 65%,rgba(25,69,112,.10),transparent 35%),
+    linear-gradient(180deg,#080b12 0%,#06080d 100%) !important;
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.55;z-index:0;
+  background:
+    repeating-radial-gradient(circle at 50% -5%,rgba(111,154,194,.07) 0 1px,transparent 1px 42px),
+    linear-gradient(90deg,transparent 0 49.8%,rgba(55,129,176,.045) 50%,transparent 50.2%);
+}
+#app{position:relative;z-index:1;max-width:480px;background:transparent;}
+.screen{animation:cindFade .22s ease;}
+@keyframes cindFade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* Global header */
+.topbar{
+  padding:17px 18px 11px !important;
+  border-bottom:1px solid rgba(112,143,179,.10);
+  background:linear-gradient(180deg,rgba(7,10,16,.94),rgba(7,10,16,.55),transparent);
+}
+.brand{font-size:28px !important;letter-spacing:3px !important;text-shadow:0 0 18px rgba(53,191,243,.28) !important;}
+.brand::after{height:3px !important;width:42px !important;background:linear-gradient(90deg,#35bff3 0 55%,#ff4d5f 55%) !important;}
+.iconbtn{
+  width:42px !important;height:42px !important;border-radius:13px !important;
+  background:rgba(15,22,33,.88) !important;border-color:rgba(83,129,173,.34) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.05),0 8px 24px rgba(0,0,0,.22);
+}
+.iconbtn:hover{color:#dff7ff;}
+
+/* Scroll surfaces */
+.home-content,.list-wrap{padding-left:16px !important;padding-right:16px !important;padding-bottom:34px !important;}
+.section-label{
+  margin:20px 2px 9px !important;font-size:10px !important;letter-spacing:2px !important;
+  color:#91a8c3 !important;position:relative;padding-left:11px;
+}
+.section-label::before{content:"";position:absolute;left:0;top:2px;bottom:2px;width:3px;border-radius:3px;background:#35bff3;box-shadow:0 0 8px rgba(53,191,243,.55);}
+.metric-card,.stat-card,.week-card,.chart-card,.reminder-card,.quest-card,.character-sheet-card,.modal-card{
+  background:linear-gradient(145deg,rgba(18,25,37,.96),rgba(10,15,23,.96)) !important;
+  border:1px solid rgba(101,131,164,.25) !important;border-radius:16px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.035),0 12px 34px rgba(0,0,0,.20) !important;
+}
+
+/* HOME hero */
+.mascot-card,.hero-card{
+  background:
+    radial-gradient(circle at 50% 22%,rgba(43,139,189,.16),transparent 40%),
+    linear-gradient(155deg,rgba(17,28,42,.98),rgba(7,11,18,.98)) !important;
+  border:1px solid rgba(75,130,171,.35) !important;border-radius:22px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.055),0 20px 50px rgba(0,0,0,.32),0 0 38px rgba(29,126,171,.07) !important;
+  overflow:hidden;
+}
+.mascot-card::before,.hero-card::before{background:linear-gradient(135deg,rgba(53,191,243,.10),transparent 50%) !important;}
+.mascot-avatar{filter:drop-shadow(0 0 18px rgba(53,191,243,.20));}
+.mascot-level-badge,.status-pill,.mascot-rank{
+  border-radius:8px !important;border:1px solid rgba(53,191,243,.45) !important;
+  background:rgba(8,19,29,.86) !important;color:#75d8ff !important;
+}
+.xp-bar-track{background:#080d15 !important;border-color:rgba(92,122,154,.25) !important;height:8px !important;}
+.xp-bar-fill{background:linear-gradient(90deg,#2caee4,#6edcff) !important;box-shadow:0 0 12px rgba(53,191,243,.35);}
+
+/* Boss teaser */
+.boss-teaser-card,.boss-card{
+  background:
+    linear-gradient(180deg,rgba(8,14,23,.30),rgba(8,12,19,.94)),
+    radial-gradient(circle at 50% 25%,rgba(53,191,243,.11),transparent 48%),
+    var(--card) !important;
+  border:1px solid rgba(91,126,161,.38) !important;border-radius:20px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.05),0 16px 40px rgba(0,0,0,.30) !important;
+  overflow:hidden;
+}
+.boss-name{letter-spacing:1.8px !important;color:#39c8ff !important;text-shadow:0 0 16px rgba(53,191,243,.18);}
+.boss-tag,.boss-phase-label{letter-spacing:1.5px !important;color:#8ea4bd !important;}
+.boss-hp-track{height:9px !important;border-radius:99px !important;background:#090d14 !important;border:1px solid rgba(86,116,147,.25) !important;}
+.boss-hp-fill{background:linear-gradient(90deg,#35bff3,#ff5b61) !important;box-shadow:0 0 12px rgba(53,191,243,.22);}
+.boss-stage{min-height:245px !important;background:radial-gradient(circle at 50% 55%,rgba(28,83,115,.20),transparent 48%) !important;}
+.boss-stage .boss-art{filter:drop-shadow(0 0 14px rgba(53,191,243,.18));}
+.boss-view-btn,.boss-header-btns button{background:rgba(12,20,31,.86) !important;border:1px solid rgba(87,124,158,.38) !important;color:#a7bad0 !important;border-radius:11px !important;}
+.boss-attack-log{background:rgba(7,12,19,.65) !important;border-color:rgba(87,119,151,.20) !important;border-radius:13px !important;}
+
+/* Program cards */
+.program-card-link{
+  min-height:112px !important;padding:15px !important;border-radius:17px !important;
+  border:1px solid rgba(87,122,157,.30) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.035),0 12px 28px rgba(0,0,0,.20) !important;
+}
+.program-card-link .title{letter-spacing:.7px !important;font-size:16px !important;}
+.program-card-link .sub,.program-card-link .sub2,.program-card-link .sub3{color:#8192a8 !important;}
+.program-card-icon{border-radius:14px !important;background:rgba(6,14,22,.75) !important;border:1px solid currentColor !important;}
+.mode-custom{color:#39e0a0 !important;}
+.mode-cardio{color:#ff5260 !important;}
+.mode-cindy{color:#55c8ff !important;}
+.mode-run{color:#35d2bf !important;}
+.mode-trainingcamp{color:#ffbd55 !important;}
+
+/* Tabs / bottom navigation */
+.period-row{gap:7px !important;}
+.period-pill{background:rgba(12,19,29,.82) !important;border:1px solid rgba(85,116,148,.26) !important;color:#778ba3 !important;border-radius:9px !important;}
+.period-pill.sel{background:rgba(30,103,139,.20) !important;border-color:rgba(53,191,243,.60) !important;color:#72d8ff !important;box-shadow:0 0 14px rgba(53,191,243,.08);}
+.tabbar{
+  background:rgba(6,9,15,.96) !important;border-top:1px solid rgba(91,121,153,.22) !important;
+  box-shadow:0 -12px 35px rgba(0,0,0,.34) !important;padding:7px 8px calc(7px + env(safe-area-inset-bottom)) !important;
+}
+.tab{color:#58687c !important;font-size:9px !important;letter-spacing:1.4px !important;}
+.tab.active{color:#65d4ff !important;text-shadow:0 0 12px rgba(53,191,243,.30);}
+.tab .dot{width:4px !important;height:4px !important;background:#65d4ff !important;box-shadow:0 0 8px #35bff3;}
+
+/* History / progress */
+.chart-bars{background:linear-gradient(180deg,rgba(53,191,243,.025),transparent) !important;border-radius:12px;}
+.metric-grid{gap:9px !important;}
+.metric-card .v{color:#eef7ff !important;text-shadow:0 0 12px rgba(53,191,243,.08);}
+.metric-card .l{color:#667991 !important;letter-spacing:1px !important;}
+
+/* Character */
+.character-sheet-hero{background:radial-gradient(circle at 50% 20%,rgba(55,142,190,.14),transparent 42%),linear-gradient(145deg,#111a27,#090e16) !important;}
+.character-name-btn{color:#eff7ff !important;}
+.character-cp{color:#63d5ff !important;text-shadow:0 0 12px rgba(53,191,243,.22);}
+.character-equip-slot{background:rgba(8,14,22,.80) !important;border:1px solid rgba(87,122,157,.28) !important;border-radius:14px !important;}
+.character-trophy-row{gap:8px !important;}
+
+/* Collection grids */
+.skin-grid{gap:10px !important;}
+.skin-grid > *{border-radius:14px !important;border-color:rgba(88,120,153,.26) !important;background:linear-gradient(145deg,#121a26,#0a1018) !important;}
+
+/* Buttons */
+.btn{
+  border-radius:12px !important;letter-spacing:.7px !important;font-weight:800 !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.08),0 7px 20px rgba(0,0,0,.18) !important;
+}
+.btn-primary,.battle-start-btn{background:linear-gradient(135deg,#249dcc,#176c96) !important;border-color:#48c8f4 !important;color:#f7fcff !important;box-shadow:0 0 22px rgba(53,191,243,.18),inset 0 1px rgba(255,255,255,.16) !important;}
+.btn-success{background:linear-gradient(135deg,#27b985,#19765b) !important;border-color:#49e5ad !important;}
+.btn-danger{background:linear-gradient(135deg,#d83e4b,#8c2631) !important;border-color:#ff5b67 !important;}
+.btn-outline,.btn-ghost{background:rgba(10,17,26,.72) !important;border-color:rgba(89,122,155,.38) !important;color:#9eb0c4 !important;}
+
+/* Workout HUD */
+.workout-wrap,.timer-wrap{background:transparent !important;}
+.exercise-row{background:linear-gradient(145deg,rgba(17,25,37,.96),rgba(9,14,22,.96)) !important;border:1px solid rgba(88,121,153,.28) !important;border-radius:15px !important;}
+.rep{color:#eaf8ff !important;text-shadow:0 0 15px rgba(53,191,243,.18);}
+.save-round-btn{min-height:50px !important;font-size:14px !important;}
+.combo-result-card{border-color:rgba(255,180,74,.32) !important;background:linear-gradient(145deg,rgba(48,32,16,.50),rgba(15,19,26,.95)) !important;}
+
+/* Boss battle screen — reference-inspired full-screen stage */
+#screen-bossbattle{background:linear-gradient(180deg,#07111b 0%,#070b12 52%,#05070b 100%) !important;}
+#screen-bossbattle .complete-wrap{padding:18px 16px 26px !important;}
+#screen-bossbattle .battle-eyebrow{font-size:10px !important;letter-spacing:2.5px !important;color:#70869e !important;text-transform:uppercase;}
+#screen-bossbattle .boss-card{border-radius:20px !important;}
+#screen-bossbattle .boss-header{padding:14px 16px !important;}
+#screen-bossbattle .battle-field{min-height:340px !important;overflow:hidden;background:
+  radial-gradient(circle at 50% 62%,rgba(41,119,160,.22),transparent 33%),
+  linear-gradient(180deg,rgba(13,33,49,.55),rgba(6,13,20,.92)) !important;}
+#screen-bossbattle .battle-field::after{content:"";position:absolute;left:0;right:0;bottom:0;height:42%;background:linear-gradient(180deg,transparent,rgba(5,8,12,.88));pointer-events:none;}
+#screen-bossbattle .battle-field-clouds{opacity:.55 !important;}
+#screen-bossbattle .boss-stage{min-height:340px !important;}
+#screen-bossbattle .boss-stage .boss-art{transform:scale(1.06);}
+#screen-bossbattle .boss-hp-track{margin:13px 16px 0 !important;}
+#screen-bossbattle .boss-hp-label{font-size:10px !important;letter-spacing:1px !important;color:#7d92a9 !important;}
+#screen-bossbattle .battle-start-btn{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:5;min-width:230px;min-height:46px;border-radius:13px !important;}
+#screen-bossbattle .battle-log{margin-top:12px !important;padding:12px 14px !important;border:1px solid rgba(88,120,153,.24) !important;border-radius:12px !important;background:rgba(10,16,24,.82) !important;color:#aab9c9 !important;}
+
+/* Completion */
+.complete-wrap{padding-left:16px !important;padding-right:16px !important;}
+.complete-hero{background:radial-gradient(circle,rgba(53,191,243,.10),transparent 62%) !important;}
+.complete-rounds{color:#eaf8ff !important;text-shadow:0 0 24px rgba(53,191,243,.20);}
+.pr-badge{border-radius:9px !important;}
+
+/* Modals */
+.modal-card{box-shadow:0 30px 90px rgba(0,0,0,.65),inset 0 1px rgba(255,255,255,.06) !important;}
+.modal-row{border-color:rgba(87,118,150,.18) !important;}
+
+/* Responsive: keep density readable on narrow phones */
+@media(max-width:380px){
+  .home-content,.list-wrap{padding-left:12px !important;padding-right:12px !important;}
+  .topbar{padding-left:14px !important;padding-right:14px !important;}
+  .brand{font-size:25px !important;}
+  .mascot-card,.hero-card{border-radius:18px !important;}
+  #screen-bossbattle .battle-field,#screen-bossbattle .boss-stage{min-height:300px !important;}
+}

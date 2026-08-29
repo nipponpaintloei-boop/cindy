@@ -1132,55 +1132,7 @@ body{
 .boss-view-modifier{font-size:10.5px;color:var(--text-dim);background:var(--bg-elev);border:1px solid var(--card-border);border-radius:8px;padding:8px 10px;margin-bottom:10px;}
 .boss-header-btns{display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
 .boss-chapter-label{font-size:8.5px;font-weight:800;letter-spacing:1px;color:var(--text-faint);text-transform:uppercase;}
-.boss-modifier-label{
-  display:inline-block;margin-top:8px;font-size:10px;font-weight:800;letter-spacing:.5px;font-style:normal;
-  background:rgba(var(--boss-accent-rgb),.14);color:rgb(var(--boss-accent-rgb));
-  border:1px solid rgba(var(--boss-accent-rgb),.4);border-radius:20px;padding:4px 10px;
-}
-.boss-modifier-label:empty{display:none;}
-/* ---- boss-fight redesign (2026-08): phase info row replaces the old plain
-   centered .boss-phase-label — now shows the phase name + a short
-   description next to a BOSS INFO button that opens the existing archive
-   modal. .boss-phase-label kept as the name element (same id/JS binding,
-   renderBossCard() still owns phase-* class toggling) so no app.js render
-   logic needed to change, just restyled + given a sibling desc line. ---- */
-.phase-info-row{
-  display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
-  margin-top:14px;padding-top:12px;border-top:1px solid var(--card-border);
-}
-#screen-bossfight .boss-phase-label{
-  text-align:left;font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--text-faint);
-}
-.boss-phase-label.phase-armorbreak{color:#ffb020;}
-.boss-phase-label.phase-rage{color:#ff6a3d;}
-.boss-phase-label.phase-critical{color:#e8232a;}
-.boss-phase-desc{font-size:10.5px;color:var(--text-dim);margin-top:4px;line-height:1.5;max-width:240px;}
-.boss-info-btn{
-  flex-shrink:0;font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--text-dim);
-  background:var(--bg-elev);border:1px solid var(--card-border);border-radius:8px;padding:9px 12px;cursor:pointer;
-}
-.boss-info-btn:active{transform:scale(.96);}
-/* four-node phase progress strip — driven 1:1 by the real BOSS_PHASES array
-   (NORMAL / ARMOR BREAK / RAGE / CRITICAL), not a separate data source, so
-   it can never drift from the phase the HP bar/label are already showing. */
-.phase-strip{
-  background:rgba(0,0,0,.22);border:1px solid var(--card-border);border-radius:var(--radius-sm);
-  padding:14px 10px;margin-top:12px;
-}
-.phase-strip-title{font-size:9.5px;font-weight:800;letter-spacing:1.2px;color:var(--text-faint);text-align:center;margin-bottom:12px;}
-.phase-nodes{display:flex;align-items:center;justify-content:space-between;}
-.phase-node{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;min-width:0;}
-.phase-node-circle{
-  width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  border:1.5px solid var(--card-border);background:var(--bg-elev);color:var(--text-faint);flex-shrink:0;
-}
-.phase-node-circle svg{width:15px;height:15px;}
-.phase-node.active .phase-node-circle{border-color:rgb(var(--boss-accent-rgb));box-shadow:0 0 0 3px rgba(var(--boss-accent-rgb),.18);color:rgb(var(--boss-accent-rgb));}
-.phase-node.done .phase-node-circle{border-color:var(--text-faint);color:var(--text-dim);}
-.phase-node-lbl{font-size:8px;font-weight:800;color:var(--text-faint);text-align:center;letter-spacing:.3px;white-space:nowrap;}
-.phase-node-sub{font-size:7.5px;color:var(--text-faint);text-align:center;white-space:nowrap;}
-.phase-node.active .phase-node-lbl,.phase-node.active .phase-node-sub{color:rgb(var(--boss-accent-rgb));}
-.phase-arrow{color:var(--text-faint);flex-shrink:0;margin:0 -1px 16px;font-size:11px;}
+.boss-modifier-label{font-size:9.5px;font-style:italic;color:rgba(var(--boss-accent-rgb),.85);margin-top:3px;}
 .fitness-rank-overall{display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;margin-bottom:10px;border-bottom:1px solid var(--card-border);}
 .fitness-rank-overall-lbl{font-size:10px;font-weight:800;letter-spacing:1.2px;color:var(--text-faint);}
 .fitness-rank-overall-grade{font-family:var(--font-display);font-size:26px;color:var(--primary);}
@@ -2694,6 +2646,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
   #screen-running .run-distance-big{font-size:80px;}
 }
 </style>
+  <link rel="stylesheet" href="cindy-ui-redesign.css">
 </head>
 <body>
 <div id="splash" class="splash">
@@ -2905,17 +2858,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
         </div>
         <div class="boss-hp-track"><div id="bossHpFill" class="boss-hp-fill" style="width:100%;"></div></div>
         <div id="bossHpLabel" class="boss-hp-label">0 / 0 HP</div>
-        <div class="phase-info-row">
-          <div>
-            <div id="bossPhaseLabel" class="boss-phase-label"></div>
-            <div id="bossPhaseDesc" class="boss-phase-desc"></div>
-          </div>
-          <button id="bossInfoBtn" class="boss-info-btn" type="button">BOSS INFO</button>
-        </div>
-        <div class="phase-strip">
-          <div class="phase-strip-title">BOSS PHASE</div>
-          <div id="bossPhaseNodes" class="phase-nodes"></div>
-        </div>
+        <div id="bossPhaseLabel" class="boss-phase-label"></div>
         <div id="bossAttackLog" class="boss-attack-log"></div>
       </div>
     </div>
