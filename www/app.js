@@ -15,7 +15,7 @@ const KEY_RUN_ACTIVE = 'cindy_run_active';
  * Each migration must be idempotent (safe to re-run) since a stamp write
  * failing mid-way must not corrupt anything on retry. */
 const KEY_SCHEMA_VERSION = 'cindy_schema_version';
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 
 /* v2 flag — Phase 2B redefined Combat Power (see computeCombatPower) so
  * it stops double-counting reps that already feed the stat levels. That
@@ -50,6 +50,24 @@ const MIGRATIONS = [
       if (computeTotalXP() > 0) {
         localStorage.setItem(KEY_CP_PATCHNOTE_V1_PENDING, '1');
       }
+    }
+  },
+  {
+    version: 3,
+    run: () => {
+      // dev brief §15: Skill unlock moves from "Fitness Rank → auto
+      // unlock" to "Level Up → Skill Points → player chooses". That
+      // makes skill-unlock state a real, persisted thing for the first
+      // time (KEY_SKILL_UNLOCKED_IDS) instead of derived live from Rank
+      // every render. Whatever skills a player's Fitness Rank had
+      // already unlocked under the OLD logic get grandfathered in here,
+      // for free (not spent from their new Skill Point pool), so nobody
+      // loses an ability they already had — dev brief §04/non-negotiable
+      // rule #3 (never lose player data / never take away earned
+      // progress). See legacyUnlockedSkillIdsByRank() below for the
+      // exact old formula this reproduces.
+      const legacy = legacyUnlockedSkillIdsByRank();
+      if (legacy.length) saveUnlockedSkillIds(legacy);
     }
   },
 ];
@@ -4247,25 +4265,29 @@ function renderFitnessRank(containerId) {
     + '<div class="fitness-rank-rows">' + rowsHtml + '</div>';
 }
 
-/* ================= SKILL TREE (product doc #18) =================
- * Team decision needed before starting this item was "what does a skill
- * unlock from?" (Level / Fitness Rank / Achievement) — going with Fitness
- * Rank's overall letter grade (computeFitnessRankInfo(), landed in
- * Phase 3's Fitness Rank item), because it's the one progression axis
- * that's a pure real-world signal already (no equipment/bonus-XP mixed
- * in — see Phase 2B's Fitness Power split) and the doc's own framing for
- * Skill Tree ("passive/modifier", not active abilities) fits a grade
- * you *earn through training* better than a level you can also reach by
- * grinding bonus XP.
+/* ================= SKILL TREE (product doc #18 → reworked, dev brief §15/16) =================
+ * Original Phase 3 build tied skill unlock to Fitness Rank's overall
+ * letter grade — a pure real-world signal, but fully automatic: nothing
+ * to choose, no build identity. Dev brief §15 explicitly asks for the
+ * opposite shape: "Rank → Auto Unlock" becomes "Level Up → Skill Points
+ * → Player เลือก Skill" (§16: player picks a Body/Mind/Life-flavored
+ * build). This rework keeps the 3 skills the doc named (SECOND WIND,
+ * OVERDRIVE, BOSS SLAYER) and their exact effects — only the *gate*
+ * changes, from "your Rank is high enough" to "you're high enough level
+ * to be eligible, AND you chose to spend a Skill Point on it".
  *
- * Kept deliberately small: the 3 skills the doc names as examples
- * (SECOND WIND, OVERDRIVE, BOSS SLAYER), no allocation UI, no skill
- * points to spend — every skill whose grade threshold is met is just
- * always on, the same "nothing to configure, it reflects your training"
- * feel as Fitness Rank itself. Nothing here is stored: unlock state is
- * derived live from the current Fitness Rank grade every time it's
- * checked, so there's no new save data that could ever drift out of
- * sync with the stats it's based on.
+ * Skill Points: 1 per Level Up (see totalSkillPointsEarned below) — the
+ * same currency the brief names, spent explicitly via unlockSkillWithPoint().
+ * minLevel per skill mirrors roughly where its old unlockGrade sat under
+ * the existing level→Fitness-Rank-tier math (FITNESS_RANK_TIER_SIZE=5,
+ * tiers F/E/D/C/B/A/S): D≈level 11, B≈level 21, A≈level 26. unlockGrade
+ * is kept only as a flavor label in the UI ("used to unlock at Rank D"),
+ * it no longer gates anything.
+ *
+ * Unlock state is now real, persisted data (KEY_SKILL_UNLOCKED_IDS) —
+ * see the schema v3 migration above for how existing players' already-
+ * unlocked skills were grandfathered in for free so nobody lost an
+ * ability they'd already earned.
  *
  * Same Phase 2C guardrail as Equipment/Sets applies to every effect
  * below: they only ever add to bonus-XP counters or flat Combat Power —
@@ -4275,23 +4297,75 @@ function renderFitnessRank(containerId) {
  * BOSS SLAYER adds a flat Combat Power number the same way an equipped
  * item's statBonus does. */
 const SKILL_DEFS = [
-  { id: 'skill_secondwind', name: 'SECOND WIND', unlockGrade: 'D', effect: 'restSkipMult', value: 1.2,
+  { id: 'skill_secondwind', name: 'SECOND WIND', minLevel: 11, unlockGrade: 'D', effect: 'restSkipMult', value: 1.2,
     desc: 'Rest-skip ให้โบนัส XP มากขึ้น 20%' },
-  { id: 'skill_overdrive', name: 'OVERDRIVE', unlockGrade: 'B', effect: 'comboMult', value: 1.25,
+  { id: 'skill_overdrive', name: 'OVERDRIVE', minLevel: 21, unlockGrade: 'B', effect: 'comboMult', value: 1.25,
     desc: 'โบนัส XP จาก Max Combo ต่อเซสชันเพิ่มขึ้น 25%' },
-  { id: 'skill_bossslayer', name: 'BOSS SLAYER', unlockGrade: 'A', effect: 'flatCP', value: 10,
+  { id: 'skill_bossslayer', name: 'BOSS SLAYER', minLevel: 26, unlockGrade: 'A', effect: 'flatCP', value: 10,
     desc: 'Combat Power เพิ่มถาวร +10' }
 ];
-/** ids of every skill whose unlockGrade tier is at or below the player's
- * current overall Fitness Rank tier (suffix +/- ignored — tier letter
- * only, same granularity the doc's grade examples use). */
-function loadUnlockedSkillIds() {
+const KEY_SKILL_UNLOCKED_IDS = 'cindy_skill_unlocked_ids_v1';
+const SKILL_POINTS_PER_LEVEL = 1;
+
+/** OLD unlock formula (Fitness Rank overall grade), kept only so schema
+ * v3's migration can grandfather already-unlocked skills in for free —
+ * not used for any live gating anymore. */
+function legacyUnlockedSkillIdsByRank() {
   const overallTier = computeFitnessRankInfo().overall.tier;
   const tierIdx = FITNESS_RANK_TIERS.indexOf(overallTier);
   return SKILL_DEFS.filter(s => tierIdx >= FITNESS_RANK_TIERS.indexOf(s.unlockGrade)).map(s => s.id);
 }
+function loadUnlockedSkillIds() {
+  try { return JSON.parse(localStorage.getItem(KEY_SKILL_UNLOCKED_IDS)) || []; }
+  catch (e) { return []; }
+}
+function saveUnlockedSkillIds(ids) {
+  localStorage.setItem(KEY_SKILL_UNLOCKED_IDS, JSON.stringify(ids));
+}
 function isSkillUnlocked(id) {
   return loadUnlockedSkillIds().indexOf(id) !== -1;
+}
+/** Lifetime Skill Points earned — 1 per level past LV.1, same currency
+ * dev brief §15 names ("Level Up → Skill Points"). Pure function of the
+ * player's current level, same "derive live, never drift" approach the
+ * rest of this file's progression numbers already use. */
+function totalSkillPointsEarned() {
+  const level = computeLevelInfo(computeTotalXP()).level;
+  return Math.max(0, (level - 1) * SKILL_POINTS_PER_LEVEL);
+}
+/** Points still spendable right now. Grandfathered skills (schema v3
+ * migration) count as already-spent here so a long-time player doesn't
+ * see a huge free pile of points for skills they didn't actually choose —
+ * clamped at 0 so an early migration grant (a skill unlocked at a level
+ * lower than its points would "cost") can never show as negative. */
+function availableSkillPoints() {
+  return Math.max(0, totalSkillPointsEarned() - loadUnlockedSkillIds().length);
+}
+function isSkillLevelEligible(skill) {
+  return computeLevelInfo(computeTotalXP()).level >= skill.minLevel;
+}
+function canUnlockSkill(skill) {
+  return !isSkillUnlocked(skill.id) && isSkillLevelEligible(skill) && availableSkillPoints() > 0;
+}
+/** Spends 1 Skill Point to unlock a skill the player chose — the actual
+ * "Level Up → Skill Points → Player เลือก Skill" action dev brief §15
+ * asks for. Validates eligibility again server-side-style (defensive
+ * against a stale render) before touching storage. */
+function unlockSkillWithPoint(id) {
+  const skill = SKILL_DEFS.find(s => s.id === id);
+  if (!skill || !canUnlockSkill(skill)) { showToast('ยังปลดล็อกไม่ได้'); return; }
+  const unlocked = loadUnlockedSkillIds();
+  unlocked.push(id);
+  saveUnlockedSkillIds(unlocked);
+  showSystemEvent({
+    header: 'NEW SKILL UNLOCKED',
+    title: skill.name,
+    rewards: [skill.desc],
+    accent: '#B48CFF'
+  });
+  vibrate([40, 30, 40]);
+  renderSkillTree('skillTreeList');
+  renderCharacterSheet();
 }
 /** Combined multiplier from every unlocked skill tagged with this effect
  * key (multiplicative — only matters once there's ever 2+ skills sharing
@@ -4307,20 +4381,20 @@ function skillFlatBonus(effectKey) {
 }
 
 /* ---- new-skill detection for the System Window ----
- * Skills here unlock silently (derived live from Fitness Rank, see
- * loadUnlockedSkillIds() above) rather than being granted by a discrete
- * action, so unlike level-up or boss-defeat there's no natural call site
- * to announce from. This tracks which skill ids the player has already
- * been shown and fires showSystemEvent() for any that just appeared —
- * safe to call from anywhere; a no-op once nothing new has unlocked. */
+ * Now mostly a safety net: unlockSkillWithPoint() above already fires its
+ * own showSystemEvent() at the moment a player spends a point, which
+ * covers every unlock going forward. This still exists so the schema v3
+ * grandfather-migration (silent storage write, no natural call site to
+ * announce from) doesn't leave a player wondering why a skill they
+ * already had is suddenly showing as unlocked with no notification —
+ * first run after migration just seeds "seen" silently rather than
+ * flooding old players with popups for skills their old Fitness Rank
+ * had already cleared long ago. */
 const KEY_SEEN_UNLOCKED_SKILLS = 'cindy_seen_unlocked_skills';
 function checkNewlyUnlockedSkills() {
   const unlocked = loadUnlockedSkillIds();
   const raw = localStorage.getItem(KEY_SEEN_UNLOCKED_SKILLS);
   if (raw === null) {
-    // First run on this device (or pre-existing player before this
-    // shipped) — seed silently so nobody gets a flood of "new skill"
-    // popups for skills their Fitness Rank already cleared long ago.
     localStorage.setItem(KEY_SEEN_UNLOCKED_SKILLS, JSON.stringify(unlocked));
     return;
   }
@@ -4344,14 +4418,30 @@ function checkNewlyUnlockedSkills() {
 function renderSkillTree(containerId) {
   const wrap = document.getElementById(containerId || 'skillTreeList');
   if (!wrap) return;
-  const unlocked = loadUnlockedSkillIds();
+  const pointsEl = document.getElementById('skillPointsAvailable');
+  if (pointsEl) pointsEl.textContent = availableSkillPoints() + ' SP พร้อมใช้';
   wrap.innerHTML = SKILL_DEFS.map(s => {
-    const isUnlocked = unlocked.indexOf(s.id) !== -1;
-    return '<div class="boss-view-item' + (isUnlocked ? ' unlocked' : '') + '">'
+    const unlocked = isSkillUnlocked(s.id);
+    const eligible = isSkillLevelEligible(s);
+    let statusHtml, tagHtml;
+    if (unlocked) {
+      statusHtml = '<div class="boss-view-item-status">ACTIVE</div>';
+      tagHtml = 'ปลดล็อกแล้ว';
+    } else if (eligible && availableSkillPoints() > 0) {
+      statusHtml = '<button class="quest-claim-btn" onclick="unlockSkillWithPoint(\'' + s.id + '\')">ใช้ 1 SP ปลดล็อก</button>';
+      tagHtml = 'ถึง LV.' + s.minLevel + ' แล้ว — พร้อมปลดล็อก';
+    } else if (eligible) {
+      statusHtml = '<div class="boss-view-item-status">LOCKED</div>';
+      tagHtml = 'ถึงเลเวลแล้ว แต่ยังไม่มี Skill Point';
+    } else {
+      statusHtml = '<div class="boss-view-item-status">LOCKED</div>';
+      tagHtml = 'ปลดล็อกได้ที่ LV.' + s.minLevel + ' ขึ้นไป';
+    }
+    return '<div class="boss-view-item' + (unlocked ? ' unlocked' : '') + '">'
       + '<div class="boss-view-item-top">'
       + '<div><div class="boss-view-item-name">' + s.name + '</div>'
-      + '<div class="boss-view-item-tag">ปลดล็อกที่ Fitness Rank ' + s.unlockGrade + ' ขึ้นไป</div></div>'
-      + '<div class="boss-view-item-status">' + (isUnlocked ? 'ACTIVE' : 'LOCKED') + '</div>'
+      + '<div class="boss-view-item-tag">' + tagHtml + '</div></div>'
+      + statusHtml
       + '</div>'
       + '<div class="boss-view-item-story">' + s.desc + '</div>'
       + '</div>';
