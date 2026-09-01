@@ -3401,6 +3401,120 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 }
 
 </style>
+<style id="theme-solo-leveling-system">
+/* =====================================================================
+   SOLO LEVELING "SYSTEM" THEME OVERRIDE
+   Pure visual re-skin: palette + glow + corner-bracket framing only.
+   No structural/HTML/JS changes — sits last in cascade so it wins.
+   ===================================================================== */
+:root{
+  --bg:#04060B;
+  --bg-elev:#0A1120;
+  --card:#0B1526;
+  --card-border:#1E4470;
+  --primary:#3DA5FF;
+  --primary-text:#EAF6FF;
+  --primary-dim:#132540;
+  --success:#3ED598;
+  --warning:#FFC94D;
+  --danger:#FF3B4E;
+  --text:#E9F2FF;
+  --text-dim:#7C93B8;
+  --text-faint:#425574;
+  --web:#3D6FE0;
+  --pull:#3D6FE0;
+  --push:#FF4757;
+  --squat:#FFC94D;
+  --run:#22C7B0;
+  --core:#B24DE8;
+  --sys-glow:0,163,255;
+}
+body.oled{
+  --bg:#000000;
+  --bg-elev:#05070E;
+  --card:#080E1B;
+  --card-border:#1A3C63;
+}
+
+/* ---- base atmosphere: faint blue grid + vignette, no layout impact ---- */
+body{
+  background-color:var(--bg);
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(61,165,255,.10), transparent 55%),
+    linear-gradient(rgba(61,165,255,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(61,165,255,.05) 1px, transparent 1px);
+  background-size:auto, 34px 34px, 34px 34px;
+  background-position:0 0, center, center;
+}
+
+/* ---- brand wordmark glow ---- */
+.brand{
+  color:var(--text) !important;
+  text-shadow:0 0 10px rgba(var(--sys-glow),.65), 0 0 26px rgba(var(--sys-glow),.28) !important;
+}
+
+/* ---- buttons: primary action becomes the System's signature blue ---- */
+.btn-primary{
+  background:linear-gradient(105deg,#2F8FFF,#1560C4 70%,#0D3E8A) !important;
+  border:1px solid rgba(120,195,255,.55) !important;
+  box-shadow:0 0 22px rgba(61,165,255,.35), inset 0 1px 0 rgba(255,255,255,.16) !important;
+  color:#EAF6FF !important;
+}
+#screen-customlist .btn-primary{
+  background:linear-gradient(105deg,#2F8FFF,#1560C4 70%,#0D3E8A) !important;
+  border:1px solid rgba(120,195,255,.55) !important;
+  box-shadow:0 0 24px rgba(61,165,255,.30), inset 0 1px 0 rgba(255,255,255,.16) !important;
+}
+.btn-outline{border-color:rgba(61,165,255,.45) !important;}
+.btn-ghost{background:rgba(61,165,255,.08) !important;}
+
+/* ---- nav active state ---- */
+.tab.active{color:var(--primary) !important;text-shadow:0 0 8px rgba(var(--sys-glow),.6);}
+.tab.active .dot{background:var(--primary) !important;box-shadow:0 0 6px rgba(var(--sys-glow),.8);}
+.tabbar{background:linear-gradient(180deg,rgba(10,17,32,.7),var(--bg-elev)) !important;border-top:1px solid rgba(61,165,255,.25) !important;}
+
+/* ---- xp / level bars glow blue instead of red-gold ---- */
+.xp-bar-fill{background:linear-gradient(90deg,#1E63C9,#3DA5FF,#8FD2FF) !important;box-shadow:0 0 10px rgba(61,165,255,.65);}
+.xp-bar-track{box-shadow:inset 0 0 6px rgba(0,0,0,.5);}
+.stat-bar-fill,.growth-fill-now{box-shadow:0 0 6px rgba(61,165,255,.35);}
+
+/* ---- System-window corner-bracket framing on the app's panel surfaces.
+   Matched by naming convention (-card/-modal/-panel/-window suffixes)
+   so it reaches the many independently-styled containers without
+   touching each one individually. Decorative only — no layout change. ---- */
+[class*="-card"]:not(.btn-primary):not(.combo-badge):not(.gem-badge),
+[class*="-modal"],
+[class*="-panel"],
+[class*="-window"],
+.modal-card{
+  position:relative;
+  border-color:rgba(61,165,255,.30) !important;
+  box-shadow:0 0 0 1px rgba(61,165,255,.08) inset, 0 8px 28px rgba(0,0,0,.45), 0 0 16px rgba(61,165,255,.06) !important;
+}
+[class*="-card"]:not(.btn-primary):not(.combo-badge):not(.gem-badge)::before,
+[class*="-modal"]::before,
+.modal-card::before,
+[class*="-card"]:not(.btn-primary):not(.combo-badge):not(.gem-badge)::after,
+[class*="-modal"]::after,
+.modal-card::after{
+  content:"";position:absolute;width:12px;height:12px;pointer-events:none;
+  border:2px solid rgba(120,195,255,.55);
+  opacity:.85;
+}
+[class*="-card"]:not(.btn-primary):not(.combo-badge):not(.gem-badge)::before,
+[class*="-modal"]::before,
+.modal-card::before{
+  top:-1px;left:-1px;border-right:none;border-bottom:none;border-top-left-radius:4px;
+}
+[class*="-card"]:not(.btn-primary):not(.combo-badge):not(.gem-badge)::after,
+[class*="-modal"]::after,
+.modal-card::after{
+  bottom:-1px;right:-1px;border-left:none;border-top:none;border-bottom-right-radius:4px;
+}
+
+/* ---- headings / eyebrow labels take on a faint System-terminal tint ---- */
+.modal-title{color:var(--text) !important;text-shadow:0 0 8px rgba(var(--sys-glow),.35);}
+</style>
 </head>
 <body>
 <div id="splash" class="splash">
