@@ -2,7 +2,7 @@
   "name": "cindy-app",
   "version": "1.0.0",
   "private": true,
-  "description": "CINDY — Fitness RPG Workout (Capacitor Android wrapper)",
+  "description": "SYSTEM — Level Up Your Life (Capacitor Android wrapper)",
   "scripts": {
     "sync": "cap sync android"
   },
