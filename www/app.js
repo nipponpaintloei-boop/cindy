@@ -2435,6 +2435,7 @@ function renderHome() {
   renderTreasureChest();
   renderDailyQuests();
   renderWeeklyMissions();
+  renderSpecialQuests();
   renderStepsCard();
   runSystemChecks();
 }
@@ -2563,7 +2564,18 @@ const QUEST_POOL = [
   { id: 'rounds3', title: 'ทำ 3 รอบรวด', desc: 'ทำ Cindy ให้ครบอย่างน้อย 3 รอบในเซสชันเดียว', xp: 20,
     check: (ctx) => ctx.todayMaxRounds >= 3 },
   { id: 'custom_today', title: 'ลอง Custom Workout', desc: 'เล่น Custom Workout โหมดใดก็ได้วันนี้', xp: 15,
-    check: (ctx) => ctx.customPlayedToday }
+    check: (ctx) => ctx.customPlayedToday },
+  // ---- manual (self-report) quests, dev brief §09 ----
+  // The app has no reading/focus/personal-task tracking yet — rather than
+  // wait for those features, these three let the player self-attest
+  // ("I did this") the same way a paper habit tracker would: no check(ctx)
+  // condition, just always-claimable once per day. Deliberately no MIND/
+  // LIFE stat tag wired up yet — that waits for the Body/Mind/Life stat
+  // system (dev brief §07, Phase 3) to actually exist; for now these only
+  // grant EXP like every other quest.
+  { id: 'read_today', title: 'อ่าน/เรียนรู้อะไรบางอย่าง', desc: 'อ่านหนังสือ บทความ หรือเรียนรู้เรื่องใหม่วันนี้ — กดยืนยันเอง', xp: 15, manual: true },
+  { id: 'focus_today', title: 'โฟกัส 1 ช่วง', desc: 'ตั้งใจทำงาน/เรียนแบบไม่วอกแวกอย่างน้อย 1 ช่วง — กดยืนยันเอง', xp: 15, manual: true },
+  { id: 'personal_task_today', title: 'ทำสิ่งที่ตั้งใจไว้', desc: 'ภารกิจส่วนตัวที่ตั้งใจไว้วันนี้ — กดยืนยันเอง', xp: 15, manual: true }
 ];
 function todayQuestContext() {
   const todayKey = dayKey(Date.now());
@@ -2889,7 +2901,7 @@ function renderDailyQuests() {
     const q = QUEST_POOL.find(x => x.id === id);
     if (!q) return '';
     const claimed = claimState.ids.indexOf(id) !== -1;
-    const done = q.check(ctx);
+    const done = q.manual ? true : q.check(ctx);
     let statusHtml;
     if (claimed) statusHtml = '<div class="quest-claimed">' + iconHtml('check') + ' รับแล้ว</div>';
     else if (done) statusHtml = '<button class="quest-claim-btn" onclick="claimDailyQuest(\'' + id + '\', event)">รับ +' + q.xp + ' XP</button>';
@@ -2904,7 +2916,7 @@ function claimDailyQuest(id, evt) {
   const state = loadQuestClaimState();
   if (state.ids.indexOf(id) !== -1) return;
   const q = QUEST_POOL.find(x => x.id === id);
-  if (!q || !q.check(todayQuestContext())) return;
+  if (!q || (!q.manual && !q.check(todayQuestContext()))) return;
   const settle = playClaimFeedback(evt, q.xp);
   vibrate([40, 30, 60]);
   settle(() => {
@@ -3117,6 +3129,106 @@ function claimWeeklyChest() {
   renderXpBar();
   vibrate([60, 40, 60, 40, 120]);
   showToast('เปิด WEEKLY CHEST สำเร็จ +' + WEEKLY_CHEST_XP + ' XP', 'gift');
+}
+
+/* ================= SPECIAL QUEST (dev brief §09) =================
+ * "BREAK YOUR LIMIT"-style: a harder, time-boxed challenge instead of a
+ * daily/weekly cadence — same claim/XP mechanism as Daily Quest and Weekly
+ * Mission (own bonus-XP counter folded into computeTotalXP, own claim
+ * state) but keyed to a rolling N-day window that starts the moment a
+ * cycle begins rather than a calendar boundary.
+ *
+ * A cycle is {startTs, claimed}, one per def, in KEY_SPECIAL_QUEST_STATE.
+ * ensureSpecialQuestCycle() lazily starts one on first check, and quietly
+ * starts a fresh one the moment the window has fully elapsed — whether or
+ * not the previous cycle was completed. A missed Special Quest just
+ * re-rolls next time the player opens the app, the same no-penalty
+ * rollover Daily/Weekly already use, rather than punishing a miss.
+ *
+ * def.progress(startTs) reads straight from the existing session arrays
+ * (same source Daily/Weekly read from) — nothing new to store or migrate,
+ * and nothing here can desync from real training history. */
+const KEY_SPECIAL_QUEST_STATE = 'cindy_special_quest_state_v1';
+const KEY_SPECIAL_QUEST_BONUS_XP = 'cindy_special_quest_bonus_xp';
+const SPECIAL_QUEST_DEFS = [
+  { id: 'break_limit', title: 'BREAK YOUR LIMIT', desc: 'ทำเซสชันฝึกให้ครบ 4 ครั้ง ภายใน 7 วัน',
+    unit: 'ครั้ง', windowDays: 7, target: 4, xp: 80,
+    progress: (startTs) => {
+      const cindy = loadSessions().filter(s => s.completed !== false && s.finished >= startTs).length;
+      const custom = loadCustomWorkoutSessions().filter(s => s.completedAt >= startTs).length;
+      const run = loadRunSessions().filter(s => s.completedAt >= startTs).length;
+      return cindy + custom + run;
+    }
+  }
+];
+function loadSpecialQuestState() {
+  let state;
+  try { state = JSON.parse(localStorage.getItem(KEY_SPECIAL_QUEST_STATE)); } catch (e) { state = null; }
+  return (state && typeof state === 'object') ? state : {};
+}
+function saveSpecialQuestState(state) {
+  localStorage.setItem(KEY_SPECIAL_QUEST_STATE, JSON.stringify(state));
+}
+function ensureSpecialQuestCycle(def, state) {
+  const now = Date.now();
+  const windowMs = def.windowDays * 86400000;
+  let entry = state[def.id];
+  if (!entry || (now - entry.startTs >= windowMs)) {
+    entry = { startTs: now, claimed: false };
+    state[def.id] = entry;
+    saveSpecialQuestState(state);
+  }
+  return entry;
+}
+function loadSpecialQuestBonusXP() {
+  const n = parseInt(localStorage.getItem(KEY_SPECIAL_QUEST_BONUS_XP), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+function addSpecialQuestBonusXP(amount) {
+  if (amount <= 0) return;
+  localStorage.setItem(KEY_SPECIAL_QUEST_BONUS_XP, String(loadSpecialQuestBonusXP() + amount));
+}
+function renderSpecialQuests() {
+  const wrap = document.getElementById('specialQuestList');
+  if (!wrap) return;
+  const state = loadSpecialQuestState();
+  wrap.innerHTML = SPECIAL_QUEST_DEFS.map(def => {
+    const entry = ensureSpecialQuestCycle(def, state);
+    const current = Math.min(def.target, def.progress(entry.startTs));
+    const done = current >= def.target;
+    const daysLeft = Math.max(0, Math.ceil((entry.startTs + def.windowDays * 86400000 - Date.now()) / 86400000));
+    let statusHtml;
+    if (entry.claimed) statusHtml = '<div class="quest-claimed">' + iconHtml('check') + ' รับแล้ว</div>';
+    else if (done) statusHtml = '<button class="quest-claim-btn" onclick="claimSpecialQuest(\'' + def.id + '\', event)">รับ +' + def.xp + ' XP</button>';
+    else statusHtml = '<div class="quest-xp-tag">' + current + '/' + def.target + ' ' + def.unit + '</div>';
+    return '<div class="quest-row' + (entry.claimed ? ' done' : '') + '">'
+      + '<div class="quest-info"><div class="quest-title">' + escapeHtml(def.title) + '</div>'
+      + '<div class="quest-desc">' + escapeHtml(def.desc) + (entry.claimed ? '' : ' · เหลือ ' + daysLeft + ' วัน') + '</div></div>'
+      + statusHtml
+      + '</div>';
+  }).join('');
+}
+function claimSpecialQuest(id, evt) {
+  const state = loadSpecialQuestState();
+  const def = SPECIAL_QUEST_DEFS.find(x => x.id === id);
+  if (!def) return;
+  const entry = ensureSpecialQuestCycle(def, state);
+  if (entry.claimed || def.progress(entry.startTs) < def.target) return;
+  const settle = playClaimFeedback(evt, def.xp);
+  vibrate([50, 40, 50, 40, 90]);
+  settle(() => {
+    entry.claimed = true;
+    saveSpecialQuestState(state);
+    addSpecialQuestBonusXP(def.xp);
+    renderSpecialQuests();
+    renderXpBar();
+    showSystemEvent({
+      header: 'SPECIAL QUEST CLEAR',
+      title: def.title,
+      rewards: ['+' + def.xp + ' EXP'],
+      accent: '#FF6B4A'
+    });
+  });
 }
 
 /* ================= SEASON (product doc #20) =================
@@ -3438,7 +3550,7 @@ function computeSessionXP() {
 }
 function computeTotalXP() {
   const { cindyXP, customXP, runXP } = computeSessionXP();
-  return cindyXP + customXP + runXP + loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP() + loadStepsBonusXP() + loadWeeklyBonusXP() + loadSeasonBonusXP();
+  return cindyXP + customXP + runXP + loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP() + loadStepsBonusXP() + loadWeeklyBonusXP() + loadSeasonBonusXP() + loadSpecialQuestBonusXP();
 }
 function xpRequiredForLevel(level) {
   return 100 + (level - 1) * 50;
