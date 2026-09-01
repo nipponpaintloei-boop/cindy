@@ -4627,7 +4627,14 @@ body.drawer-open{overflow:hidden;}
       <div style="width:38px;"></div>
     </div>
     <div class="list-wrap">
-      <div class="character-sheet-card character-sheet-hero no-portrait system-status-hero">
+      <!-- ---- hidden, not deleted: characterLevelBadge/characterRank/
+           characterNameBtn/characterTitleTag/characterCP/characterClassTitle
+           still exist off-screen below so renderCharacterSheet()'s existing
+           getElementById calls keep working untouched; the visible player
+           name/rank/title editor now lives on the Home mascot card, and
+           COMBAT POWER/FITNESS POWER numbers were dropped from view per
+           request (this card duplicated the STATUS window below it). ---- -->
+      <div class="character-sheet-card character-sheet-hero no-portrait system-status-hero" style="display:none;" aria-hidden="true">
         <div class="character-hero-info">
           <div id="characterLevelBadge" class="system-level-display" aria-label="Player level">
             <div class="system-level-kicker">PLAYER LEVEL</div>
