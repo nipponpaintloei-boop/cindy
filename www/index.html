@@ -2154,6 +2154,62 @@ body{
   .celebration-overlay.show .celebration-rarity::after{animation:none !important;opacity:1 !important;transform:none !important;}
 }
 
+/* ================= LEVEL-UP NOTIFICATION PANEL =================
+   Distinct "System notification" HUD look used only for level-up — a
+   glassy, faintly-cracked slanted panel with glowing top/bottom rails, an
+   exclamation icon + "NOTIFICATION" label, and an italic "Leveled up!"
+   message, instead of the badge/particle-burst .celebration-overlay used
+   for loot drops. Driven by showLevelUpNotification()/
+   dismissLevelUpNotification() in app.js. */
+.levelup-overlay{
+  position:fixed;inset:0;z-index:92;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,0);opacity:0;pointer-events:none;
+  transition:opacity .25s ease, background .25s ease;
+}
+.levelup-overlay.show{background:rgba(0,0,0,.55);opacity:1;pointer-events:auto;}
+.levelup-panel{
+  position:relative;width:min(320px,86vw);padding:26px 22px 28px;
+  background:
+    repeating-linear-gradient(115deg, rgba(255,255,255,.035) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(25deg, rgba(255,255,255,.025) 0 1px, transparent 1px 34px),
+    linear-gradient(165deg, rgba(10,22,40,.94), rgba(3,8,16,.97));
+  border:1px solid rgba(110,190,255,.55);
+  clip-path:polygon(3% 0%, 100% 0%, 97% 100%, 0% 100%);
+  box-shadow:0 0 0 1px rgba(90,180,255,.12), 0 14px 34px rgba(0,0,0,.5), 0 0 26px rgba(60,150,255,.18);
+  transform:scale(.85) translateY(10px);opacity:0;
+  transition:transform .35s cubic-bezier(.2,1.4,.4,1), opacity .3s ease;
+}
+.levelup-overlay.show .levelup-panel{transform:scale(1) translateY(0);opacity:1;}
+.levelup-panel::before,.levelup-panel::after{
+  content:"";position:absolute;left:-4%;right:-4%;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(120,200,255,.9) 20%,rgba(120,200,255,.9) 80%,transparent);
+  box-shadow:0 0 10px rgba(90,180,255,.7);
+}
+.levelup-panel::before{top:-10px;}
+.levelup-panel::after{bottom:-10px;}
+.levelup-header{display:flex;align-items:center;gap:10px;margin-bottom:22px;}
+.levelup-icon{
+  width:22px;height:22px;border-radius:50%;border:1.5px solid #cfe9ff;color:#eaf6ff;
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;
+  font-family:var(--font-display);flex-shrink:0;box-shadow:0 0 8px rgba(140,205,255,.5);
+}
+.levelup-label{
+  font-family:var(--font-display);font-size:13px;letter-spacing:3px;color:#eaf6ff;
+  border:1px solid rgba(160,210,255,.55);padding:4px 12px;border-radius:2px;
+  text-shadow:0 0 8px rgba(120,195,255,.5);
+}
+.levelup-body{text-align:center;min-height:40px;display:flex;flex-direction:column;justify-content:center;gap:6px;}
+.levelup-main{
+  font-size:20px;font-weight:800;font-style:italic;color:#f4faff;
+  text-shadow:0 0 12px rgba(140,205,255,.6);
+}
+.levelup-meta{font-size:11px;letter-spacing:1px;color:#a9c6e6;font-weight:600;}
+.levelup-rankup{font-size:10px;letter-spacing:1.5px;font-weight:800;color:#7fd2ff;display:none;text-shadow:0 0 8px rgba(120,195,255,.5);}
+.levelup-rankup.show{display:block;animation:xpEarnedIn .4s ease .1s both;}
+@media (prefers-reduced-motion:reduce){
+  .levelup-panel{transition:none !important;}
+}
+
 .complete-wrap{flex:1;min-height:0;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .complete-hero{position:relative;text-align:center;padding:22px 0 8px;}
 .complete-hero::before{
@@ -5543,6 +5599,24 @@ body.drawer-open{overflow:hidden;}
     <div class="celebration-title" id="celebrationTitle"></div>
     <div class="celebration-subtitle" id="celebrationSubtitle"></div>
     <div class="celebration-rankup" id="celebrationRankup"></div>
+  </div>
+</div>
+
+<!-- ---- LEVEL-UP NOTIFICATION: holographic "NOTIFICATION" HUD panel used
+     only for level-up (loot/skin unlocks still use .celebration-overlay
+     above). Driven by showLevelUpNotification()/dismissLevelUpNotification()
+     in app.js. ---- -->
+<div id="levelUpOverlay" class="levelup-overlay" onclick="dismissLevelUpNotification()">
+  <div class="levelup-panel">
+    <div class="levelup-header">
+      <span class="levelup-icon">!</span>
+      <span class="levelup-label">NOTIFICATION</span>
+    </div>
+    <div class="levelup-body">
+      <div class="levelup-main">Leveled up!</div>
+      <div class="levelup-meta" id="levelUpMeta"></div>
+      <div class="levelup-rankup" id="levelUpRankup"></div>
+    </div>
   </div>
 </div>
 

@@ -2072,6 +2072,52 @@ const _celebrationQueue = [];
 let _celebrationActive = false;
 let _celebrationTimer = null;
 
+/* ---- LEVEL-UP NOTIFICATION: a separate, simpler "System notification"
+ * panel (icon + NOTIFICATION label + message) used only for level-up,
+ * distinct from the badge/particle-burst .celebration-overlay above (still
+ * used for loot drops/skin unlocks). Queued the same way so a level-up
+ * firing mid-loot-celebration doesn't collide with it. */
+const LEVELUP_NOTIF_DURATION_MS = 2400;
+const _levelUpQueue = [];
+let _levelUpActive = false;
+let _levelUpTimer = null;
+
+function showLevelUpNotification(opts) {
+  _levelUpQueue.push(opts || {});
+  _runLevelUpQueue();
+}
+function _runLevelUpQueue() {
+  if (_levelUpActive || _levelUpQueue.length === 0) return;
+  _levelUpActive = true;
+  _renderLevelUpNotification(_levelUpQueue.shift());
+}
+function _renderLevelUpNotification(opts) {
+  const overlay = document.getElementById('levelUpOverlay');
+  if (!overlay) { _levelUpActive = false; return; } // markup missing — don't jam the queue
+  const metaEl = document.getElementById('levelUpMeta');
+  const rankupEl = document.getElementById('levelUpRankup');
+  if (metaEl) metaEl.textContent = opts.meta || '';
+  if (rankupEl) {
+    if (opts.rankup) { rankupEl.textContent = opts.rankup; rankupEl.classList.add('show'); }
+    else { rankupEl.textContent = ''; rankupEl.classList.remove('show'); }
+  }
+  overlay.classList.add('show');
+  vibrate([50, 30, 50]);
+  clearTimeout(_levelUpTimer);
+  _levelUpTimer = setTimeout(dismissLevelUpNotification, LEVELUP_NOTIF_DURATION_MS);
+}
+/** Ends the current notification early (tap-to-dismiss) or via its own
+ * timeout, then — after a short gap so the fade-out isn't cut off by the
+ * next one popping in instantly — advances the queue. Same pattern as
+ * dismissCelebration() above. */
+function dismissLevelUpNotification() {
+  const overlay = document.getElementById('levelUpOverlay');
+  if (!overlay || !overlay.classList.contains('show')) return;
+  overlay.classList.remove('show');
+  clearTimeout(_levelUpTimer);
+  setTimeout(() => { _levelUpActive = false; _runLevelUpQueue(); }, 220);
+}
+
 function queueCelebration(opts) {
   _celebrationQueue.push(opts || {});
   _runCelebrationQueue();
@@ -3682,12 +3728,8 @@ function renderXpBar() {
     badge.addEventListener('animationend', () => badge.classList.remove('bump'), { once: true });
     vibrate([60, 40, 60]);
     const rank = rankForLevel(info.level);
-    queueCelebration({
-      icon: rank.icon,
-      title: 'LEVEL UP!',
-      subtitle: 'ตอนนี้ LV.' + info.level + ' · ' + rank.title,
-      accent: RANK_ACCENT_HEX[rank.title.toLowerCase()],
-      variant: 'levelup',
+    showLevelUpNotification({
+      meta: 'LV.' + info.level + ' · ' + rank.title,
       rankup: rank.title !== prevRank.title ? 'RANK UP → ' + rank.title : null
     });
   }
