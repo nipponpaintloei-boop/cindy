@@ -4036,6 +4036,21 @@ function renderStatusWindow() {
   }).join('') + '<div class="sw-stat-row sw-stat-total"><span class="sw-stat-label">STAT LV TOTAL</span>'
     + '<span class="sw-stat-value">' + totalLv + '</span></div>';
 
+  // pentagon radar — same radarPoint() helper/angle math as the old
+  // full-page radar, just fed the 5 solo stats (STR/VIT/AGI/INT/PER)
+  // in the same order as the SVG's <text> labels above.
+  const area = document.getElementById('swRadarArea');
+  const line = document.getElementById('swRadarLine');
+  const dots = document.getElementById('swRadarDots');
+  if (area && line && dots) {
+    const values = SOLO_STAT_DEFS.map(def => stats[def.key].level / 20);
+    const points = values.map((v, i) => radarPoint(150, 135, 105, i, v));
+    const pointString = points.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
+    area.setAttribute('points', pointString);
+    line.setAttribute('points', pointString);
+    dots.innerHTML = points.map(p => '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3"></circle>').join('');
+  }
+
   const info = computeLevelInfo(computeTotalXP());
   const maxHp = 100 + (info.level - 1) * 40;
   const maxMp = 50 + (info.level - 1) * 15;

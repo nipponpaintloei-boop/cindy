@@ -3565,6 +3565,14 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 .sw-bar-num{font-size:9px;color:#a9c6e6;flex-shrink:0;min-width:62px;text-align:right;font-weight:700;}
 .sw-fatigue-row{font-size:9px;letter-spacing:1.5px;color:#8bcfff;font-weight:800;text-align:right;margin-top:2px;}
 .sw-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(104,191,255,.5),transparent);margin:10px 0 12px;}
+.sw-radar-wrap{margin:0 0 12px;}
+.sw-radar{display:block;width:100%;max-width:280px;height:auto;margin:0 auto;overflow:visible;}
+.sw-radar-grid polygon,.sw-radar-grid line{fill:none;stroke:rgba(86,153,214,.24);stroke-width:1;}
+.sw-radar-grid polygon:first-child{stroke:rgba(98,176,244,.42);}
+.sw-radar-area{fill:rgba(64,153,255,.16);stroke:none;}
+.sw-radar-line{fill:none;stroke:#67b9ff;stroke-width:2;filter:drop-shadow(0 0 4px rgba(80,180,255,.55));}
+.sw-radar-dots circle{fill:#eaf7ff;stroke:#5db8ff;stroke-width:1.5;filter:drop-shadow(0 0 4px rgba(80,180,255,.7));}
+.sw-radar-labels text{font-family:var(--font-display);font-size:9px;font-weight:800;letter-spacing:1.5px;fill:#9fc8e9;}
 .sw-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px 16px;}
 .sw-stat-row{display:flex;align-items:center;gap:8px;}
 .sw-stat-icon{width:9px;height:9px;flex-shrink:0;border-radius:2px;background:#67b9ff;box-shadow:0 0 6px rgba(104,195,255,.6);}
@@ -4680,6 +4688,34 @@ body.drawer-open{overflow:hidden;}
             <div class="sw-fatigue-row">FATIGUE: <span id="swFatigueValue">0</span></div>
           </div>
           <div class="sw-divider"></div>
+          <div class="sw-radar-wrap">
+            <svg id="swRadarChart" class="sw-radar" viewBox="0 0 300 270" role="img" aria-label="Stat radar chart">
+              <defs>
+                <filter id="swRadarGlow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              </defs>
+              <g class="sw-radar-grid">
+                <polygon points="150,30 264,112 220,244 80,244 36,112"></polygon>
+                <polygon points="150,58 237,121 204,220 96,220 63,121"></polygon>
+                <polygon points="150,86 210,130 188,196 112,196 90,130"></polygon>
+                <polygon points="150,114 184,139 172,172 128,172 116,139"></polygon>
+                <line x1="150" y1="135" x2="150" y2="30"></line>
+                <line x1="150" y1="135" x2="264" y2="112"></line>
+                <line x1="150" y1="135" x2="220" y2="244"></line>
+                <line x1="150" y1="135" x2="80" y2="244"></line>
+                <line x1="150" y1="135" x2="36" y2="112"></line>
+              </g>
+              <polygon id="swRadarArea" class="sw-radar-area" points="150,135 150,135 150,135 150,135 150,135" filter="url(#swRadarGlow)"></polygon>
+              <polygon id="swRadarLine" class="sw-radar-line" points="150,135 150,135 150,135 150,135 150,135"></polygon>
+              <g id="swRadarDots" class="sw-radar-dots"></g>
+              <g class="sw-radar-labels">
+                <text x="150" y="17" text-anchor="middle">STR</text>
+                <text x="278" y="110" text-anchor="start">VIT</text>
+                <text x="224" y="260" text-anchor="middle">AGI</text>
+                <text x="76" y="260" text-anchor="middle">INT</text>
+                <text x="22" y="110" text-anchor="end">PER</text>
+              </g>
+            </svg>
+          </div>
           <div class="sw-stat-grid" id="swStatGrid"></div>
         </div>
       </div>
