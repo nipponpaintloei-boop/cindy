@@ -3668,7 +3668,7 @@ function renderXpBar() {
   if (!badge || !fill || !label) return;
 
   const info = computeLevelInfo(computeTotalXP());
-  badge.textContent = 'LV.' + info.level;
+  badge.innerHTML = '<span class="level-prefix">PLAYER SYSTEM</span><span class="level-number">' + info.level + '</span><span class="level-corner tl"></span><span class="level-corner tr"></span><span class="level-corner bl"></span><span class="level-corner br"></span>';
   fill.style.width = Math.round(info.pct * 100) + '%';
   label.textContent = info.xpIntoLevel + ' / ' + info.xpForNextLevel + ' XP';
 
@@ -4767,7 +4767,7 @@ function renderCharacterSheet() {
   if (!levelBadge) return;
 
   const info = computeLevelInfo(computeTotalXP());
-  levelBadge.textContent = 'LV.' + info.level;
+  levelBadge.innerHTML = '<span class="level-prefix">PLAYER SYSTEM</span><span class="level-number">' + info.level + '</span><span class="level-corner tl"></span><span class="level-corner tr"></span><span class="level-corner bl"></span><span class="level-corner br"></span>';
   renderCharacterName();
   const rank = rankForLevel(info.level);
   const rankEl = document.getElementById('characterRank');

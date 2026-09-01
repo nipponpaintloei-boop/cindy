@@ -300,10 +300,40 @@ body{
 .mascot-card.no-avatar{margin-top:16px;padding:20px 22px;}
 .mascot-card.no-avatar .mascot-text{width:100%;}
 .status-level-badge{
-  position:static;transform:none;display:inline-block;
-  margin-bottom:8px;font-size:20px;letter-spacing:.5px;
-  padding:4px 14px 3px;border-radius:8px;
+  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:min(190px,62vw);height:112px;margin:0 auto 14px;padding:14px 22px 12px;
+  background:linear-gradient(180deg,rgba(10,24,42,.82),rgba(4,10,18,.72));
+  border:1px solid rgba(105,190,255,.58);border-radius:2px;
+  color:#eef8ff;text-shadow:0 0 14px rgba(75,184,255,.7);
+  box-shadow:inset 0 0 28px rgba(43,151,225,.12),0 0 22px rgba(45,150,225,.12);
+  overflow:hidden;isolation:isolate;
 }
+.status-level-badge::before{
+  content:"LEVEL";font-family:var(--font-display);font-size:9px;font-weight:800;
+  letter-spacing:3px;color:#8fd7ff;text-shadow:0 0 8px rgba(77,184,255,.65);
+  margin-bottom:2px;
+}
+.status-level-badge::after{
+  content:"";position:absolute;left:13px;right:13px;bottom:9px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(120,211,255,.75),transparent);
+  box-shadow:0 0 8px rgba(74,183,255,.55);
+}
+.status-level-badge .level-number{
+  position:relative;z-index:2;font-family:var(--font-display);font-size:54px;line-height:.92;
+  font-weight:900;letter-spacing:2px;color:#f4fbff;
+}
+.status-level-badge .level-prefix{
+  position:absolute;left:10px;top:9px;font-family:var(--font-display);font-size:8px;
+  letter-spacing:1.5px;color:rgba(177,224,255,.6);
+}
+.status-level-badge .level-corner{position:absolute;width:13px;height:13px;border-color:#76cfff;opacity:.9;}
+.status-level-badge .level-corner.tl{left:-1px;top:-1px;border-left:2px solid;border-top:2px solid;}
+.status-level-badge .level-corner.tr{right:-1px;top:-1px;border-right:2px solid;border-top:2px solid;}
+.status-level-badge .level-corner.bl{left:-1px;bottom:-1px;border-left:2px solid;border-bottom:2px solid;}
+.status-level-badge .level-corner.br{right:-1px;bottom:-1px;border-right:2px solid;border-bottom:2px solid;}
+.status-level-badge.bump{animation:systemLevelPulse .65s ease;}
+@keyframes systemLevelPulse{0%{transform:scale(1);filter:brightness(1)}35%{transform:scale(1.035);filter:brightness(1.45)}100%{transform:scale(1);filter:brightness(1)}}
+
 /* Progressive backdrop: JS sets --backdrop-img (a url()) per unlocked tier and
    toggles this class. Layered as: dark fade toward the text side (readability)
    + the backdrop photo + the original flat gradient as a safe fallback if the
@@ -3649,7 +3679,7 @@ body.drawer-open{overflow:hidden;}
       <div class="mascot-card no-avatar" id="playerStatusCard">
         <div id="treasureChestBtn" class="treasure-chest-btn" onclick="openTreasureChestModal()" aria-label="เปิดหีบรางวัล"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><rect x="4" y="12" width="16" height="9" rx="1"/><path d="M12 8v13"/><path d="M12 8C10.5 4.5 6.5 4.5 6.5 6.9c0 1.5 2 1.1 5.5 1.1z"/><path d="M12 8c1.5-3.5 5.5-3.9 5.5-1.1 0 1.5-2 1.1-5.5 1.1z"/></svg></span></div>
         <div class="mascot-text">
-          <div id="mascotLevelBadge" class="mascot-level-badge status-level-badge">LV.1</div>
+          <div id="mascotLevelBadge" class="mascot-level-badge status-level-badge"><span class="level-prefix">PLAYER SYSTEM</span><span class="level-number">1</span><span class="level-corner tl"></span><span class="level-corner tr"></span><span class="level-corner bl"></span><span class="level-corner br"></span></div>
           <div id="mascotCharacterName" class="mascot-character-name" onclick="openCharacterNameModal()"></div>
           <div id="mascotRank" class="mascot-rank rank-recruit"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 7.6-7 9-4-1.4-7-4.4-7-9V6z"/></svg></span> RECRUIT</div>
           <div id="mascotHeadline" class="mascot-headline">ยังไม่มีประวัติการเล่น</div>
@@ -4451,7 +4481,7 @@ body.drawer-open{overflow:hidden;}
     <div class="list-wrap">
       <div class="character-sheet-card character-sheet-hero no-portrait">
         <div class="character-hero-info">
-          <div id="characterLevelBadge" class="mascot-level-badge">LV.1</div>
+          <div id="characterLevelBadge" class="mascot-level-badge status-level-badge"><span class="level-prefix">PLAYER SYSTEM</span><span class="level-number">1</span><span class="level-corner tl"></span><span class="level-corner tr"></span><span class="level-corner bl"></span><span class="level-corner br"></span></div>
           <div id="characterRank" class="mascot-rank rank-recruit" style="display:inline-block;"></div>
           <button id="characterNameBtn" class="character-name-btn" onclick="openCharacterNameModal()" type="button">
             <span id="characterNameText">ตั้งชื่อตัวละคร</span>
