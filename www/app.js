@@ -2393,7 +2393,7 @@ function ensureLobbyEmbers() {
 })();
 
 function renderHome() {
-  renderMascotCard();
+  renderPlayerStatusCard();
   renderHomeWeeklyPlanCard();
   renderBossCard();
   renderBossTeaser();
@@ -3312,11 +3312,9 @@ function todayHasPR() {
   return cindyPR || customPR;
 }
 
-function renderMascotCard() {
+function renderPlayerStatusCard() {
   const headline = document.getElementById('mascotHeadline');
   const sub = document.getElementById('mascotSub');
-  const img = document.getElementById('mascotImg');
-  const imgGlow = document.getElementById('mascotImgGlow');
   if (!headline || !sub) return;
   const streak = computeCombinedStreak();
   const playedToday = didPlayToday();
@@ -3334,11 +3332,8 @@ function renderMascotCard() {
   const line = pickDailyLine(pool);
   headline.textContent = fillTemplate(line.h, { streak });
   sub.textContent = fillTemplate(line.s, { streak });
-  if (img) img.src = 'assets/mascot/mascot.png';
-  if (imgGlow) imgGlow.src = 'assets/mascot/mascot.png';
 
   renderXpBar();
-  applyActiveMascotSkinFilter();
   renderCharacterName();
 }
 
@@ -3437,7 +3432,6 @@ function renderXpBar() {
   const badge = document.getElementById('mascotLevelBadge');
   const fill = document.getElementById('xpBarFill');
   const label = document.getElementById('xpBarLabel');
-  const avatar = document.getElementById('mascotAvatar');
   if (!badge || !fill || !label) return;
 
   const info = computeLevelInfo(computeTotalXP());
@@ -3449,12 +3443,6 @@ function renderXpBar() {
   if (info.level > lastSeen) {
     const prevRank = rankForLevel(lastSeen);
     saveLastSeenLevel(info.level);
-    if (avatar) {
-      avatar.classList.remove('level-up-glow');
-      void avatar.offsetWidth; // reflow so the animation can replay
-      avatar.classList.add('level-up-glow');
-      avatar.addEventListener('animationend', () => avatar.classList.remove('level-up-glow'), { once: true });
-    }
     badge.classList.remove('bump');
     void badge.offsetWidth;
     badge.classList.add('bump');
@@ -3471,7 +3459,6 @@ function renderXpBar() {
     });
   }
   renderRankTag(info.level);
-  applyMascotBackdrop(info.level);
   checkNewlyUnlockedSkills();
 }
 
@@ -3494,135 +3481,6 @@ function rankForLevel(level) {
   return RANK_TIERS.find(r => level >= r.min && level <= r.max) || RANK_TIERS[0];
 }
 
-/* ================= PROGRESSIVE BACKDROP =================
- * First 2 tiers only, wired for an APK smoke test — same "same training
- * ground, evolving with the player" concept as MASCOT_SKINS. Deliberately
- * paired with the same level milestones as the skins (LV.5 etc.) rather than
- * its own unlock track, so a level-up reveals both at once. LV.10/15/20
- * added below continue the same escalation (cyber-energy hall → arcane
- * blue rune circle → gold/crimson legend throne room), each a visibly
- * bigger leap than the last so leveling up keeps paying off visually.
- * User-selectable via the backdrop picker below (same staged/confirm
- * pattern as the skin picker) — the saved pick is used as long as it's
- * still unlocked, otherwise falls back to the highest unlocked tier for
- * the current level. */
-const BACKDROPS = [
-  { id: 'default', name: 'สนามฝึกเปล่า', img: 'assets/backdrops/bg-default.jpg', unlock: null },
-  { id: 'lv5', name: 'สนามเริ่มมีพลังงาน', img: 'assets/backdrops/bg-lv5.jpg',
-    unlock: { type: 'level', value: 5 }, cond: 'ถึง LV.5' },
-  { id: 'lv10', name: 'สนามฝึกพลังไซเบอร์', img: 'assets/backdrops/bg-lv10.jpg',
-    unlock: { type: 'level', value: 10 }, cond: 'ถึง LV.10' },
-  { id: 'lv15', name: 'สนามพลังเวทอาถรรพ์', img: 'assets/backdrops/bg-lv15.jpg',
-    unlock: { type: 'level', value: 15 }, cond: 'ถึง LV.15' },
-  { id: 'lv20', name: 'ห้องบัลลังก์นักสู้ในตำนาน', img: 'assets/backdrops/bg-lv20.jpg',
-    unlock: { type: 'level', value: 20 }, cond: 'ถึง LV.20' }
-];
-function isBackdropUnlocked(bd) {
-  if (!bd.unlock) return true;
-  if (bd.unlock.type === 'level') return computeLevelInfo(computeTotalXP()).level >= bd.unlock.value;
-  return false;
-}
-/** Highest-tier backdrop the current level has unlocked (BACKDROPS is kept in
- * ascending unlock order, so the last match wins). */
-function activeBackdropForLevel(level) {
-  let picked = BACKDROPS[0];
-  for (const bd of BACKDROPS) {
-    if (!bd.unlock) { picked = bd; continue; }
-    if (bd.unlock.type === 'level' && level >= bd.unlock.value) picked = bd;
-  }
-  return picked;
-}
-/** Applies the right backdrop image to one card element (.mascot-card on
- * Home, or .character-hero-img-wrap on the Character sheet) for the given
- * level. Both elements share the same --backdrop-img + .has-backdrop
- * convention set up in CSS. */
-function applyBackdropToEl(el, level) {
-  if (!el) return;
-  const bd = activeBackdropForDisplay(level);
-  el.style.setProperty('--backdrop-img', 'url("' + bd.img + '")');
-  el.classList.add('has-backdrop');
-}
-function applyMascotBackdrop(level) {
-  applyBackdropToEl(document.querySelector('.mascot-card'), level);
-  applyBackdropToEl(document.querySelector('.character-hero-img-wrap'), level);
-}
-
-/* ================= BACKDROP PICKER (user-selectable) =================
- * Lets the player manually choose among unlocked BACKDROPS instead of
- * always showing the auto highest-unlocked tier. Mirrors the mascot skin
- * picker's staged/confirm flow: a tap in the grid only "stages" a pick,
- * nothing is saved/applied until confirmBackdropChange(). */
-const KEY_ACTIVE_BACKDROP = 'cindy_active_backdrop';
-function loadActiveBackdropId() {
-  return localStorage.getItem(KEY_ACTIVE_BACKDROP) || null;
-}
-function saveActiveBackdropId(id) {
-  localStorage.setItem(KEY_ACTIVE_BACKDROP, id);
-}
-/** Resolves which backdrop should actually be shown: the player's saved
- * pick if it's still unlocked, otherwise the highest tier the current
- * level has unlocked (same behavior as before the picker existed). */
-function activeBackdropForDisplay(level) {
-  const savedId = loadActiveBackdropId();
-  if (savedId) {
-    const bd = BACKDROPS.find(b => b.id === savedId);
-    if (bd && isBackdropUnlocked(bd)) return bd;
-  }
-  return activeBackdropForLevel(level);
-}
-let stagedBackdropId = null;
-function openBackdropPicker() {
-  const info = computeLevelInfo(computeTotalXP());
-  stagedBackdropId = activeBackdropForDisplay(info.level).id;
-  renderBackdropGrid();
-  document.getElementById('backdropPickerModal').classList.add('active');
-}
-function stageBackdrop(id) {
-  const bd = BACKDROPS.find(b => b.id === id);
-  if (!bd || !isBackdropUnlocked(bd)) return;
-  stagedBackdropId = id;
-  renderBackdropGrid();
-}
-function renderBackdropGrid() {
-  const grid = document.getElementById('backdropGrid');
-  if (!grid) return;
-  const info = computeLevelInfo(computeTotalXP());
-  const activeId = activeBackdropForDisplay(info.level).id;
-  const stagedId = stagedBackdropId || activeId;
-  grid.innerHTML = BACKDROPS.map(bd => {
-    const unlocked = isBackdropUnlocked(bd);
-    const isActive = bd.id === activeId;
-    const isStaged = bd.id === stagedId;
-    const cls = 'backdrop-item' + (isActive ? ' active' : '') + (isStaged && !isActive ? ' staged' : '') + (unlocked ? '' : ' locked');
-    const clickAttr = unlocked ? ' onclick="stageBackdrop(\'' + bd.id + '\')"' : '';
-    const cornerHtml = isStaged ? '<div class="active-check">' + iconHtml('check') + '</div>' : (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>');
-    const thumbStyle = 'background-image:url(\'' + bd.img + '\');' + (unlocked ? '' : 'filter:grayscale(1) brightness(.5);');
-    return '<div class="' + cls + '"' + clickAttr + '>' + cornerHtml +
-      '<div class="backdrop-thumb" style="' + thumbStyle + '"></div>' +
-      '<div class="skin-name">' + bd.name + '</div>' +
-      (unlocked ? '' : '<div class="skin-cond">' + bd.cond + '</div>') +
-      '</div>';
-  }).join('');
-  const bar = document.getElementById('backdropConfirmBar');
-  if (bar) bar.classList.toggle('show', stagedId !== activeId);
-}
-/** Applies the staged backdrop (if different from what's shown) and closes
- * the picker. No one-shot FX here (unlike skins) — the backdrop is a
- * static scene behind the card, so a clean re-render is enough. */
-function confirmBackdropChange() {
-  const info = computeLevelInfo(computeTotalXP());
-  const activeId = activeBackdropForDisplay(info.level).id;
-  if (!stagedBackdropId || stagedBackdropId === activeId) {
-    closeModal('backdropPickerModal');
-    return;
-  }
-  const bd = BACKDROPS.find(b => b.id === stagedBackdropId);
-  if (!bd || !isBackdropUnlocked(bd)) return;
-  closeModal('backdropPickerModal');
-  saveActiveBackdropId(bd.id);
-  applyMascotBackdrop(info.level);
-  showToast('เปลี่ยนพื้นหลังเป็น ' + bd.name);
-}
 function renderRankTag(level) {
   const el = document.getElementById('mascotRank');
   if (!el) return;
@@ -4342,17 +4200,6 @@ function initAchModal() {
  * avatar itself; this just surfaces the same two picks as RPG-style
  * equipment slots that link back to where they're changed. */
 function renderCharacterEquipment() {
-  const skin = MASCOT_SKINS.find(s => s.id === loadActiveSkin()) || MASCOT_SKINS[0];
-  const skinIconEl = document.getElementById('characterEquipSkinIcon');
-  const skinNameEl = document.getElementById('characterEquipSkinName');
-  if (skinIconEl) {
-    // Same coin-shell hook used everywhere else on this screen (loot slot,
-    // trophy wall) so the SKIN slot doesn't stand out on its own — every
-    // skin including the default now has its own custom-designed icon.
-    skinIconEl.innerHTML = skinIconHtml(skin, { glow: !!skin.strong });
-  }
-  if (skinNameEl) skinNameEl.textContent = skin.name;
-
   const item = equippedLootItem();
   const lootIconEl = document.getElementById('characterEquipLootIcon');
   const lootNameEl = document.getElementById('characterEquipLootName');
@@ -4365,14 +4212,13 @@ function renderCharacterEquipment() {
   const lootStatEl = document.getElementById('characterEquipLootStat');
   if (lootStatEl) lootStatEl.textContent = item ? lootStatBonusLabel(item) : '';
 }
-/** Jumps to the Collection screen and scrolls straight to the relevant
- * section (skins or loot) — used by the Character sheet's equipment
- * slots so tapping one goes right to where it's changed. */
+/** Jumps to the Collection screen and scrolls straight to the loot
+ * grid — used by the Character sheet's equipment slot so tapping it
+ * goes right to where the loot badge is changed. */
 function goToCollectionSection(section) {
   go('collection');
-  const targetId = section === 'loot' ? 'collectionLootGrid' : 'collectionSkinGrid';
   setTimeout(() => {
-    const el = document.getElementById(targetId);
+    const el = document.getElementById('collectionLootGrid');
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 60);
 }
@@ -4418,34 +4264,11 @@ function renderCharacterRecentLog() {
  * same derived data, laid out like an RPG character sheet (mascot centered,
  * stats around it) instead of a list item in the Progress screen. */
 function renderCharacterSheet() {
-  const img = document.getElementById('characterMascotImg');
-  const avatar = document.getElementById('characterAvatar');
-  const accessory = document.getElementById('characterSkinAccessory');
   const levelBadge = document.getElementById('characterLevelBadge');
-  const gear = document.getElementById('characterGearBadge');
-  if (!img || !avatar) return;
-
-  const skin = MASCOT_SKINS.find(s => s.id === loadActiveSkin()) || MASCOT_SKINS[0];
-  const unlocked = isSkinUnlocked(skin);
-  img.src = (unlocked && skin.img) ? skin.img : 'assets/mascot/mascot.png';
-  img.style.filter = unlocked ? skin.filter : 'none';
-
-  const hasAura = !!(unlocked && skin.aura);
-  avatar.classList.toggle('skin-glow', hasAura);
-  avatar.classList.toggle('skin-glow-strong', hasAura && !!skin.strong);
-  avatar.style.setProperty('--skin-aura', hasAura ? skin.aura : 'transparent');
-
-  if (accessory) {
-    if (unlocked && skin.accIcon) {
-      accessory.innerHTML = skinIconHtml(skin, { glow: !!skin.strong });
-      accessory.classList.add('show');
-    } else {
-      accessory.classList.remove('show');
-    }
-  }
+  if (!levelBadge) return;
 
   const info = computeLevelInfo(computeTotalXP());
-  if (levelBadge) levelBadge.textContent = 'LV.' + info.level;
+  levelBadge.textContent = 'LV.' + info.level;
   renderCharacterName();
   const rank = rankForLevel(info.level);
   const rankEl = document.getElementById('characterRank');
@@ -4454,32 +4277,10 @@ function renderCharacterSheet() {
     RANK_TIERS.forEach(r => rankEl.classList.remove('rank-' + r.title.toLowerCase()));
     rankEl.classList.add('rank-' + rank.title.toLowerCase());
   }
-  applyMascotBackdrop(info.level);
   const tier = rank.title.toLowerCase();
-  // Character page's img-wrap lives outside .mascot-card's subtree, so it never
-  // inherited that element's --mascot-accent-rgb — the rank tint here (and the
-  // ::after edge-fade that depends on the same var) was silently a no-op before
-  // this. Set it directly on the wrap, same lookup Home's version uses.
-  const heroWrap = document.querySelector('.character-hero-img-wrap');
-  if (heroWrap) heroWrap.style.setProperty('--mascot-accent-rgb', hexToRgbTriplet(RANK_ACCENT_HEX[tier] || RANK_ACCENT_HEX.recruit));
-  RANK_TIERS.forEach(r => avatar.classList.remove('aura-' + r.title.toLowerCase()));
-  if (tier !== 'recruit') avatar.classList.add('aura-' + tier);
-  if (levelBadge) {
-    RANK_TIERS.forEach(r => levelBadge.classList.remove('lvbadge-' + r.title.toLowerCase()));
-    if (tier !== 'recruit') levelBadge.classList.add('lvbadge-' + tier);
-  }
-  if (gear) {
-    RANK_TIERS.forEach(r => gear.classList.remove('gear-' + r.title.toLowerCase()));
-    if (tier === 'recruit') {
-      gear.classList.remove('show');
-    } else {
-      gear.innerHTML = iconHtml(rank.icon);
-      gear.classList.add('show', 'gear-' + tier);
-    }
-  }
+  RANK_TIERS.forEach(r => levelBadge.classList.remove('lvbadge-' + r.title.toLowerCase()));
+  if (tier !== 'recruit') levelBadge.classList.add('lvbadge-' + tier);
 
-  renderMascotTitle('characterSkinTitle', skin, unlocked);
-  applyEquippedLootBadge('characterLootBadge');
   renderStatBars('characterStatBarList');
   renderLifeStatBars('characterLifeStatBarList');
   renderFitnessRank('characterFitnessRank');
@@ -4684,7 +4485,11 @@ function applyActiveMascotSkinFilter() {
  * ("นักสู้ 7 วัน", "ตำนาน 100 วัน", "ผู้พิชิต CORE-ZERO"...) — this just
  * surfaces that name as a title chip next to the rank badge instead of
  * introducing a second, separate title system. Default skin shows nothing
- * (rank badge alone covers that case). */
+ * (rank badge alone covers that case). No longer called from the Home/
+ * Character/Companion HUD (their target elements were removed along with
+ * the mascot avatar), kept only as a no-op-safe helper for any other
+ * caller that still passes an element id.
+ */
 function renderMascotTitle(elId, skin, unlocked) {
   const el = document.getElementById(elId);
   if (!el) return;
@@ -4697,128 +4502,17 @@ function renderMascotTitle(elId, skin, unlocked) {
     el.classList.remove('show', 'title-strong');
   }
 }
-/* ================= COMPANION HUD (Custom Workout player) =================
- * Small corner mascot shown while a Custom Workout is in progress, wearing
- * whatever skin is currently equipped on Home — same lookup, just a
- * different, smaller target element so it isn't a duplicate skin system.
- * It reacts (a quick bounce) whenever a rest-skip bonus lands, tying the
- * in-workout moment back to the same mascot card on Home. */
-function applyCompanionHudSkin() {
-  const img = document.getElementById('playerCompanionImg');
-  const hud = document.getElementById('playerCompanionHud');
-  if (!img || !hud) return;
-  const skin = MASCOT_SKINS.find(s => s.id === loadActiveSkin()) || MASCOT_SKINS[0];
-  const unlocked = isSkinUnlocked(skin);
-  img.src = (unlocked && skin.img) ? skin.img : 'assets/mascot/mascot.png';
-  img.style.filter = unlocked ? skin.filter : 'none';
-  const hasAura = !!(unlocked && skin.aura);
-  hud.classList.toggle('skin-glow', hasAura);
-  hud.style.setProperty('--skin-aura', hasAura ? skin.aura : 'transparent');
-  applyEquippedLootBadge('playerCompanionLootBadge');
-}
 /** Rest-skip bonus visual: a bouncing "+N XP" badge on the timer ring
- * (same pop/scale language as the AMRAP screen's .combo-badge, just a
- * cooler-toned gradient so it doesn't read as a combo) plus a quick bounce
- * on the companion mascot HUD. */
+ * (same pop/scale language as the AMRAP screen's .combo-badge). */
 function showRestSkipBonusEffect(bonus) {
   const badge = document.getElementById('restBonusBadge');
-  if (badge) {
-    badge.textContent = '+' + bonus + ' XP';
-    badge.classList.remove('show', 'pulse');
-    void badge.offsetWidth;
-    badge.classList.add('show', 'pulse');
-    clearTimeout(showRestSkipBonusEffect._h);
-    showRestSkipBonusEffect._h = setTimeout(() => badge.classList.remove('show'), 900);
-  }
-  const hud = document.getElementById('playerCompanionHud');
-  if (hud) {
-    hud.classList.remove('companion-react');
-    void hud.offsetWidth;
-    hud.classList.add('companion-react');
-  }
-}
-
-/* Selection made inside the picker is only "staged" until confirmed —
- * nothing is saved/applied to the avatar until confirmMascotSkinChange().
- * Resets to the currently-equipped skin every time the modal opens. */
-let stagedSkinId = null;
-function openSkinPicker() {
-  stagedSkinId = loadActiveSkin();
-  renderSkinGrid();
-  document.getElementById('skinPickerModal').classList.add('active');
-}
-function stageMascotSkin(id) {
-  const skin = MASCOT_SKINS.find(s => s.id === id);
-  if (!skin || !isSkinUnlocked(skin)) return;
-  stagedSkinId = id;
-  renderSkinGrid();
-}
-function renderSkinGrid() {
-  const grid = document.getElementById('skinGrid');
-  if (!grid) return;
-  const activeId = loadActiveSkin();
-  const stagedId = stagedSkinId || activeId;
-  grid.innerHTML = MASCOT_SKINS.map(skin => {
-    const unlocked = isSkinUnlocked(skin);
-    const isActive = skin.id === activeId;
-    const isStaged = skin.id === stagedId;
-    const cls = 'skin-item' + (isActive ? ' active' : '') + (isStaged && !isActive ? ' staged' : '') + (unlocked ? '' : ' locked');
-    const clickAttr = unlocked ? ' onclick="stageMascotSkin(\'' + skin.id + '\')"' : '';
-    const cornerHtml = isStaged ? '<div class="active-check">' + iconHtml('check') + '</div>' : (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>');
-    const thumbFilter = unlocked ? skin.filter : 'grayscale(1) brightness(.4)';
-    const thumbShadow = unlocked && skin.aura ? 'box-shadow:0 0 ' + (skin.strong ? '14px 3px' : '9px 2px') + ' ' + skin.aura + ';border-radius:50%;' : '';
-    const accessoryHtml = unlocked && skin.icon ? '<div class="skin-thumb-accessory">' + skinIconHtml(skin, { glow: !!skin.strong }) + '</div>' : '';
-    const thumbSrc = (unlocked && skin.img) ? skin.img : 'assets/mascot/mascot.png';
-    return '<div class="' + cls + '"' + clickAttr + '>' + cornerHtml +
-      '<div class="skin-thumb-wrap" style="' + thumbShadow + '"><img src="' + thumbSrc + '" style="filter:' + thumbFilter + ';" alt="" />' + accessoryHtml + '</div>' +
-      '<div class="skin-name">' + skin.name + '</div>' +
-      (unlocked ? '' : '<div class="skin-cond">' + skin.cond + '</div>') +
-      '</div>';
-  }).join('');
-  const bar = document.getElementById('skinConfirmBar');
-  if (bar) bar.classList.toggle('show', stagedId !== activeId);
-}
-/** Applies the staged skin (if different from what's equipped) and plays
- * the one-shot equip effect on the home avatar. Closes the picker first so
- * the effect is visible immediately behind it, no lingering overlay. */
-function confirmMascotSkinChange() {
-  const activeId = loadActiveSkin();
-  if (!stagedSkinId || stagedSkinId === activeId) {
-    closeModal('skinPickerModal');
-    return;
-  }
-  const skin = MASCOT_SKINS.find(s => s.id === stagedSkinId);
-  if (!skin || !isSkinUnlocked(skin)) return;
-  closeModal('skinPickerModal');
-  saveActiveSkin(skin.id);
-  playMascotSkinChangeEffect(skin);
-  showToast('เปลี่ยนสกินเป็น ' + skin.name);
-}
-/** One-shot equip effect: expanding ring + particle burst tinted to the
- * new skin's own aura color, with the avatar art cross-fading to the new
- * skin at the burst's peak. Never loops — plays once per confirm, then the
- * .play class is removed so it can be re-triggered next time. */
-function playMascotSkinChangeEffect(skin) {
-  const avatar = document.getElementById('mascotAvatar');
-  const fx = document.getElementById('mascotSkinFx');
-  if (!avatar || !fx) { applyActiveMascotSkinFilter(); return; }
-  const fxColor = skin.aura || 'rgba(255,255,255,.6)';
-  avatar.style.setProperty('--fx-color', fxColor);
-  fx.classList.remove('play');
-  void fx.offsetWidth; // restart animation
-  fx.classList.add('play');
-  avatar.classList.add('skin-fx-swap');
-  setTimeout(() => {
-    applyActiveMascotSkinFilter();
-    avatar.classList.remove('skin-fx-swap');
-    avatar.classList.remove('skin-fx-bounce');
-    void avatar.offsetWidth;
-    avatar.classList.add('skin-fx-bounce');
-  }, 220);
-  setTimeout(() => {
-    fx.classList.remove('play');
-    avatar.classList.remove('skin-fx-bounce');
-  }, 1000);
+  if (!badge) return;
+  badge.textContent = '+' + bonus + ' XP';
+  badge.classList.remove('show', 'pulse');
+  void badge.offsetWidth;
+  badge.classList.add('show', 'pulse');
+  clearTimeout(showRestSkipBonusEffect._h);
+  showRestSkipBonusEffect._h = setTimeout(() => badge.classList.remove('show'), 900);
 }
 /* ================= COLLECTION / TROPHY ROOM =================
  * One screen combining the three collectible sets that already exist
@@ -4827,16 +4521,14 @@ function playMascotSkinChangeEffect(skin) {
  * modal and skin picker, rendered with the same .skin-item card. */
 function renderCollection() {
   renderCollectionBadges();
-  renderCollectionSkins();
   renderCollectionTitles();
   renderLootGrid('collectionLootGrid');
   renderLootSets('collectionLootSets');
   const badgeCount = STREAK_MILESTONES.filter(m => loadOpenedChests().indexOf(m) !== -1).length;
-  const skinCount = MASCOT_SKINS.filter(isSkinUnlocked).length;
   const titleCount = RANK_TIERS.filter(r => loadLastSeenLevel() >= r.min).length;
   const summary = document.getElementById('collectionSummary');
   if (summary) {
-    summary.textContent = 'สะสมแล้ว ' + (badgeCount + skinCount + titleCount) + ' / ' + (STREAK_MILESTONES.length + MASCOT_SKINS.length + RANK_TIERS.length);
+    summary.textContent = 'สะสมแล้ว ' + (badgeCount + titleCount) + ' / ' + (STREAK_MILESTONES.length + RANK_TIERS.length);
   }
   const lootInv = loadLootInventory();
   const lootOwnedCount = LOOT_ITEMS.filter(it => (lootInv[it.id] || 0) > 0).length;
@@ -4856,26 +4548,6 @@ function renderCollectionBadges() {
       + '<div class="collection-emoji">' + (unlocked ? badgeHtml(info.icon, info.c1, info.c2, { glow: true, ring: true, glowColor: info.glow }) : lockedBadgeHtml()) + '</div>'
       + '<div class="skin-name">' + info.title + '</div>'
       + (unlocked ? '' : '<div class="skin-cond">Streak ' + m + ' วัน</div>')
-      + '</div>';
-  }).join('');
-}
-function renderCollectionSkins() {
-  const grid = document.getElementById('collectionSkinGrid');
-  if (!grid) return;
-  const activeId = loadActiveSkin();
-  grid.innerHTML = MASCOT_SKINS.map(skin => {
-    const unlocked = isSkinUnlocked(skin);
-    const isActive = skin.id === activeId;
-    const cls = 'skin-item' + (isActive ? ' active' : '') + (unlocked ? '' : ' locked');
-    const thumbFilter = unlocked ? skin.filter : 'grayscale(1) brightness(.4)';
-    const thumbShadow = unlocked && skin.aura ? 'box-shadow:0 0 ' + (skin.strong ? '14px 3px' : '9px 2px') + ' ' + skin.aura + ';border-radius:50%;' : '';
-    const accessoryHtml = unlocked && skin.icon ? '<div class="skin-thumb-accessory">' + skinIconHtml(skin, { glow: !!skin.strong }) + '</div>' : '';
-    const thumbSrc = (unlocked && skin.img) ? skin.img : 'assets/mascot/mascot.png';
-    return '<div class="' + cls + '">'
-      + (isActive ? '<div class="active-check">' + iconHtml('check') + '</div>' : (unlocked ? '' : '<div class="lock-icon">' + iconHtml('lock') + '</div>'))
-      + '<div class="skin-thumb-wrap" style="' + thumbShadow + '"><img src="' + thumbSrc + '" style="filter:' + thumbFilter + ';" alt="" />' + accessoryHtml + '</div>'
-      + '<div class="skin-name">' + skin.name + '</div>'
-      + (unlocked ? '' : '<div class="skin-cond">' + skin.cond + '</div>')
       + '</div>';
   }).join('');
 }

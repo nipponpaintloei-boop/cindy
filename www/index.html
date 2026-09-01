@@ -294,6 +294,16 @@ body{
   overflow:visible;
   transition:border-color .4s ease;
 }
+/* SYSTEM status card — no mascot art. Card no longer needs the top margin
+   reserved for an avatar peeking above it, and the text block takes the
+   full width instead of sharing space with an image column. */
+.mascot-card.no-avatar{margin-top:16px;padding:20px 22px;}
+.mascot-card.no-avatar .mascot-text{width:100%;}
+.status-level-badge{
+  position:static;transform:none;display:inline-block;
+  margin-bottom:8px;font-size:20px;letter-spacing:.5px;
+  padding:4px 14px 3px;border-radius:8px;
+}
 /* Progressive backdrop: JS sets --backdrop-img (a url()) per unlocked tier and
    toggles this class. Layered as: dark fade toward the text side (readability)
    + the backdrop photo + the original flat gradient as a safe fallback if the
@@ -879,6 +889,16 @@ body{
 .character-hero-info .character-cp{margin-top:10px;}
 .character-hero-info .mascot-skin-title{margin:10px 0 0;text-align:right;}
 .character-hero-info .character-class-title{text-align:right;}
+/* PLAYER STATUS layout — Character sheet with no portrait/mascot art.
+   Hero card becomes a centered status block instead of the old
+   image-left/stats-right split; used by #screen-character only. */
+.character-sheet-hero.no-portrait{display:block;padding:22px 20px;min-height:0;}
+.character-sheet-hero.no-portrait .character-hero-info{padding:0;align-items:center;text-align:center;}
+.character-sheet-hero.no-portrait .mascot-level-badge{position:static;transform:none;align-self:center;margin:0 0 9px;}
+.character-sheet-hero.no-portrait .mascot-rank{align-self:center;}
+.character-sheet-hero.no-portrait .character-cp{margin-top:10px;text-align:center;}
+.character-sheet-hero.no-portrait .character-class-title{text-align:center;}
+.character-equip-row.single{grid-template-columns:1fr;}
 .character-sheet-card .mascot-rank{margin:14px 0 4px;}
 .character-sheet-card .mascot-skin-title{margin:0;}
 
@@ -3465,32 +3485,12 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     </div>
     <div class="home-content">
 
-      <div class="mascot-card">
+      <div class="mascot-card no-avatar" id="playerStatusCard">
         <div id="treasureChestBtn" class="treasure-chest-btn" onclick="openTreasureChestModal()" aria-label="เปิดหีบรางวัล"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><rect x="4" y="12" width="16" height="9" rx="1"/><path d="M12 8v13"/><path d="M12 8C10.5 4.5 6.5 4.5 6.5 6.9c0 1.5 2 1.1 5.5 1.1z"/><path d="M12 8c1.5-3.5 5.5-3.9 5.5-1.1 0 1.5-2 1.1-5.5 1.1z"/></svg></span></div>
-        <div id="mascotBgBtn" class="mascot-bg-btn" onclick="openBackdropPicker()" aria-label="เปลี่ยนพื้นหลัง"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5.5-5.5L5 20"/></svg></span></div>
-        <div class="mascot-avatar" id="mascotAvatar" onclick="openSkinPicker()">
-          <img id="mascotImgGlow" src="assets/mascot/mascot.png" alt="" aria-hidden="true" />
-          <img id="mascotImg" src="assets/mascot/mascot.png" alt="" />
-          <div id="mascotSkinFx" class="skin-fx">
-            <div class="skin-fx-particle" style="--fx-dx:0px;--fx-dy:-60px;--fx-delay:0s;"></div>
-            <div class="skin-fx-particle" style="--fx-dx:42px;--fx-dy:-38px;--fx-delay:.03s;"></div>
-            <div class="skin-fx-particle" style="--fx-dx:52px;--fx-dy:18px;--fx-delay:.06s;"></div>
-            <div class="skin-fx-particle" style="--fx-dx:22px;--fx-dy:55px;--fx-delay:.02s;"></div>
-            <div class="skin-fx-particle" style="--fx-dx:-24px;--fx-dy:55px;--fx-delay:.05s;"></div>
-            <div class="skin-fx-particle" style="--fx-dx:-50px;--fx-dy:16px;--fx-delay:.01s;"></div>
-            <div class="skin-fx-particle" style="--fx-dx:-44px;--fx-dy:-40px;--fx-delay:.04s;"></div>
-          </div>
-          <div id="mascotLevelBadge" class="mascot-level-badge">LV.1</div>
-          <div id="mascotGearBadge" class="mascot-gear-badge"></div>
-          <div id="mascotSkinAccessory" class="mascot-skin-accessory"></div>
-          <div id="mascotLootBadge" class="mascot-loot-badge"></div>
-          <div id="mascotPokeSpark" class="mascot-poke-spark"><span></span><span></span><span></span><span></span><span></span></div>
-          <div class="mascot-skin-hint"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 100 18c1.4 0 2-1.1 1.2-2.2-.5-.7-.1-1.8 1-1.8H16a5 5 0 005-5c0-5-4.5-9-9-9z"/><circle cx="7.7" cy="10.5" r="1.15" fill="currentColor" stroke="none"/><circle cx="12" cy="7.3" r="1.15" fill="currentColor" stroke="none"/><circle cx="16.1" cy="10" r="1.15" fill="currentColor" stroke="none"/><circle cx="9.3" cy="15" r="1.15" fill="currentColor" stroke="none"/></svg></span></div>
-        </div>
         <div class="mascot-text">
+          <div id="mascotLevelBadge" class="mascot-level-badge status-level-badge">LV.1</div>
           <div id="mascotCharacterName" class="mascot-character-name" onclick="openCharacterNameModal()"></div>
           <div id="mascotRank" class="mascot-rank rank-recruit"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 7.6-7 9-4-1.4-7-4.4-7-9V6z"/></svg></span> RECRUIT</div>
-          <div id="mascotSkinTitle" class="mascot-skin-title"></div>
           <div id="mascotHeadline" class="mascot-headline">ยังไม่มีประวัติการเล่น</div>
           <div id="mascotSub" class="mascot-sub">เริ่มวันนี้เลย แล้วมาสร้าง streak กัน</div>
           <div class="xp-bar-wrap">
@@ -4233,9 +4233,6 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       <div class="section-label" style="margin-top:8px;">BADGES</div>
       <div id="collectionBadgeGrid" class="skin-grid" style="max-height:none;overflow:visible;"></div>
 
-      <div class="section-label">MASCOT SKINS</div>
-      <div id="collectionSkinGrid" class="skin-grid" style="max-height:none;overflow:visible;"></div>
-
       <div class="section-label">TITLES</div>
       <div id="collectionTitleGrid" class="skin-grid" style="max-height:none;overflow:visible;"></div>
 
@@ -4262,15 +4259,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       <div style="width:38px;"></div>
     </div>
     <div class="list-wrap">
-      <div class="character-sheet-card character-sheet-hero">
-        <div class="character-hero-img-wrap">
-          <div class="mascot-avatar" id="characterAvatar">
-            <img id="characterMascotImg" src="assets/mascot/mascot.png" alt="" />
-            <div id="characterGearBadge" class="mascot-gear-badge"></div>
-            <div id="characterSkinAccessory" class="mascot-skin-accessory"></div>
-            <div id="characterLootBadge" class="mascot-loot-badge"></div>
-          </div>
-        </div>
+      <div class="character-sheet-card character-sheet-hero no-portrait">
         <div class="character-hero-info">
           <div id="characterLevelBadge" class="mascot-level-badge">LV.1</div>
           <div id="characterRank" class="mascot-rank rank-recruit" style="display:inline-block;"></div>
@@ -4280,7 +4269,6 @@ textarea.note-input::placeholder{color:var(--text-faint);}
           </button>
           <div id="characterTitleTag" class="character-title-tag"></div>
           <div id="characterCP" class="character-cp"></div>
-          <div id="characterSkinTitle" class="mascot-skin-title"></div>
           <div id="characterClassTitle" class="character-class-title"></div>
         </div>
       </div>
@@ -4310,14 +4298,7 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       </button>
 
       <div class="section-label">EQUIPMENT</div>
-      <div class="character-equip-row">
-        <button class="character-equip-slot" onclick="goToCollectionSection('skin')">
-          <div class="character-equip-icon" id="characterEquipSkinIcon"></div>
-          <div class="character-equip-info">
-            <div class="character-equip-label">SKIN</div>
-            <div class="character-equip-name" id="characterEquipSkinName">Classic</div>
-          </div>
-        </button>
+      <div class="character-equip-row single">
         <button class="character-equip-slot" onclick="goToCollectionSection('loot')">
           <div class="character-equip-icon" id="characterEquipLootIcon"></div>
           <div class="character-equip-info">
@@ -4530,10 +4511,6 @@ textarea.note-input::placeholder{color:var(--text-faint);}
       <button id="playerDoneBtn" class="btn btn-success save-round-btn" style="display:none;" onclick="confirmPlayerExerciseDone()"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg></span> เสร็จแล้ว</button>
       <button id="playerPauseBtn" class="btn btn-outline" style="display:none;" onclick="togglePlayerPause()"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4.5" height="14" rx="1.2"/><rect x="13.5" y="5" width="4.5" height="14" rx="1.2"/></svg></span> หยุดชั่วคราว</button>
       <button id="playerSkipBtn" class="btn btn-outline" style="display:none;" onclick="skipPlayerStep()">ข้าม</button>
-    </div>
-    <div id="playerCompanionHud" class="player-companion-hud">
-      <img id="playerCompanionImg" src="assets/mascot/mascot.png" alt="" />
-      <div id="playerCompanionLootBadge" class="mascot-loot-badge"></div>
     </div>
   </section>
 
@@ -4798,36 +4775,6 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="modal-row" style="grid-template-columns:1fr 1fr;margin-top:14px;">
       <button class="btn btn-outline btn-sm" onclick="closeModal('characterNameModal')">ยกเลิก</button>
       <button class="btn btn-primary btn-sm" onclick="saveCharacterNameFromModal()">บันทึก</button>
-    </div>
-  </div>
-</div>
-
-<!-- Mascot Skin Picker Modal -->
-<div id="skinPickerModal" class="modal-overlay">
-  <div class="modal-card" style="max-width:380px;">
-    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>เลือกสกิน Mascot</span>
-      <span onclick="closeModal('skinPickerModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
-    </div>
-    <div class="modal-body" style="margin-bottom:12px;">ปลดล็อคสกินใหม่ได้จาก Streak, เลเวล, และการปราบ Boss</div>
-    <div id="skinGrid" class="skin-grid"></div>
-    <div id="skinConfirmBar" class="skin-confirm-bar">
-      <button class="btn btn-primary" style="width:100%;" onclick="confirmMascotSkinChange()">ยืนยันเปลี่ยนสกิน</button>
-    </div>
-  </div>
-</div>
-
-<!-- Backdrop Picker Modal -->
-<div id="backdropPickerModal" class="modal-overlay">
-  <div class="modal-card" style="max-width:380px;">
-    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>เลือกพื้นหลัง</span>
-      <span onclick="closeModal('backdropPickerModal')" style="cursor:pointer;font-size:22px;line-height:1;color:var(--text-dim);padding:0 4px;">&times;</span>
-    </div>
-    <div class="modal-body" style="margin-bottom:12px;">ปลดล็อคฉากใหม่ได้ตามเลเวลที่เพิ่มขึ้น</div>
-    <div id="backdropGrid" class="backdrop-grid"></div>
-    <div id="backdropConfirmBar" class="backdrop-confirm-bar">
-      <button class="btn btn-primary" style="width:100%;" onclick="confirmBackdropChange()">ยืนยันเปลี่ยนพื้นหลัง</button>
     </div>
   </div>
 </div>
