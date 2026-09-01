@@ -3668,7 +3668,7 @@ function renderXpBar() {
   if (!badge || !fill || !label) return;
 
   const info = computeLevelInfo(computeTotalXP());
-  badge.innerHTML = '<span class="level-prefix">PLAYER SYSTEM</span><span class="level-number">' + info.level + '</span><span class="level-corner tl"></span><span class="level-corner tr"></span><span class="level-corner bl"></span><span class="level-corner br"></span>';
+  badge.textContent = 'LV.' + info.level;
   fill.style.width = Math.round(info.pct * 100) + '%';
   label.textContent = info.xpIntoLevel + ' / ' + info.xpForNextLevel + ' XP';
 
@@ -3913,6 +3913,60 @@ function renderStatBars(containerId) {
       + '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + Math.round(info.pct * 100) + '%;background:' + def.color + ';"></div></div>'
       + '</div>';
   }).join('');
+}
+
+function statusStatNumericItem(def, info) {
+  return '<div class="status-stat-item">'
+    + '<div class="status-stat-code">' + def.short + '</div>'
+    + '<div class="status-stat-name">' + def.label + '</div>'
+    + '<div class="status-stat-value">' + info.level + '</div>'
+    + '<div class="status-stat-level">STAT LEVEL</div>'
+    + '</div>';
+}
+
+function radarPoint(cx, cy, radius, index, value) {
+  const angle = (-Math.PI / 2) + index * (Math.PI * 2 / 5);
+  const r = Math.max(0.08, Math.min(1, value)) * radius;
+  return [cx + Math.cos(angle) * r, cy + Math.sin(angle) * r];
+}
+
+function renderStatusRadar() {
+  const area = document.getElementById('statusRadarArea');
+  const line = document.getElementById('statusRadarLine');
+  const dots = document.getElementById('statusRadarDots');
+  if (!area || !line || !dots) return;
+  const totals = loadStatTotals();
+  const values = STAT_DEFS.map(def => {
+    const info = computeStatInfo(totals[def.key]);
+    return info.level / 20;
+  });
+  const points = values.map((v, i) => radarPoint(150, 135, 105, i, v));
+  const pointString = points.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
+  area.setAttribute('points', pointString);
+  line.setAttribute('points', pointString);
+  dots.innerHTML = points.map((p, i) => '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3"></circle>').join('');
+}
+
+function renderStatusNumericStats() {
+  const body = document.getElementById('characterStatNumericGrid');
+  const mind = document.getElementById('characterMindStatNumericGrid');
+  const life = document.getElementById('characterLifeStatNumericGrid');
+  if (body) {
+    const totals = loadStatTotals();
+    body.innerHTML = STAT_DEFS.map(def => statusStatNumericItem(def, computeStatInfo(totals[def.key]))).join('');
+  }
+  if (mind) {
+    const totals = loadMindStatTotals();
+    mind.innerHTML = MIND_STAT_DEFS.map(def => {
+      const info = def.key === 'intelligence' ? computeMindIntInfo(totals[def.key]) : computeMindVolumeInfo(totals[def.key]);
+      return statusStatNumericItem(def, info);
+    }).join('');
+  }
+  if (life) {
+    const totals = loadLifeStatTotals();
+    life.innerHTML = LIFE_STAT_DEFS.map(def => statusStatNumericItem(def, computeLifeStatInfo(totals[def.key]))).join('');
+  }
+  renderStatusRadar();
 }
 
 /* ---- derived "class" flavor title — whichever stat has the most
@@ -4767,7 +4821,9 @@ function renderCharacterSheet() {
   if (!levelBadge) return;
 
   const info = computeLevelInfo(computeTotalXP());
-  levelBadge.innerHTML = '<span class="level-prefix">PLAYER SYSTEM</span><span class="level-number">' + info.level + '</span><span class="level-corner tl"></span><span class="level-corner tr"></span><span class="level-corner bl"></span><span class="level-corner br"></span>';
+  const levelValue = document.getElementById('characterLevelValue');
+  if (levelValue) levelValue.textContent = info.level;
+  else levelBadge.textContent = info.level;
   renderCharacterName();
   const rank = rankForLevel(info.level);
   const rankEl = document.getElementById('characterRank');
@@ -4780,9 +4836,7 @@ function renderCharacterSheet() {
   RANK_TIERS.forEach(r => levelBadge.classList.remove('lvbadge-' + r.title.toLowerCase()));
   if (tier !== 'recruit') levelBadge.classList.add('lvbadge-' + tier);
 
-  renderStatBars('characterStatBarList');
-  renderLifeStatBars('characterLifeStatBarList');
-  renderMindStatBars('characterMindStatBarList');
+  renderStatusNumericStats();
   renderFitnessRank('characterFitnessRank');
   renderSkillTree('skillTreeList');
 

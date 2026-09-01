@@ -307,33 +307,20 @@ body{
   color:#eef8ff;text-shadow:0 0 14px rgba(75,184,255,.7);
   box-shadow:inset 0 0 28px rgba(43,151,225,.12),0 0 22px rgba(45,150,225,.12);
   overflow:hidden;isolation:isolate;
+  font-family:var(--font-display);font-size:54px;line-height:.92;font-weight:900;letter-spacing:2px;
 }
 .status-level-badge::before{
-  content:"LEVEL";font-family:var(--font-display);font-size:9px;font-weight:800;
-  letter-spacing:3px;color:#8fd7ff;text-shadow:0 0 8px rgba(77,184,255,.65);
-  margin-bottom:2px;
+  content:"LEVEL";position:relative;display:block;font-family:var(--font-display);font-size:9px;font-weight:800;
+  line-height:1;letter-spacing:3px;color:#8fd7ff;text-shadow:0 0 8px rgba(77,184,255,.65);
+  margin-bottom:8px;
 }
 .status-level-badge::after{
   content:"";position:absolute;left:13px;right:13px;bottom:9px;height:1px;
   background:linear-gradient(90deg,transparent,rgba(120,211,255,.75),transparent);
   box-shadow:0 0 8px rgba(74,183,255,.55);
 }
-.status-level-badge .level-number{
-  position:relative;z-index:2;font-family:var(--font-display);font-size:54px;line-height:.92;
-  font-weight:900;letter-spacing:2px;color:#f4fbff;
-}
-.status-level-badge .level-prefix{
-  position:absolute;left:10px;top:9px;font-family:var(--font-display);font-size:8px;
-  letter-spacing:1.5px;color:rgba(177,224,255,.6);
-}
-.status-level-badge .level-corner{position:absolute;width:13px;height:13px;border-color:#76cfff;opacity:.9;}
-.status-level-badge .level-corner.tl{left:-1px;top:-1px;border-left:2px solid;border-top:2px solid;}
-.status-level-badge .level-corner.tr{right:-1px;top:-1px;border-right:2px solid;border-top:2px solid;}
-.status-level-badge .level-corner.bl{left:-1px;bottom:-1px;border-left:2px solid;border-bottom:2px solid;}
-.status-level-badge .level-corner.br{right:-1px;bottom:-1px;border-right:2px solid;border-bottom:2px solid;}
 .status-level-badge.bump{animation:systemLevelPulse .65s ease;}
 @keyframes systemLevelPulse{0%{transform:scale(1);filter:brightness(1)}35%{transform:scale(1.035);filter:brightness(1.45)}100%{transform:scale(1);filter:brightness(1)}}
-
 /* Progressive backdrop: JS sets --backdrop-img (a url()) per unlocked tier and
    toggles this class. Layered as: dark fade toward the text side (readability)
    + the backdrop photo + the original flat gradient as a safe fallback if the
@@ -3431,6 +3418,65 @@ textarea.note-input::placeholder{color:var(--text-faint);}
 }
 
 </style>
+<style id="status-system-rpg-remake">
+/* STATUS SYSTEM / LEVEL + NUMERIC STATS
+   Visual-only layer for the new Player Status architecture.
+   The old stat bars remain in legacy screens/data paths but are not used by
+   the primary STATUS screen. */
+.system-status-hero{
+  background:
+    linear-gradient(180deg,rgba(8,18,32,.96),rgba(3,8,15,.98)),
+    radial-gradient(circle at 50% 20%,rgba(70,145,255,.16),transparent 58%);
+  border:1px solid rgba(92,166,255,.5) !important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.025),0 12px 30px rgba(0,0,0,.45),0 0 28px rgba(43,132,255,.10) !important;
+}
+.system-status-hero::before{
+  content:"";position:absolute;inset:10px;pointer-events:none;border:1px solid rgba(91,167,255,.16);
+  clip-path:polygon(0 0,14% 0,14% 1px,86% 1px,86% 0,100% 0,100% 100%,86% 100%,86% calc(100% - 1px),14% calc(100% - 1px),14% 100%,0 100%);
+}
+.system-level-display{
+  width:min(100%,340px);padding:16px 18px 14px;position:relative;
+  background:linear-gradient(180deg,rgba(11,28,50,.62),rgba(4,11,21,.78));
+  border:1px solid rgba(103,184,255,.62);border-radius:2px;
+  box-shadow:inset 0 0 24px rgba(54,147,255,.08),0 0 22px rgba(50,142,255,.14);
+  overflow:hidden;
+}
+.system-level-display::before,.system-level-display::after{
+  content:"";position:absolute;width:18px;height:18px;border-color:#67b9ff;border-style:solid;opacity:.85;
+}
+.system-level-display::before{top:-1px;left:-1px;border-width:2px 0 0 2px;}
+.system-level-display::after{right:-1px;bottom:-1px;border-width:0 2px 2px 0;}
+.system-level-kicker{font-family:var(--font-display);font-size:9px;font-weight:800;letter-spacing:3px;color:#8bcfff;text-shadow:0 0 9px rgba(94,184,255,.55);}
+.system-level-value{font-family:var(--font-display);font-size:76px;line-height:.88;font-weight:900;letter-spacing:5px;color:#eef8ff;text-shadow:0 0 10px rgba(104,195,255,.65),0 0 32px rgba(44,139,255,.22);margin:8px 0 6px;}
+.system-level-rule{height:1px;background:linear-gradient(90deg,transparent,rgba(104,191,255,.9),transparent);position:relative;}
+.system-level-rule span{display:block;width:24px;height:3px;background:#e9f7ff;box-shadow:0 0 9px rgba(110,202,255,.9);position:absolute;left:50%;top:-1px;transform:translateX(-50%);}
+.system-level-meta{font-size:8px;letter-spacing:2px;color:rgba(180,218,246,.62);margin-top:8px;}
+.system-level-meta b{color:#75c6ff;font-weight:800;}
+.system-level-display.bump{animation:systemLevelDisplayPulse .65s ease;}
+@keyframes systemLevelDisplayPulse{0%{transform:scale(1);filter:brightness(1)}35%{transform:scale(1.025);filter:brightness(1.5)}100%{transform:scale(1);filter:brightness(1)}}
+.status-stats-card{padding:14px !important;background:linear-gradient(180deg,rgba(9,18,32,.96),rgba(5,11,20,.96)) !important;}
+.status-radar-wrap{border-bottom:1px solid rgba(90,150,210,.13);padding-bottom:10px;margin-bottom:12px;}
+.status-radar-heading{display:flex;justify-content:space-between;align-items:center;padding:0 3px;font-size:9px;letter-spacing:2px;color:#8eb9dc;font-weight:800;}
+.status-radar-heading small{font-size:7px;letter-spacing:1.3px;color:#4f6f8d;font-weight:700;}
+.status-radar{display:block;width:100%;max-width:330px;height:auto;margin:2px auto 0;overflow:visible;}
+.radar-grid polygon,.radar-grid line{fill:none;stroke:rgba(86,153,214,.24);stroke-width:1;}
+.radar-grid polygon:first-child{stroke:rgba(98,176,244,.42);}
+.radar-area{fill:rgba(64,153,255,.16);stroke:none;}
+.radar-line{fill:none;stroke:#67b9ff;stroke-width:2;filter:drop-shadow(0 0 4px rgba(80,180,255,.55));}
+.radar-dots circle{fill:#eaf7ff;stroke:#5db8ff;stroke-width:1.5;filter:drop-shadow(0 0 4px rgba(80,180,255,.7));}
+.radar-labels text{font-family:var(--font-display);font-size:8px;font-weight:800;letter-spacing:1.5px;fill:#9fc8e9;}
+.status-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.status-stat-grid-3{grid-template-columns:repeat(3,minmax(0,1fr));}
+.status-stat-item{position:relative;padding:11px 10px 10px;background:rgba(9,20,35,.76);border:1px solid rgba(78,139,201,.27);border-radius:3px;overflow:hidden;}
+.status-stat-item::before{content:"";position:absolute;left:0;top:0;width:18px;height:1px;background:#69baff;box-shadow:0 0 7px rgba(82,177,255,.5);}
+.status-stat-code{font-family:var(--font-display);font-size:9px;letter-spacing:1.4px;color:#77bdf0;font-weight:800;}
+.status-stat-name{font-size:8px;color:#536e89;letter-spacing:.7px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.status-stat-value{font-family:var(--font-display);font-size:25px;line-height:1;color:#e9f5ff;letter-spacing:1px;margin-top:7px;text-shadow:0 0 8px rgba(91,180,255,.25);}
+.status-stat-level{font-size:7px;color:#45647f;letter-spacing:1px;margin-top:4px;}
+.status-stat-grid-3 .status-stat-item{padding:10px 8px;}
+.status-stat-grid-3 .status-stat-value{font-size:22px;}
+@media(max-width:380px){.system-level-value{font-size:68px}.status-stat-grid-3{grid-template-columns:1fr 1fr}.status-stat-grid-3 .status-stat-item:last-child{grid-column:1/-1;}}
+</style>
 <style id="theme-solo-leveling-system">
 /* =====================================================================
    SOLO LEVELING "SYSTEM" THEME OVERRIDE
@@ -3679,7 +3725,7 @@ body.drawer-open{overflow:hidden;}
       <div class="mascot-card no-avatar" id="playerStatusCard">
         <div id="treasureChestBtn" class="treasure-chest-btn" onclick="openTreasureChestModal()" aria-label="เปิดหีบรางวัล"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><rect x="4" y="12" width="16" height="9" rx="1"/><path d="M12 8v13"/><path d="M12 8C10.5 4.5 6.5 4.5 6.5 6.9c0 1.5 2 1.1 5.5 1.1z"/><path d="M12 8c1.5-3.5 5.5-3.9 5.5-1.1 0 1.5-2 1.1-5.5 1.1z"/></svg></span></div>
         <div class="mascot-text">
-          <div id="mascotLevelBadge" class="mascot-level-badge status-level-badge"><span class="level-prefix">PLAYER SYSTEM</span><span class="level-number">1</span><span class="level-corner tl"></span><span class="level-corner tr"></span><span class="level-corner bl"></span><span class="level-corner br"></span></div>
+          <div id="mascotLevelBadge" class="mascot-level-badge status-level-badge">1</div>
           <div id="mascotCharacterName" class="mascot-character-name" onclick="openCharacterNameModal()"></div>
           <div id="mascotRank" class="mascot-rank rank-recruit"><span class="icon-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 7.6-7 9-4-1.4-7-4.4-7-9V6z"/></svg></span> RECRUIT</div>
           <div id="mascotHeadline" class="mascot-headline">ยังไม่มีประวัติการเล่น</div>
@@ -4479,9 +4525,14 @@ body.drawer-open{overflow:hidden;}
       <div style="width:38px;"></div>
     </div>
     <div class="list-wrap">
-      <div class="character-sheet-card character-sheet-hero no-portrait">
+      <div class="character-sheet-card character-sheet-hero no-portrait system-status-hero">
         <div class="character-hero-info">
-          <div id="characterLevelBadge" class="mascot-level-badge status-level-badge"><span class="level-prefix">PLAYER SYSTEM</span><span class="level-number">1</span><span class="level-corner tl"></span><span class="level-corner tr"></span><span class="level-corner bl"></span><span class="level-corner br"></span></div>
+          <div id="characterLevelBadge" class="system-level-display" aria-label="Player level">
+            <div class="system-level-kicker">PLAYER LEVEL</div>
+            <div class="system-level-value" id="characterLevelValue">1</div>
+            <div class="system-level-rule"><span></span></div>
+            <div class="system-level-meta">SYSTEM STATUS <b>ACTIVE</b></div>
+          </div>
           <div id="characterRank" class="mascot-rank rank-recruit" style="display:inline-block;"></div>
           <button id="characterNameBtn" class="character-name-btn" onclick="openCharacterNameModal()" type="button">
             <span id="characterNameText">ตั้งชื่อตัวละคร</span>
@@ -4493,23 +4544,52 @@ body.drawer-open{overflow:hidden;}
         </div>
       </div>
 
-      <div class="section-label">STATS</div>
-      <div class="metric-card" style="padding:16px;">
-        <div id="characterStatBarList"></div>
+      <div class="section-label">BODY STATUS</div>
+      <div class="metric-card status-stats-card">
+        <div class="status-radar-wrap">
+          <div class="status-radar-heading"><span>BODY PARAMETERS</span><small>5 CORE AXES</small></div>
+          <svg id="statusRadarChart" class="status-radar" viewBox="0 0 300 270" role="img" aria-label="Body stats radar chart">
+            <defs>
+              <filter id="radarGlow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <g class="radar-grid">
+              <polygon points="150,30 264,112 220,244 80,244 36,112"></polygon>
+              <polygon points="150,58 237,121 204,220 96,220 63,121"></polygon>
+              <polygon points="150,86 210,130 188,196 112,196 90,130"></polygon>
+              <polygon points="150,114 184,139 172,172 128,172 116,139"></polygon>
+              <line x1="150" y1="135" x2="150" y2="30"></line>
+              <line x1="150" y1="135" x2="264" y2="112"></line>
+              <line x1="150" y1="135" x2="220" y2="244"></line>
+              <line x1="150" y1="135" x2="80" y2="244"></line>
+              <line x1="150" y1="135" x2="36" y2="112"></line>
+            </g>
+            <polygon id="statusRadarArea" class="radar-area" points="150,135 150,135 150,135 150,135 150,135" filter="url(#radarGlow)"></polygon>
+            <polygon id="statusRadarLine" class="radar-line" points="150,135 150,135 150,135 150,135 150,135"></polygon>
+            <g id="statusRadarDots" class="radar-dots"></g>
+            <g class="radar-labels">
+              <text x="150" y="17" text-anchor="middle">STR</text>
+              <text x="278" y="110" text-anchor="start">PWR</text>
+              <text x="224" y="260" text-anchor="middle">END</text>
+              <text x="76" y="260" text-anchor="middle">CORE</text>
+              <text x="22" y="110" text-anchor="end">CARDIO</text>
+            </g>
+          </svg>
+        </div>
+        <div id="characterStatNumericGrid" class="status-stat-grid"></div>
       </div>
 
-      <div class="section-label">LIFE</div>
-      <div class="metric-card" style="padding:16px;">
-        <div id="characterLifeStatBarList"></div>
-      </div>
-
-      <div class="section-label">MIND</div>
-      <div class="metric-card" style="padding:16px;">
-        <div id="characterMindStatBarList"></div>
+      <div class="section-label">MIND STATUS</div>
+      <div class="metric-card status-stats-card">
+        <div id="characterMindStatNumericGrid" class="status-stat-grid status-stat-grid-3"></div>
         <div class="control-row" style="margin-top:14px;">
           <button class="btn btn-outline btn-sm" onclick="openLearningLogModal()">+ LEARNING LOG</button>
           <button class="btn btn-outline btn-sm" onclick="openFocusSessionModal()">+ FOCUS SESSION</button>
         </div>
+      </div>
+
+      <div class="section-label">LIFE STATUS</div>
+      <div class="metric-card status-stats-card">
+        <div id="characterLifeStatNumericGrid" class="status-stat-grid status-stat-grid-3"></div>
       </div>
 
       <div class="section-label">FITNESS RANK</div>
