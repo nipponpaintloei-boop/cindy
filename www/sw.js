@@ -1,9 +1,10 @@
-const CACHE_NAME = 'cindy-v4';
+const CACHE_NAME = 'cindy-v5';
 const CORE_ASSETS = [
   './index.html',
   './app.js',
   './manifest.webmanifest',
-  './icon.svg',
+  './icon-192.png',
+  './icon-512.png',
   './mascot-happy.svg',
   './mascot-warn.svg',
   './storage-shim.js',

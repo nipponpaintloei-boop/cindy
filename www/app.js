@@ -2133,6 +2133,8 @@ function dismissCelebration() {
 function getPlayerStatus() {
   const info = computeLevelInfo(computeTotalXP());
   const rank = rankForLevel(info.level);
+  const bodyTotals = loadStatTotals();
+  const lifeTotals = loadLifeStatTotals();
   return {
     level: info.level,
     xpIntoLevel: info.xpIntoLevel,
@@ -2142,7 +2144,9 @@ function getPlayerStatus() {
     rankIcon: rank.icon,
     combatPower: computeCombatPower(),
     fitnessPower: computeFitnessPower(),
-    streak: computeCombinedStreak()
+    streak: computeCombinedStreak(),
+    bodyStats: STAT_DEFS.map(def => Object.assign({ key: def.key, label: def.label, short: def.short }, computeStatInfo(bodyTotals[def.key]))),
+    lifeStats: LIFE_STAT_DEFS.map(def => Object.assign({ key: def.key, label: def.label, short: def.short }, computeLifeStatInfo(lifeTotals[def.key])))
   };
 }
 
@@ -3823,6 +3827,123 @@ function computeClassTitle(totals) {
   return STAT_CLASS_TITLES[best];
 }
 
+/* ================= LIFE STATS: DISC / WILL / CONSISTENCY (dev brief §7) ==
+ * Same level-curve pattern as the Body stats above (STAT_DEFS / computeStatInfo),
+ * fed only from real "did you do what you said you would" signals already
+ * tracked elsewhere in the app — nothing here is guessed or simulated:
+ *   DISCIPLINE   — total weeks (all-time) where the Weekly Plan was fully
+ *                  satisfied. Reuses planDaySatisfied() (see
+ *                  computePlanStreak() above) but counts every satisfied
+ *                  week in history instead of stopping at the first gap,
+ *                  since a broken streak shouldn't erase discipline
+ *                  already demonstrated.
+ *   CONSISTENCY  — total unique calendar days (all-time) with any logged
+ *                  activity (Cindy / Custom Workout / Run) — brief §7
+ *                  names Streak as the direct example for this stat;
+ *                  this is its lifetime, non-resetting form.
+ *   WILLPOWER    — the longest combined streak ever reached, ratcheted
+ *                  upward the same "ever" way loadBossEverDefeated()
+ *                  tracks bosses beaten, so breaking a streak doesn't
+ *                  erase the willpower it took to build it.
+ * No MIND stats (INT/FOCUS/LEARN) yet — the app has no reading/focus/
+ * learning activity anywhere to derive them from honestly. Adding that
+ * category now with nothing real feeding it would just be a permanently
+ * empty stat bar, which is its own kind of broken promise to the player. */
+const LIFE_STAT_DEFS = [
+  { key: 'discipline', label: 'DISCIPLINE', short: 'DISC', color: 'var(--pull)' },
+  { key: 'willpower', label: 'WILLPOWER', short: 'WILL', color: 'var(--push)' },
+  { key: 'consistency', label: 'CONSISTENCY', short: 'CONST', color: 'var(--run)' }
+];
+function lifeStatReqForLevel(level) {
+  return 5 + (level - 1) * 5;
+}
+function computeLifeStatInfo(total) {
+  let level = 1;
+  let remaining = total;
+  let req = lifeStatReqForLevel(level);
+  while (remaining >= req) {
+    remaining -= req;
+    level++;
+    req = lifeStatReqForLevel(level);
+  }
+  return { level, pct: req > 0 ? remaining / req : 0 };
+}
+function earliestActivityTs() {
+  const all = []
+    .concat(loadSessions().map(s => s.finished))
+    .concat(loadCustomWorkoutSessions().map(s => s.completedAt))
+    .concat(loadRunSessions().map(s => s.completedAt))
+    .filter(Boolean);
+  return all.length ? Math.min.apply(null, all) : null;
+}
+/** All-time count of weeks where every scheduled Weekly Plan day was
+ * satisfied — walks backward from this week through real history only
+ * (stops once a week falls entirely before the player's first-ever
+ * logged activity, via earliestActivityTs(), so an empty plan from
+ * before the player started doesn't get counted as free discipline). */
+function countAllSatisfiedPlanWeeks() {
+  const plan = loadWeeklyPlan();
+  const hasAnyScheduledDay = Object.keys(plan).some(k => plan[k]);
+  if (!hasAnyScheduledDay) return 0;
+  const earliest = earliestActivityTs();
+  if (!earliest) return 0;
+  let cursor = weekStart(Date.now()).getTime();
+  let satisfied = 0;
+  const SAFETY_CAP_WEEKS = 520;
+  for (let i = 0; i < SAFETY_CAP_WEEKS; i++) {
+    if (cursor + 6 * 24 * 60 * 60 * 1000 < earliest) break;
+    let weekOk = true;
+    for (let d = 0; d < 7; d++) {
+      const dayTs = cursor + d * 24 * 60 * 60 * 1000;
+      const dayOfWeekIdx = (d + 1) % 7;
+      if (!planDaySatisfied(dayTs, plan[dayOfWeekIdx])) { weekOk = false; break; }
+    }
+    if (weekOk) satisfied++;
+    cursor -= 7 * 24 * 60 * 60 * 1000;
+  }
+  return satisfied;
+}
+/** All-time count of distinct calendar days with any logged activity. */
+function countUniqueActiveDays() {
+  const days = new Set();
+  loadSessions().forEach(s => { if (s.completed !== false && s.finished) days.add(dayKey(s.finished)); });
+  loadCustomWorkoutSessions().forEach(s => { if (s.completedAt) days.add(dayKey(s.completedAt)); });
+  loadRunSessions().forEach(s => { if (s.completedAt) days.add(dayKey(s.completedAt)); });
+  return days.size;
+}
+/** Longest combined streak ever reached — ratchets upward on read, same
+ * pattern already used for KEY_LAST_SEEN_LEVEL / loadBossEverDefeated. */
+const KEY_BEST_STREAK_EVER = 'cindy_best_streak_ever';
+function loadBestStreakEver() {
+  const n = parseInt(localStorage.getItem(KEY_BEST_STREAK_EVER), 10);
+  const stored = Number.isFinite(n) && n > 0 ? n : 0;
+  const current = computeCombinedStreak();
+  if (current > stored) {
+    localStorage.setItem(KEY_BEST_STREAK_EVER, String(current));
+    return current;
+  }
+  return stored;
+}
+function loadLifeStatTotals() {
+  return {
+    discipline: countAllSatisfiedPlanWeeks(),
+    willpower: loadBestStreakEver(),
+    consistency: countUniqueActiveDays()
+  };
+}
+function renderLifeStatBars(containerId) {
+  const wrap = document.getElementById(containerId || 'lifeStatBarList');
+  if (!wrap) return;
+  const totals = loadLifeStatTotals();
+  wrap.innerHTML = LIFE_STAT_DEFS.map(def => {
+    const info = computeLifeStatInfo(totals[def.key]);
+    return '<div class="stat-bar-row">'
+      + '<div class="stat-bar-top"><span class="stat-bar-label">' + def.short + ' · ' + def.label + '</span><span class="stat-bar-lv">LV.' + info.level + '</span></div>'
+      + '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + Math.round(info.pct * 100) + '%;background:' + def.color + ';"></div></div>'
+      + '</div>';
+  }).join('');
+}
+
 /* ---- Fitness Power vs Combat Power (Phase 2B) ----
  * Fitness Power = pure real-world signal — the summed levels of all 5
  * stats, which themselves are derived only from actual reps/seconds
@@ -4350,6 +4471,7 @@ function renderCharacterSheet() {
   renderMascotTitle('characterSkinTitle', skin, unlocked);
   applyEquippedLootBadge('characterLootBadge');
   renderStatBars('characterStatBarList');
+  renderLifeStatBars('characterLifeStatBarList');
   renderFitnessRank('characterFitnessRank');
   renderSkillTree('skillTreeList');
 
@@ -6143,10 +6265,10 @@ async function ensureReminderChannels() {
   if (!plugins || !plugins.LocalNotifications) return;
   try {
     await plugins.LocalNotifications.createChannel({
-      id: 'cindy_default', name: 'CINDY เตือนประจำวัน (มีเสียง)', importance: 4, visibility: 1, sound: 'default', vibration: true
+      id: 'cindy_default', name: 'SYSTEM เตือนประจำวัน (มีเสียง)', importance: 4, visibility: 1, sound: 'default', vibration: true
     });
     await plugins.LocalNotifications.createChannel({
-      id: 'cindy_silent', name: 'CINDY เตือนประจำวัน (สั่นอย่างเดียว)', importance: 3, visibility: 1, vibration: true
+      id: 'cindy_silent', name: 'SYSTEM เตือนประจำวัน (สั่นอย่างเดียว)', importance: 3, visibility: 1, vibration: true
     });
   } catch (e) {}
 }
@@ -6170,7 +6292,7 @@ async function rescheduleNativeReminder(forceTomorrow) {
     await plugins.LocalNotifications.schedule({
       notifications: [{
         id: REMINDER_NOTIF_ID,
-        title: 'CINDY',
+        title: 'SYSTEM',
         body: 'ยังไม่ได้เล่น Workout วันนี้เลย — ลุยสักรอบไหม?',
         schedule: { at: fireDate },
         channelId: cfg.sound === 'silent' ? 'cindy_silent' : 'cindy_default',
@@ -6189,7 +6311,7 @@ async function testReminderNow() {
       if (perm.display !== 'granted') { showToast('ยังไม่ได้อนุญาตการแจ้งเตือน'); return; }
       await plugins.LocalNotifications.schedule({
         notifications: [{
-          id: 9999, title: 'CINDY', body: 'นี่คือการแจ้งเตือนทดสอบ',
+          id: 9999, title: 'SYSTEM', body: 'นี่คือการแจ้งเตือนทดสอบ',
           schedule: { at: new Date(Date.now() + 3000) },
           channelId: cfg.sound === 'silent' ? 'cindy_silent' : 'cindy_default'
         }]
@@ -6254,16 +6376,16 @@ function checkReminder() {
 
   cfg.lastShownDay = todayKey;
   saveReminderConfig(cfg);
-  showToast('ยังไม่ได้เล่น CINDY วันนี้เลยนะ', 'web');
+  showToast('ยังไม่ได้เล่น SYSTEM วันนี้เลยนะ', 'web');
   if ('Notification' in window && Notification.permission === 'granted') {
     try {
       if (navigator.serviceWorker && navigator.serviceWorker.ready) {
-        navigator.serviceWorker.ready.then(reg => reg.showNotification('CINDY', {
+        navigator.serviceWorker.ready.then(reg => reg.showNotification('SYSTEM', {
           body: 'ยังไม่ได้เล่น Workout วันนี้เลย — ลุยสักรอบไหม?',
-          icon: 'icon.svg'
+          icon: 'icon-192.png'
         })).catch(() => {});
       } else {
-        new Notification('CINDY', { body: 'ยังไม่ได้เล่น Workout วันนี้เลย — ลุยสักรอบไหม?', icon: 'icon.svg' });
+        new Notification('SYSTEM', { body: 'ยังไม่ได้เล่น Workout วันนี้เลย — ลุยสักรอบไหม?', icon: 'icon-192.png' });
       }
     } catch (e) {}
   }
@@ -6570,7 +6692,7 @@ async function shareCustomResult(id) {
         directory: 'CACHE'
       });
       await plugins.Share.share({
-        title: 'CINDY Custom Workout Result',
+        title: 'SYSTEM Custom Workout Result',
         text: s.setsCompleted + ' sets — ' + (s.workoutName || 'Custom Workout'),
         url: written.uri,
         dialogTitle: 'แชร์ผลลัพธ์ Workout'
@@ -6588,7 +6710,7 @@ async function shareCustomResult(id) {
     const file = new File([blob], fileName, { type: 'image/png' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: 'CINDY Custom Workout Result', text: s.setsCompleted + ' sets — ' + (s.workoutName || 'Custom Workout') });
+        await navigator.share({ files: [file], title: 'SYSTEM Custom Workout Result', text: s.setsCompleted + ' sets — ' + (s.workoutName || 'Custom Workout') });
         return;
       } catch (e) { /* cancelled — fall through to download */ }
     }
@@ -6843,10 +6965,10 @@ async function deliverExportFile(json, fname) {
         encoding: 'utf8'
       });
       await nativePlugins.Share.share({
-        title: 'CINDY Backup',
-        text: 'ไฟล์สำรองข้อมูล CINDY',
+        title: 'SYSTEM Backup',
+        text: 'ไฟล์สำรองข้อมูล SYSTEM',
         url: written.uri,
-        dialogTitle: 'บันทึก/แชร์ไฟล์สำรอง CINDY'
+        dialogTitle: 'บันทึก/แชร์ไฟล์สำรอง SYSTEM'
       });
       showToast('ส่งออกข้อมูลแล้ว (Cindy + Custom Workout + สกิน/ความคืบหน้า)');
       return;
@@ -7304,7 +7426,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
   updateInstallButton();
-  showToast('ติดตั้ง CINDY สำเร็จ', 'muscle');
+  showToast('ติดตั้ง SYSTEM สำเร็จ', 'muscle');
 });
 async function handleInstallClick() {
   if (deferredInstallPrompt) {
@@ -7807,7 +7929,7 @@ async function shareRunResult(id) {
   ctx.textAlign = 'center';
   ctx.fillStyle = '#22C7B0';
   ctx.font = '800 46px Arial';
-  ctx.fillText('CINDY RUN', W / 2, 130);
+  ctx.fillText('SYSTEM RUN', W / 2, 130);
   ctx.fillStyle = 'rgba(245,244,240,0.6)';
   ctx.font = '600 26px Arial';
   ctx.fillText(fmtDate(s.completedAt), W / 2, 172);
@@ -7894,11 +8016,11 @@ async function shareRunResult(id) {
 
   ctx.fillStyle = 'rgba(245,244,240,0.45)';
   ctx.font = '600 28px Arial';
-  ctx.fillText('CINDY — Fitness RPG Workout', W / 2, 1720);
+  ctx.fillText('SYSTEM — Level Up Your Life', W / 2, 1720);
 
   const fileName = 'cindy_run_' + s.id + '.png';
-  const shareTitle = 'CINDY Run';
-  const shareText = s.distanceKm.toFixed(2) + ' กม. ในเวลา ' + fmtTime(s.movingSec) + ' เพซเฉลี่ย ' + fmtPace(s.paceSecPerKm) + '/กม. — CINDY RUN';
+  const shareTitle = 'SYSTEM Run';
+  const shareText = s.distanceKm.toFixed(2) + ' กม. ในเวลา ' + fmtTime(s.movingSec) + ' เพซเฉลี่ย ' + fmtPace(s.paceSecPerKm) + '/กม. — SYSTEM RUN';
 
   /* Native app (Capacitor): write to app cache then hand off to the OS
      share sheet via @capacitor/share — same approach as shareResult(). */

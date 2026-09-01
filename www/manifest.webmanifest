@@ -1,6 +1,6 @@
 {
-  "name": "CINDY — Fitness RPG Workout",
-  "short_name": "CINDY",
+  "name": "SYSTEM — Level Up Your Life",
+  "short_name": "SYSTEM",
   "description": "20 นาที AMRAP: Pull-Up, Push-Up, Squat (ปรับจำนวนและเวลาได้)",
   "start_url": "./index.html",
   "scope": "./",
@@ -9,8 +9,9 @@
   "background_color": "#0A0A0D",
   "theme_color": "#0A0A0D",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
     {
@@ -18,7 +19,7 @@
       "short_name": "Start",
       "description": "เริ่ม Workout ทันที",
       "url": "./index.html?action=start",
-      "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }
