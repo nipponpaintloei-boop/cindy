@@ -2226,6 +2226,39 @@ function dismissSystemWindow() {
   }, SYSTEM_WINDOW_GAP_MS);
 }
 
+/* ================= SYSTEM EVENT ENGINE (dev brief §11) =================
+ * Central place that answers "what changed since we last checked, and does
+ * it deserve a SYSTEM notification?" — the ACTION → VALIDATION → SYSTEM
+ * EVENT → REWARD → PLAYER UPDATE → UI NOTIFICATION pipeline the brief asks
+ * for, adapted to how this app already stores state.
+ *
+ * This app derives XP / Level / Stats / Rank / Achievements / Skills live
+ * from sessions[] on every render rather than mutating counters as events
+ * happen (see computeTotalXP, computeStatInfo, loadUnlockedSkillIds, etc.)
+ * — REWARD and PLAYER UPDATE are already handled correctly for free just
+ * by re-rendering, and can't be "lost" the way an incrementally-mutated
+ * counter could, which is exactly what dev-brief §04 (never lose player
+ * data) wants. So VALIDATION here means: derive current truth, diff it
+ * against what the player was last shown, and only the delta needs a
+ * SYSTEM EVENT.
+ *
+ * runSystemChecks() is that single entry point. It doesn't replace
+ * showSystemEvent()/queueCelebration() (still the UI notification layer,
+ * §10) — it's what decides when to call them. Call it after anything that
+ * could have changed derived player state (a render of Home/Character is
+ * enough, since everything downstream is computed from sessions[] at read
+ * time) rather than scattering the individual check*() calls at each call
+ * site. New checks (quest progress, boss-clear, rank-up, future
+ * skill-point awards) get added to the list below as their systems are
+ * built — each one is just another "diff derived state, notify" function
+ * dropped in here, same shape as the two that already exist. */
+function runSystemChecks() {
+  checkAndUnlockAchievements();
+  checkNewlyUnlockedSkills();
+  // Phase 2+: checkQuestProgress(), checkBossClear(), checkRankUp(),
+  // checkSkillPointsAwarded() join this list as each system is built.
+}
+
 /* ---------- navigation ---------- */
 function go(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -2403,7 +2436,7 @@ function renderHome() {
   renderDailyQuests();
   renderWeeklyMissions();
   renderStepsCard();
-  checkAndUnlockAchievements();
+  runSystemChecks();
 }
 
 /** Combined streak across Cindy sessions + Custom Workout sessions. */
@@ -3459,7 +3492,7 @@ function renderXpBar() {
     });
   }
   renderRankTag(info.level);
-  checkNewlyUnlockedSkills();
+  runSystemChecks();
 }
 
 /* ================= RANK / TITLE =================
@@ -4300,7 +4333,7 @@ function renderCharacterSheet() {
   renderCharacterBossTrophyRow();
   renderCharacterRecentLog();
   renderCharacterTitleTag();
-  checkAndUnlockAchievements();
+  runSystemChecks();
   renderPinSettingsUI();
 }
 
