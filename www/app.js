@@ -3947,6 +3947,71 @@ function renderStatusRadar() {
   dots.innerHTML = points.map((p, i) => '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3"></circle>').join('');
 }
 
+/* ================= STATUS WINDOW (Solo-Leveling "Status" screen layout) =====
+ * Re-presents the SAME underlying data as STAT_DEFS/MIND_STAT_DEFS above —
+ * nothing new is tracked or invented — as the classic 5-attribute RPG status
+ * window (STR/VIT/AGI/INT/PER) instead of the radar chart + 2/3-col numeric
+ * grids:
+ *   STR = pull + push volume  (upper-body strength work)
+ *   VIT = legs + core volume  (lower-body/core endurance -> "vitality")
+ *   AGI = cardio volume       (running/movement speed -> "agility")
+ *   INT = Mind INT stat as-is (distinct days with Learning/Focus logged)
+ *   PER = Mind FOCUS stat as-is (lifetime focus-session minutes -> "perception")
+ * All five reuse the exact level curves already defined above
+ * (computeStatInfo / computeMindIntInfo / computeMindVolumeInfo), so a
+ * player's level in each attribute doesn't change from the old layout —
+ * only the grouping and labels do.
+ * HP / MP / FATIGUE are flavor-only numbers derived deterministically from
+ * player level, not a real resource system — this app has no damage/rest
+ * mechanic to drain them, so they always render full. */
+const SOLO_STAT_DEFS = [
+  { key: 'str', label: 'STR' },
+  { key: 'vit', label: 'VIT' },
+  { key: 'agi', label: 'AGI' },
+  { key: 'int', label: 'INT' },
+  { key: 'per', label: 'PER' }
+];
+function computeSoloStats() {
+  const body = loadStatTotals();
+  const mind = loadMindStatTotals();
+  return {
+    str: computeStatInfo(body.pull + body.push),
+    vit: computeStatInfo(body.legs + body.core),
+    agi: computeStatInfo(body.cardio),
+    int: computeMindIntInfo(mind.intelligence),
+    per: computeMindVolumeInfo(mind.focus)
+  };
+}
+function renderStatusWindow() {
+  const grid = document.getElementById('swStatGrid');
+  if (!grid) return;
+  const stats = computeSoloStats();
+  const totalLv = stats.str.level + stats.vit.level + stats.agi.level + stats.int.level + stats.per.level;
+  grid.innerHTML = SOLO_STAT_DEFS.map(def => {
+    return '<div class="sw-stat-row"><span class="sw-stat-icon sw-icon-' + def.key + '"></span>'
+      + '<span class="sw-stat-label">' + def.label + '</span>'
+      + '<span class="sw-stat-value">' + stats[def.key].level + '</span></div>';
+  }).join('') + '<div class="sw-stat-row sw-stat-total"><span class="sw-stat-label">STAT LV TOTAL</span>'
+    + '<span class="sw-stat-value">' + totalLv + '</span></div>';
+
+  const info = computeLevelInfo(computeTotalXP());
+  const maxHp = 100 + (info.level - 1) * 40;
+  const maxMp = 50 + (info.level - 1) * 15;
+  const hpLabel = document.getElementById('swHpLabel');
+  if (hpLabel) hpLabel.textContent = maxHp + ' / ' + maxHp;
+  const mpLabel = document.getElementById('swMpLabel');
+  if (mpLabel) mpLabel.textContent = maxMp + ' / ' + maxMp;
+  const fatigueEl = document.getElementById('swFatigueValue');
+  if (fatigueEl) fatigueEl.textContent = '0';
+
+  const levelEl = document.getElementById('swLevelValue');
+  if (levelEl) levelEl.textContent = info.level;
+  const jobEl = document.getElementById('swJobValue');
+  if (jobEl) jobEl.textContent = 'None';
+  const titleEl = document.getElementById('swTitleValue');
+  if (titleEl) titleEl.textContent = activeTitleText() || 'None';
+}
+
 function renderStatusNumericStats() {
   const body = document.getElementById('characterStatNumericGrid');
   const mind = document.getElementById('characterMindStatNumericGrid');
@@ -4837,6 +4902,7 @@ function renderCharacterSheet() {
   if (tier !== 'recruit') levelBadge.classList.add('lvbadge-' + tier);
 
   renderStatusNumericStats();
+  renderStatusWindow();
   renderFitnessRank('characterFitnessRank');
   renderSkillTree('skillTreeList');
 
