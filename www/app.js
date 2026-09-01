@@ -1313,7 +1313,10 @@ function currentBossState() {
   const customDamage = loadCustomWorkoutSessions()
     .filter(s => s.completedAt >= startTs)
     .reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
-  const damage = cindyDamage + customDamage;
+  const runDamage = loadRunSessions()
+    .filter(s => s.completedAt >= startTs)
+    .reduce((sum, s) => sum + (s.xp || 0), 0);
+  const damage = cindyDamage + customDamage + runDamage;
 
   return {
     weekIndex: idx,
@@ -1370,6 +1373,9 @@ function bossSilhouetteMarkup(bossId) {
  * state. Either way it calls onDone() to hand off to the normal results
  * screen — nothing about that flow changes, this just runs first. */
 function computeBattleTurns(session, isCustom) {
+  if (isCustom === 'run') {
+    return [{ label: 'RUN', dmg: session.xp || 0 }].filter(t => t.dmg > 0);
+  }
   if (isCustom) {
     const byName = {};
     (session.exerciseLog || []).forEach(e => {
@@ -1407,7 +1413,7 @@ function spawnFloatingDamage(stage, dmg, opts) {
 
 let bossBattleTimer = null;
 function startBossBattleCutscene(session, isCustom, onDone) {
-  const sessionDmg = isCustom ? totalVolumeOfCustomSession(session) : session.total.reps;
+  const sessionDmg = isCustom === 'run' ? (session.xp || 0) : (isCustom ? totalVolumeOfCustomSession(session) : session.total.reps);
   const afterState = currentBossState(); // session is already saved by the time this is called
   const beforeDamage = Math.max(0, afterState.damage - sessionDmg);
   const beforeHp = Math.max(0, afterState.targetHp - beforeDamage);
@@ -1974,7 +1980,10 @@ function currentBossDamageBreakdown() {
     .filter(s => cardioIds.has(s.workoutId))
     .reduce((sum, s) => sum + totalVolumeOfCustomSession(s), 0);
 
-  return { pull, push, squat, custom, cardio };
+  const runSessionsThisWeek = loadRunSessions().filter(s => s.completedAt >= startTs);
+  const run = runSessionsThisWeek.reduce((sum, s) => sum + (s.xp || 0), 0);
+
+  return { pull, push, squat, custom, cardio, run };
 }
 /* ---- category totals table (was on Home, moved into the VIEW archive
  * modal — see boss attack log comment above for why) — rendered by
@@ -1990,6 +1999,7 @@ function renderBossDmgBreakdown(containerId) {
   ];
   if (dmg.custom > 0) rows.push({ label: 'CUSTOM', val: dmg.custom, color: 'var(--success)' });
   if (dmg.cardio > 0) rows.push({ label: 'CARDIO', val: dmg.cardio, color: 'var(--danger)' });
+  if (dmg.run > 0) rows.push({ label: 'RUN', val: dmg.run, color: 'var(--run)' });
   const maxVal = Math.max(1, ...rows.map(r => r.val));
   wrap.innerHTML = rows.map(r => {
     const pct = Math.round((r.val / maxVal) * 100);
@@ -7794,8 +7804,11 @@ function finishRunSession() {
   clearRunActive();
 
   lastCompletedRunId = session.id;
-  renderRunCompleteScreen(session);
-  go('runcomplete');
+  go('bossbattle');
+  startBossBattleCutscene(session, 'run', () => {
+    renderRunCompleteScreen(session);
+    go('runcomplete');
+  });
 }
 function renderRunCompleteScreen(session) {
   document.getElementById('runCompleteDistance').textContent = session.distanceKm.toFixed(2);
