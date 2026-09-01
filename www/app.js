@@ -1193,8 +1193,8 @@ function toggleEquipLoot(itemId) {
   }
   renderLootGrid('collectionLootGrid');
   applyActiveMascotSkinFilter();
-  if (document.getElementById('screen-character') && document.getElementById('screen-character').classList.contains('active')) {
-    renderCharacterSheet();
+  if (document.getElementById('screen-home') && document.getElementById('screen-home').classList.contains('active')) {
+    renderHome();
   }
   if (customPlayer) applyCompanionHudSkin();
 }
@@ -2277,29 +2277,45 @@ function runSystemChecks() {
   // checkSkillPointsAwarded() join this list as each system is built.
 }
 
+/* ================= SYSTEM MENU ================= */
+function openSystemMenu() {
+  const overlay=document.getElementById('systemMenuOverlay');
+  const drawer=document.getElementById('systemMenu');
+  if(overlay) overlay.classList.add('active');
+  if(drawer) drawer.classList.add('active');
+}
+function closeSystemMenu(event) {
+  if(event && event.target && event.target.id !== 'systemMenuOverlay') return;
+  const overlay=document.getElementById('systemMenuOverlay');
+  const drawer=document.getElementById('systemMenu');
+  if(overlay) overlay.classList.remove('active');
+  if(drawer) drawer.classList.remove('active');
+}
+
 /* ---------- navigation ---------- */
 function go(name) {
+  const target = document.getElementById('screen-' + name);
+  if (!target) { console.warn('Unknown screen:', name); return; }
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('screen-' + name).classList.add('active');
+  target.classList.add('active');
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => {
     if (t.getAttribute('onclick') === "go('" + name + "')") t.classList.add('active');
   });
-  if (name === 'home') { renderHome(); animateHomeEntrance(); }
+  if (name === 'home') { renderHome(); animateHomeEntrance(); } // internal route = PLAYER STATUS
+  if (name === 'quest') renderQuest();
   if (name === 'program') { renderProgram(); renderProgramHubCards(); }
   if (name === 'cindy') renderProgram();
   if (name === 'history') renderHistory();
-  if (name === 'progress') { renderProgress(); applyReminderToUI(); applyRingGoalsToUI(); }
   if (name === 'customlist') renderCustomList();
   if (name === 'customhistory') renderCustomHistory();
-  if (name === 'customprogress') renderCustomProgress();
   if (name === 'customschedule') renderCustomSchedule();
   if (name === 'collection') renderCollection();
   if (name === 'cardiolist') renderCardioList();
   if (name === 'character') renderCharacterSheet();
   if (name === 'run') renderRunHome();
   if (name === 'trainingcamp') renderTrainingCamp();
-  if (name === 'bossfight') renderBossCard(); // Home already keeps this fresh, but re-render on entry too
+  if (name === 'bossfight') renderBossCard();
 }
 
 /* ================= mobile back-button / nav-gesture trap =================
@@ -2444,19 +2460,28 @@ function ensureLobbyEmbers() {
 })();
 
 function renderHome() {
+  // The old Home destination has been restructured into PLAYER STATUS.
   renderPlayerStatusCard();
-  renderHomeWeeklyPlanCard();
-  renderBossCard();
-  renderBossTeaser();
-  renderWeekRing();
-  renderHomeLastWorkout();
-  renderTreasureChest();
+  renderStatBars('characterStatBarList');
+  renderLifeStatBars('characterLifeStatBarList');
+  renderMindStatBars('characterMindStatBarList');
+  renderStatusRadar();
+  renderStatusDevelopment();
+  renderProgressRecords();
+  renderBodyGrowth();
+  renderSkillTree('skillTreeList');
+  renderCharacterTitleTag();
+  runSystemChecks();
+}
+
+function renderQuest() {
   renderDailyQuests();
   renderWeeklyMissions();
   renderSpecialQuests();
   renderStepsCard();
   runSystemChecks();
 }
+
 
 /** Combined streak across Cindy sessions + Custom Workout sessions. */
 function computeCombinedStreak() {
@@ -3498,6 +3523,16 @@ function renderPlayerStatusCard() {
 
   renderXpBar();
   renderCharacterName();
+  const titleEl = document.getElementById('statusTitleTag');
+  if (titleEl) { const title = activeTitleText(); titleEl.textContent = title ? '「' + title + '」' : ''; }
+
+  const cp = document.getElementById('statusCombatPower');
+  const fp = document.getElementById('statusFitnessPower');
+  const streakEl = document.getElementById('statusStreak');
+  if (cp) cp.textContent = computeCombatPower().toLocaleString();
+  if (fp) fp.textContent = computeFitnessPower().toLocaleString();
+  if (streakEl) streakEl.textContent = String(streak);
+
 }
 
 /* ================= CHARACTER NAME =================
@@ -3839,11 +3874,63 @@ function renderStatBars(containerId) {
   wrap.innerHTML = STAT_DEFS.map(def => {
     const info = computeStatInfo(totals[def.key]);
     return '<div class="stat-bar-row">'
-      + '<div class="stat-bar-top"><span class="stat-bar-label">' + def.short + ' · ' + def.label + '</span><span class="stat-bar-lv">LV.' + info.level + '</span></div>'
+      + '<div class="stat-bar-top"><span class="stat-bar-label">' + def.short + ' · ' + def.label + '</span><span class="stat-bar-lv tabular">' + info.level + '</span></div>'
       + '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + Math.round(info.pct * 100) + '%;background:' + def.color + ';"></div></div>'
       + '</div>';
   }).join('');
 }
+
+/* RPG radar: the five BODY stats are plotted as a pentagon. Values are the
+ * existing stat levels, not a new score, so the chart cannot drift from the
+ * numeric stat readout. */
+function renderStatusRadar() {
+  const svg = document.getElementById('statusRadar');
+  const legend = document.getElementById('statusRadarLegend');
+  if (!svg) return;
+  const totals = loadStatTotals();
+  const items = STAT_DEFS.map(def => ({ def, level: computeStatInfo(totals[def.key]).level }));
+  const maxLevel = Math.max(10, ...items.map(x => x.level));
+  const cx = 120, cy = 120, r = 82, labelR = 103;
+  const pts = items.map((item, i) => {
+    const a = -Math.PI / 2 + (Math.PI * 2 * i / items.length);
+    const rr = r * (item.level / maxLevel);
+    return [cx + Math.cos(a) * rr, cy + Math.sin(a) * rr];
+  });
+  const pointStr = pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
+  const grid = [0.25,0.5,0.75,1].map(scale => {
+    const gp = items.map((_,i) => {
+      const a=-Math.PI/2+(Math.PI*2*i/items.length);
+      return [cx+Math.cos(a)*r*scale,cy+Math.sin(a)*r*scale].map(n=>n.toFixed(1)).join(',');
+    }).join(' ');
+    return '<polygon points="'+gp+'" fill="none" stroke="rgba(141,147,166,.22)" stroke-width="1"/>';
+  }).join('');
+  const axes = items.map((_,i) => {
+    const a=-Math.PI/2+(Math.PI*2*i/items.length);
+    return '<line x1="'+cx+'" y1="'+cy+'" x2="'+(cx+Math.cos(a)*r).toFixed(1)+'" y2="'+(cy+Math.sin(a)*r).toFixed(1)+'" stroke="rgba(141,147,166,.2)" stroke-width="1"/>';
+  }).join('');
+  const labels = items.map((item,i) => {
+    const a=-Math.PI/2+(Math.PI*2*i/items.length);
+    const x=cx+Math.cos(a)*labelR, y=cy+Math.sin(a)*labelR;
+    const anchor = Math.abs(x-cx)<4 ? 'middle' : (x<cx?'end':'start');
+    return '<text x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" text-anchor="'+anchor+'" dominant-baseline="middle" fill="'+item.def.color+'" font-size="9" font-weight="800" letter-spacing=".5">'+item.def.short+'</text>';
+  }).join('');
+  const dots = pts.map(p=>'<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3" fill="var(--text)" stroke="var(--push)" stroke-width="1.5"/>').join('');
+  svg.innerHTML = grid + axes + '<polygon points="'+pointStr+'" fill="rgba(232,35,42,.14)" stroke="var(--push)" stroke-width="2"/>' + dots + labels;
+  if (legend) legend.innerHTML = items.map(item => '<div class="radar-legend-item"><span>'+item.def.short+'</span><strong>'+item.level+'</strong></div>').join('');
+}
+
+function renderStatusDevelopment() {
+  const all = loadSessions();
+  const custom = loadCustomWorkoutSessions();
+  const best = all.reduce((m,s)=>Math.max(m,s.rounds||0),0);
+  const avg = all.length ? all.reduce((sum,s)=>sum+(s.rounds||0),0)/all.length : 0;
+  const total = all.reduce((sum,s)=>sum+(s.total?s.total.reps:0),0) + custom.reduce((sum,s)=>sum+totalVolumeOfCustomSession(s),0);
+  const sessions = all.length + custom.length;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('statusBest',best+' R'); set('statusAverage',avg.toFixed(1)+' R'); set('statusSessions',sessions); set('statusTotalReps',total.toLocaleString());
+  set('statusDevelopmentStreak',computeCombinedStreak()+' DAYS');
+}
+
 
 /* ---- derived "class" flavor title — whichever stat has the most
  * lifetime volume gets a title, so two people at the same level can
@@ -4800,8 +4887,8 @@ function submitFitnessTest() {
   closeModal('fitnessTestModal');
   showToast(wasFirst ? 'บันทึก BASELINE แล้ว — ' + test.label : 'บันทึกผล Test แล้ว', 'target');
   renderTrainingCamp();
-  if (document.getElementById('screen-character') && document.getElementById('screen-character').classList.contains('active')) {
-    renderCharacterSheet();
+  if (document.getElementById('screen-home') && document.getElementById('screen-home').classList.contains('active')) {
+    renderHome();
   }
 }
 
