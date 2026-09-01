@@ -3550,7 +3550,7 @@ function computeSessionXP() {
 }
 function computeTotalXP() {
   const { cindyXP, customXP, runXP } = computeSessionXP();
-  return cindyXP + customXP + runXP + loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP() + loadStepsBonusXP() + loadWeeklyBonusXP() + loadSeasonBonusXP() + loadSpecialQuestBonusXP();
+  return cindyXP + customXP + runXP + loadQuestBonusXP() + loadComboBonusXP() + loadRestSkipBonusXP() + loadStepsBonusXP() + loadWeeklyBonusXP() + loadSeasonBonusXP() + loadSpecialQuestBonusXP() + loadMindBonusXP();
 }
 function xpRequiredForLevel(level) {
   return 100 + (level - 1) * 50;
@@ -3955,6 +3955,200 @@ function renderLifeStatBars(containerId) {
       + '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + Math.round(info.pct * 100) + '%;background:' + def.color + ';"></div></div>'
       + '</div>';
   }).join('');
+}
+
+/* ================= MIND STATS: INT / FOCUS / LEARN (dev brief §7) =================
+ * Body stats (STAT_DEFS) derive from reps already logged; Life stats
+ * (LIFE_STAT_DEFS) derive from streak/plan signals already tracked. Mind
+ * stats had nothing real feeding them — the app had no reading/focus/
+ * learning activity anywhere (see the old comment this replaces) — so
+ * this adds the two small, honest logging actions the brief names
+ * ("Learning Session → INT/LEARN", "Focus Session → FOCUS") and derives
+ * all three stats only from what the player actually logs:
+ *
+ *   LEARN — lifetime minutes logged in the Learning Log (reading, courses,
+ *           study — whatever the player names it). Raw volume, same
+ *           "sum the minutes/reps" shape as the Body stats.
+ *   FOCUS — lifetime minutes logged as completed Focus Sessions. Same
+ *           volume shape as LEARN, separate source so a player who only
+ *           does one of the two doesn't get credit for both.
+ *   INT   — count of distinct calendar days with at least one Learning
+ *           Log entry OR Focus Session, same "unique days" shape already
+ *           used for the Life stat CONSISTENCY (countUniqueActiveDays).
+ *           Volume alone rewards one long cram session; INT instead
+ *           rewards showing up on separate days, which is closer to what
+ *           "intelligence grows over time" actually means.
+ *
+ * Both logs are simple, player-reported minute counts (see
+ * logLearningEntry/logFocusSession below) — same trust model as the PIN
+ * lock and Training Camp fitness tests elsewhere in this file: nothing is
+ * verified, the game trusts the player. */
+const KEY_LEARNING_LOG = 'cindy_learning_log_v1';
+const KEY_FOCUS_SESSIONS = 'cindy_focus_sessions_v1';
+const KEY_MIND_BONUS_XP = 'cindy_mind_bonus_xp';
+const LEARNING_XP_PER_MIN = 2;
+const FOCUS_XP_PER_MIN = 2;
+
+const MIND_STAT_DEFS = [
+  { key: 'intelligence', label: 'INTELLIGENCE', short: 'INT', color: 'var(--web)' },
+  { key: 'focus', label: 'FOCUS', short: 'FOCUS', color: 'var(--core)' },
+  { key: 'learning', label: 'LEARNING', short: 'LEARN', color: 'var(--run)' }
+];
+
+function loadLearningLog() {
+  try { return JSON.parse(localStorage.getItem(KEY_LEARNING_LOG)) || []; }
+  catch (e) { return []; }
+}
+function saveLearningLog(list) {
+  localStorage.setItem(KEY_LEARNING_LOG, JSON.stringify(list));
+}
+function loadFocusSessions() {
+  try { return JSON.parse(localStorage.getItem(KEY_FOCUS_SESSIONS)) || []; }
+  catch (e) { return []; }
+}
+function saveFocusSessions(list) {
+  localStorage.setItem(KEY_FOCUS_SESSIONS, JSON.stringify(list));
+}
+function loadMindBonusXP() {
+  const n = parseInt(localStorage.getItem(KEY_MIND_BONUS_XP), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+function addMindBonusXP(amount) {
+  if (amount <= 0) return;
+  localStorage.setItem(KEY_MIND_BONUS_XP, String(loadMindBonusXP() + amount));
+}
+
+/** Volume curve for LEARN/FOCUS (minutes) — same shape as statReqForLevel
+ * (Body stats), since both are "sum of logged minutes/reps". */
+function mindVolumeReqForLevel(level) {
+  return 30 + (level - 1) * 15;
+}
+function computeMindVolumeInfo(totalMinutes) {
+  let level = 1;
+  let remaining = totalMinutes;
+  let req = mindVolumeReqForLevel(level);
+  while (remaining >= req) {
+    remaining -= req;
+    level++;
+    req = mindVolumeReqForLevel(level);
+  }
+  return { level, pct: req > 0 ? remaining / req : 0 };
+}
+/** Day-count curve for INT — same shape as lifeStatReqForLevel (Life
+ * stats), since both are "count of distinct days". */
+function mindIntReqForLevel(level) {
+  return 5 + (level - 1) * 5;
+}
+function computeMindIntInfo(totalDays) {
+  let level = 1;
+  let remaining = totalDays;
+  let req = mindIntReqForLevel(level);
+  while (remaining >= req) {
+    remaining -= req;
+    level++;
+    req = mindIntReqForLevel(level);
+  }
+  return { level, pct: req > 0 ? remaining / req : 0 };
+}
+function loadMindStatTotals() {
+  const learningLog = loadLearningLog();
+  const focusSessions = loadFocusSessions();
+  const learning = learningLog.reduce((sum, e) => sum + (e.minutes || 0), 0);
+  const focus = focusSessions.reduce((sum, e) => sum + (e.minutes || 0), 0);
+  const days = new Set();
+  learningLog.forEach(e => { if (e.ts) days.add(dayKey(e.ts)); });
+  focusSessions.forEach(e => { if (e.ts) days.add(dayKey(e.ts)); });
+  return { intelligence: days.size, focus, learning };
+}
+function renderMindStatBars(containerId) {
+  const wrap = document.getElementById(containerId || 'mindStatBarList');
+  if (!wrap) return;
+  const totals = loadMindStatTotals();
+  wrap.innerHTML = MIND_STAT_DEFS.map(def => {
+    const info = def.key === 'intelligence' ? computeMindIntInfo(totals[def.key]) : computeMindVolumeInfo(totals[def.key]);
+    return '<div class="stat-bar-row">'
+      + '<div class="stat-bar-top"><span class="stat-bar-label">' + def.short + ' · ' + def.label + '</span><span class="stat-bar-lv">LV.' + info.level + '</span></div>'
+      + '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + Math.round(info.pct * 100) + '%;background:' + def.color + ';"></div></div>'
+      + '</div>';
+  }).join('');
+}
+
+/** Logs one Learning Log entry, awards EXP, fires the SYSTEM notification,
+ * and re-renders every screen that shows XP/Mind stats — same call
+ * sequence used by every other "player did a real thing" action in this
+ * file (e.g. claimQuest / finishRunSession). */
+function logLearningEntry(minutes, topic) {
+  const mins = Math.max(1, Math.round(Number(minutes) || 0));
+  if (!mins) return;
+  const log = loadLearningLog();
+  log.push({ ts: Date.now(), minutes: mins, topic: (topic || '').trim().slice(0, 60) });
+  saveLearningLog(log);
+  const xp = mins * LEARNING_XP_PER_MIN;
+  addMindBonusXP(xp);
+  invalidateXPCache();
+  showSystemEvent({
+    header: 'LEARNING LOGGED',
+    title: topic && topic.trim() ? topic.trim() : mins + ' นาที',
+    rewards: ['+' + xp + ' EXP', '+LEARN', '+INT'],
+    accent: 'var(--run)'
+  });
+  renderXpBar();
+  renderMindStatBars('characterMindStatBarList');
+  showToast('บันทึกการเรียนรู้แล้ว +' + xp + ' EXP');
+}
+/** Same shape as logLearningEntry, for a completed Focus Session. */
+function logFocusSession(minutes) {
+  const mins = Math.max(1, Math.round(Number(minutes) || 0));
+  if (!mins) return;
+  const log = loadFocusSessions();
+  log.push({ ts: Date.now(), minutes: mins });
+  saveFocusSessions(log);
+  const xp = mins * FOCUS_XP_PER_MIN;
+  addMindBonusXP(xp);
+  invalidateXPCache();
+  showSystemEvent({
+    header: 'FOCUS SESSION COMPLETE',
+    title: mins + ' นาที',
+    rewards: ['+' + xp + ' EXP', '+FOCUS', '+INT'],
+    accent: 'var(--core)'
+  });
+  renderXpBar();
+  renderMindStatBars('characterMindStatBarList');
+  showToast('บันทึก Focus Session แล้ว +' + xp + ' EXP');
+}
+
+/* ---- Learning Log / Focus Session modals ---- */
+function openLearningLogModal() {
+  const el = document.getElementById('learningLogModal');
+  if (!el) return;
+  const minInput = document.getElementById('learningLogMinutes');
+  const topicInput = document.getElementById('learningLogTopic');
+  if (minInput) minInput.value = '';
+  if (topicInput) topicInput.value = '';
+  el.classList.add('active');
+}
+function submitLearningLogModal() {
+  const minInput = document.getElementById('learningLogMinutes');
+  const topicInput = document.getElementById('learningLogTopic');
+  const minutes = minInput ? minInput.value : 0;
+  const topic = topicInput ? topicInput.value : '';
+  if (!minutes || Number(minutes) <= 0) { showToast('ใส่จำนวนนาทีด้วย'); return; }
+  logLearningEntry(minutes, topic);
+  closeModal('learningLogModal');
+}
+function openFocusSessionModal() {
+  const el = document.getElementById('focusSessionModal');
+  if (!el) return;
+  const minInput = document.getElementById('focusSessionMinutes');
+  if (minInput) minInput.value = '';
+  el.classList.add('active');
+}
+function submitFocusSessionModal() {
+  const minInput = document.getElementById('focusSessionMinutes');
+  const minutes = minInput ? minInput.value : 0;
+  if (!minutes || Number(minutes) <= 0) { showToast('ใส่จำนวนนาทีด้วย'); return; }
+  logFocusSession(minutes);
+  closeModal('focusSessionModal');
 }
 
 /* ---- Fitness Power vs Combat Power (Phase 2B) ----
@@ -4428,6 +4622,7 @@ function renderCharacterSheet() {
 
   renderStatBars('characterStatBarList');
   renderLifeStatBars('characterLifeStatBarList');
+  renderMindStatBars('characterMindStatBarList');
   renderFitnessRank('characterFitnessRank');
   renderSkillTree('skillTreeList');
 
