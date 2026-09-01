@@ -3458,6 +3458,7 @@ function renderXpBar() {
   }
   renderRankTag(info.level);
   applyMascotBackdrop(info.level);
+  checkNewlyUnlockedSkills();
 }
 
 /* ================= RANK / TITLE =================
@@ -3976,6 +3977,42 @@ function skillFlatBonus(effectKey) {
   const unlocked = loadUnlockedSkillIds();
   return SKILL_DEFS.reduce((sum, s) => (s.effect === effectKey && unlocked.indexOf(s.id) !== -1) ? sum + s.value : sum, 0);
 }
+
+/* ---- new-skill detection for the System Window ----
+ * Skills here unlock silently (derived live from Fitness Rank, see
+ * loadUnlockedSkillIds() above) rather than being granted by a discrete
+ * action, so unlike level-up or boss-defeat there's no natural call site
+ * to announce from. This tracks which skill ids the player has already
+ * been shown and fires showSystemEvent() for any that just appeared —
+ * safe to call from anywhere; a no-op once nothing new has unlocked. */
+const KEY_SEEN_UNLOCKED_SKILLS = 'cindy_seen_unlocked_skills';
+function checkNewlyUnlockedSkills() {
+  const unlocked = loadUnlockedSkillIds();
+  const raw = localStorage.getItem(KEY_SEEN_UNLOCKED_SKILLS);
+  if (raw === null) {
+    // First run on this device (or pre-existing player before this
+    // shipped) — seed silently so nobody gets a flood of "new skill"
+    // popups for skills their Fitness Rank already cleared long ago.
+    localStorage.setItem(KEY_SEEN_UNLOCKED_SKILLS, JSON.stringify(unlocked));
+    return;
+  }
+  let seen = [];
+  try { seen = JSON.parse(raw) || []; } catch (e) { seen = []; }
+  const newlyUnlocked = unlocked.filter(id => seen.indexOf(id) === -1);
+  if (newlyUnlocked.length === 0) return;
+  localStorage.setItem(KEY_SEEN_UNLOCKED_SKILLS, JSON.stringify(unlocked));
+  newlyUnlocked.forEach(s => {
+    const skill = SKILL_DEFS.find(d => d.id === s);
+    if (!skill) return;
+    showSystemEvent({
+      header: 'NEW SKILL UNLOCKED',
+      title: skill.name,
+      rewards: [skill.desc],
+      accent: '#B48CFF'
+    });
+  });
+}
+
 function renderSkillTree(containerId) {
   const wrap = document.getElementById(containerId || 'skillTreeList');
   if (!wrap) return;
