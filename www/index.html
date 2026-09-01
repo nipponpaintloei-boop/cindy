@@ -1898,6 +1898,52 @@ body{
   60%{opacity:1;transform:translateY(0) scale(1.06);}
   100%{opacity:1;transform:translateY(0) scale(1);}
 }
+
+/* ================= SYSTEM WINDOW (dev brief §10/§11) =================
+ * A top-drop banner distinct from both .toast (routine, bottom, no
+ * ceremony) and .celebration-overlay (full-screen, level-up/loot only).
+ * This is the "you have a System" notification — quest-complete today,
+ * rank-up/skill-unlock/boss-clear reuse it in later phases. Driven
+ * entirely by showSystemEvent()/_dismissSystemWindow() in app.js; the
+ * CSS only needs --sys-color/--sys-rgb set on #systemWindow per call. */
+.system-window{
+  position:fixed;top:0;left:50%;z-index:95;
+  width:min(340px,calc(100% - 32px));
+  transform:translate(-50%,-16px) scale(.96);
+  margin-top:max(10px,env(safe-area-inset-top));
+  opacity:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(18,20,27,.97),rgba(12,13,18,.97));
+  border:1px solid rgba(var(--sys-rgb,61,111,224),.55);
+  border-radius:var(--radius-sm);
+  padding:12px 16px 14px;
+  box-shadow:0 0 0 1px rgba(var(--sys-rgb,61,111,224),.12),0 12px 28px rgba(0,0,0,.45),0 0 18px 1px rgba(var(--sys-rgb,61,111,224),.35);
+  transition:opacity .25s ease, transform .3s cubic-bezier(.2,.9,.3,1);
+  --sys-color:#3D6FE0;--sys-rgb:61,111,224;
+}
+.system-window::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(var(--sys-rgb),.5),transparent);
+  height:1px;top:0;opacity:.9;
+}
+.system-window.show{opacity:1;pointer-events:auto;transform:translate(-50%,0) scale(1);}
+.system-window-eyebrow{
+  font-family:var(--font-display);font-size:12px;letter-spacing:5px;
+  color:var(--sys-color);text-shadow:0 0 10px rgba(var(--sys-rgb),.6);
+}
+.system-window-header{
+  margin-top:4px;font-size:11px;font-weight:800;letter-spacing:1.5px;
+  color:var(--text-dim);text-transform:uppercase;
+}
+.system-window-title{
+  margin-top:2px;font-size:15px;font-weight:800;color:var(--text);
+}
+.system-window-rewards{
+  margin-top:6px;display:flex;flex-wrap:wrap;gap:6px 12px;
+}
+.system-window-rewards:empty{display:none;}
+.system-window-rewards span{
+  font-size:12.5px;font-weight:700;color:var(--sys-color);
+}
 .celebration-rarity::after{
   content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;
   background:linear-gradient(115deg,transparent,rgba(255,255,255,.6),transparent);
@@ -5151,6 +5197,21 @@ textarea.note-input::placeholder{color:var(--text-faint);}
     <div class="celebration-subtitle" id="celebrationSubtitle"></div>
     <div class="celebration-rankup" id="celebrationRankup"></div>
   </div>
+</div>
+
+<!-- ---- SYSTEM WINDOW: the "Real-Life System RPG" notification banner
+     (dev brief §10/§11) — slides down from the top for events that are
+     real but not ceremonial enough for the full-screen celebration
+     overlay above (quest complete today; rank-up / skill-unlock / boss-
+     clear wire in the same way in later phases). Never rendered directly
+     by feature code — always via showSystemEvent() in app.js, which
+     queues so back-to-back events (e.g. two quests claimed in the same
+     tick) play one after another instead of cutting each other off. ---- -->
+<div id="systemWindow" class="system-window" aria-live="polite" onclick="dismissSystemWindow()">
+  <div class="system-window-eyebrow">SYSTEM</div>
+  <div class="system-window-header" id="systemWindowHeader"></div>
+  <div class="system-window-title" id="systemWindowTitle"></div>
+  <div class="system-window-rewards" id="systemWindowRewards"></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>

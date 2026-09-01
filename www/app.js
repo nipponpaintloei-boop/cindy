@@ -2123,6 +2123,95 @@ function dismissCelebration() {
   }, CELEBRATION_GAP_MS);
 }
 
+/* ================= SYSTEM CORE — PLAYER STATUS (dev brief §6/§7) =================
+ * Single aggregator over data that's already computed elsewhere (XP/Level,
+ * Rank, Combat Power, Fitness Power, Streak) — nothing new is stored here.
+ * This is the canonical "Player Status" object: any future screen (Status
+ * tab, System Window body, share card) reads from here instead of each
+ * re-deriving level/rank/power on its own, so they can never drift out of
+ * sync with each other. */
+function getPlayerStatus() {
+  const info = computeLevelInfo(computeTotalXP());
+  const rank = rankForLevel(info.level);
+  return {
+    level: info.level,
+    xpIntoLevel: info.xpIntoLevel,
+    xpForNextLevel: info.xpForNextLevel,
+    xpPct: info.pct,
+    rank: rank.title,
+    rankIcon: rank.icon,
+    combatPower: computeCombatPower(),
+    fitnessPower: computeFitnessPower(),
+    streak: computeCombinedStreak()
+  };
+}
+
+/* ================= SYSTEM WINDOW (dev brief §10/§11) =================
+ * The "you have a System" notification banner — sits between .toast
+ * (routine, no ceremony) and the full-screen celebration overlay
+ * (level-up/loot only, see queueCelebration above). Used for events that
+ * are real progress but happen often enough that a full-screen takeover
+ * would get old fast: quest complete today; rank-up / skill-unlock /
+ * boss-clear can call the same showSystemEvent() in later phases.
+ *
+ * Feature code never touches the DOM directly — call showSystemEvent({
+ *   header,   // small eyebrow line, e.g. "QUEST COMPLETE"
+ *   title,    // e.g. the quest/skill/boss name
+ *   rewards,  // array of strings, e.g. ["+120 EXP", "+2 STR"]
+ *   accent    // optional hex color, defaults to system blue
+ * }). Queued the same way celebrations are queued, so two events firing
+ * in the same tick (e.g. claiming two quests back to back) play one after
+ * another instead of the second cutting the first's animation off. */
+const SYSTEM_WINDOW_DURATION_MS = 2400;
+const SYSTEM_WINDOW_GAP_MS = 200;
+const _systemWindowQueue = [];
+let _systemWindowActive = false;
+let _systemWindowTimer = null;
+
+function showSystemEvent(opts) {
+  _systemWindowQueue.push(opts || {});
+  _runSystemWindowQueue();
+}
+function _runSystemWindowQueue() {
+  if (_systemWindowActive || _systemWindowQueue.length === 0) return;
+  _systemWindowActive = true;
+  _renderSystemWindow(_systemWindowQueue.shift());
+}
+function _renderSystemWindow(opts) {
+  const win = document.getElementById('systemWindow');
+  const headerEl = document.getElementById('systemWindowHeader');
+  const titleEl = document.getElementById('systemWindowTitle');
+  const rewardsEl = document.getElementById('systemWindowRewards');
+  if (!win || !headerEl || !titleEl || !rewardsEl) { // markup missing — don't jam the queue
+    _systemWindowActive = false;
+    return;
+  }
+  const color = opts.accent || '#3D6FE0';
+  win.style.setProperty('--sys-color', color);
+  win.style.setProperty('--sys-rgb', hexToRgbTriplet(color));
+  headerEl.textContent = opts.header || '';
+  titleEl.textContent = opts.title || '';
+  rewardsEl.innerHTML = (opts.rewards || []).map(r => '<span>' + r + '</span>').join('');
+
+  win.classList.add('show');
+  vibrate([30, 20, 30]);
+  clearTimeout(_systemWindowTimer);
+  _systemWindowTimer = setTimeout(dismissSystemWindow, SYSTEM_WINDOW_DURATION_MS);
+}
+/** Ends the current System Window early (tap-to-dismiss) or via its own
+ * timeout, then advances the queue after a short gap so the fade-out
+ * isn't cut off by the next one popping in instantly. */
+function dismissSystemWindow() {
+  const win = document.getElementById('systemWindow');
+  if (!win || !win.classList.contains('show')) return;
+  clearTimeout(_systemWindowTimer);
+  win.classList.remove('show');
+  setTimeout(() => {
+    _systemWindowActive = false;
+    _runSystemWindowQueue();
+  }, SYSTEM_WINDOW_GAP_MS);
+}
+
 /* ---------- navigation ---------- */
 function go(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -2777,7 +2866,11 @@ function claimDailyQuest(id, evt) {
     addQuestBonusXP(q.xp);
     renderDailyQuests();
     renderXpBar();
-    showToast('รับเควสสำเร็จ +' + q.xp + ' XP', 'target');
+    showSystemEvent({
+      header: 'QUEST COMPLETE',
+      title: q.title || q.label || '',
+      rewards: ['+' + q.xp + ' EXP']
+    });
   });
 }
 
