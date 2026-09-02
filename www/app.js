@@ -1192,7 +1192,6 @@ function toggleEquipLoot(itemId) {
     showToast('สวมใส่ ' + (item ? item.name : 'ไอเทม') + ' แล้ว');
   }
   renderLootGrid('collectionLootGrid');
-  applyActiveMascotSkinFilter();
   if (document.getElementById('screen-character') && document.getElementById('screen-character').classList.contains('active')) {
     renderCharacterSheet();
   }
@@ -2544,19 +2543,6 @@ function ensureLobbyEmbers() {
   }
   wrap.innerHTML = html;
 }
-(function bindMascotPoke() {
-  document.addEventListener('DOMContentLoaded', function () {
-    const avatar = document.getElementById('mascotAvatar');
-    const spark = document.getElementById('mascotPokeSpark');
-    if (!avatar || !spark) return;
-    avatar.addEventListener('click', function () {
-      spark.classList.remove('play');
-      void spark.offsetWidth;
-      spark.classList.add('play');
-      setTimeout(() => spark.classList.remove('play'), 550);
-    });
-  });
-})();
 
 function renderHome() {
   renderPlayerStatusCard();
@@ -2673,7 +2659,6 @@ function revealTreasureChest() {
     saveOpenedChests(opened);
   }
   renderTreasureChest();
-  applyActiveMascotSkinFilter();
 }
 
 /* ================= DAILY QUEST BOARD =================
@@ -5103,78 +5088,11 @@ const MASCOT_SKINS = [
     aura: 'rgba(255,80,200,.7)', accIcon: 'core', accC1: '#ffc2ee', accC2: '#c71494', strong: true,
     unlock: { type: 'boss', bossId: 'corezero' }, cond: 'ปราบ CORE-ZERO สำเร็จ' }
 ];
-function isSkinUnlocked(skin) {
-  switch (skin.unlock.type) {
-    case 'always': return true;
-    case 'streak': return loadOpenedChests().indexOf(skin.unlock.value) !== -1;
-    case 'level': return loadLastSeenLevel() >= skin.unlock.value;
-    case 'boss': return loadBossEverDefeated().indexOf(skin.unlock.bossId) !== -1;
-    default: return false;
-  }
-}
 function loadActiveSkin() {
   return localStorage.getItem(KEY_ACTIVE_SKIN) || 'default';
 }
 function saveActiveSkin(id) {
   localStorage.setItem(KEY_ACTIVE_SKIN, id);
-}
-/** Applies the current active skin's filter, aura glow, and accessory badge
- * to the mascot avatar. Falls back to plain/no-effects if the saved active
- * skin somehow isn't unlocked anymore. */
-function applyActiveMascotSkinFilter() {
-  const img = document.getElementById('mascotImg');
-  const imgGlow = document.getElementById('mascotImgGlow');
-  const avatar = document.getElementById('mascotAvatar');
-  const accessory = document.getElementById('mascotSkinAccessory');
-  if (!img) return;
-  const skin = MASCOT_SKINS.find(s => s.id === loadActiveSkin()) || MASCOT_SKINS[0];
-  const unlocked = isSkinUnlocked(skin);
-  img.src = (unlocked && skin.img) ? skin.img : 'assets/mascot/mascot.png';
-  img.style.filter = unlocked ? skin.filter : 'none';
-  // glow clone always mirrors the real src so the rank-aura silhouette matches
-  // whichever skin is equipped — its own filter (brightness(0)+drop-shadow) is
-  // set entirely by CSS via .aura-* classes, never touched here
-  if (imgGlow) imgGlow.src = img.src;
-
-  if (avatar) {
-    const hasAura = !!(unlocked && skin.aura);
-    avatar.classList.toggle('skin-glow', hasAura);
-    avatar.classList.toggle('skin-glow-strong', hasAura && !!skin.strong);
-    avatar.style.setProperty('--skin-aura', hasAura ? skin.aura : 'transparent');
-  }
-  if (accessory) {
-    if (unlocked && skin.accIcon) {
-      accessory.innerHTML = skinIconHtml(skin, { glow: !!skin.strong });
-      accessory.classList.add('show');
-    } else {
-      accessory.classList.remove('show');
-    }
-  }
-  renderMascotTitle('mascotSkinTitle', skin, unlocked);
-  applyEquippedLootBadge('mascotLootBadge');
-}
-
-/* ================= TITLES (paired with mascot skins) =================
- * Each unlocked skin's own display name already reads like an RPG title
- * ("นักสู้ 7 วัน", "ตำนาน 100 วัน", "ผู้พิชิต CORE-ZERO"...) — this just
- * surfaces that name as a title chip next to the rank badge instead of
- * introducing a second, separate title system. Default skin shows nothing
- * (rank badge alone covers that case). No longer called from the Home/
- * Character/Companion HUD (their target elements were removed along with
- * the mascot avatar), kept only as a no-op-safe helper for any other
- * caller that still passes an element id.
- */
-function renderMascotTitle(elId, skin, unlocked) {
-  const el = document.getElementById(elId);
-  if (!el) return;
-  if (unlocked && skin.id !== 'default') {
-    el.textContent = skin.name;
-    el.classList.add('show');
-    el.classList.toggle('title-strong', !!skin.strong);
-  } else {
-    el.textContent = '';
-    el.classList.remove('show', 'title-strong');
-  }
 }
 /** Rest-skip bonus visual: a bouncing "+N XP" badge on the timer ring
  * (same pop/scale language as the AMRAP screen's .combo-badge). */
@@ -7679,7 +7597,6 @@ function importDataImpl(event) {
       showToast('นำเข้าข้อมูลแล้ว (' + added + ' รายการใหม่)');
       renderProgress();
       renderCustomList();
-      applyActiveMascotSkinFilter();
     } catch (e) {
       showToast('ไฟล์ไม่ถูกต้อง');
     }
