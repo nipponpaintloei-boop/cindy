@@ -1196,7 +1196,6 @@ function toggleEquipLoot(itemId) {
   if (document.getElementById('screen-character') && document.getElementById('screen-character').classList.contains('active')) {
     renderCharacterSheet();
   }
-  if (customPlayer) applyCompanionHudSkin();
 }
 /** Renders the equipped-loot badge (if any) into the given container id —
  * shared by the Home avatar, Character sheet avatar, and companion HUD. */
@@ -1846,10 +1845,10 @@ function renderBossCard() {
     });
     if (firstTimeEver) {
       queueCelebration({
-        icon: 'palette',
-        title: 'ปลดล็อคสกินใหม่!',
+        icon: 'award',
+        title: 'ปลดล็อค Boss Trophy!',
         subtitle: state.boss.name,
-        rarityLabel: '★ NEW SKIN ★',
+        rarityLabel: '★ NEW TROPHY ★',
         accent: state.boss.accent,
         premium: true
       });
@@ -2631,12 +2630,10 @@ function openTreasureChestModal() {
   const milestone = nextUnclaimedChestMilestone(computeCombinedStreak());
   if (milestone === null) return;
   const info = streakBadgeInfo(milestone);
-  const linkedSkin = MASCOT_SKINS.find(s => s.unlock.type === 'streak' && s.unlock.value === milestone);
   document.getElementById('chestMilestoneLabel').textContent = 'STREAK ' + milestone + ' วัน';
   document.getElementById('chestBadgeEmoji').innerHTML = badgeHtml(info.icon, info.c1, info.c2, { glow: true, ring: true, glowColor: info.glow });
   document.getElementById('chestBadgeTitle').textContent = info.title;
-  document.getElementById('chestBadgeDesc').textContent = info.desc +
-    (linkedSkin ? ' — ปลดล็อคสกิน Mascot "' + linkedSkin.name + '" ด้วย!' : '');
+  document.getElementById('chestBadgeDesc').textContent = info.desc;
   document.getElementById('treasureChestModal').dataset.milestone = String(milestone);
 
   const icon = document.getElementById('chestIcon');
@@ -9293,7 +9290,6 @@ function beginCustomWorkoutPlayerReal(workout) {
   go('customplayer');
   const voiceBtn = document.getElementById('playerVoiceBtn');
   if (voiceBtn) voiceBtn.classList.toggle('sel', isVoiceCuesEnabled());
-  applyCompanionHudSkin();
   beginCustomPlayerPhase();
 }
 
